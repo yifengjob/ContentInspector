@@ -24,6 +24,34 @@ import {logError} from '../error-utils';
 import type {ExtractorResult} from './types';
 import { readFileWithTimeout } from '../file-utils';  // 【新增】导入超时保护工具
 
+// 【关键修复】在模块级别抑制 pdfjs-dist 的警告，防止 OOM
+// 这必须在 require pdfjs-dist 之前执行
+const originalConsoleWarn = console.warn;
+const originalConsoleError = console.error;
+
+console.warn = function(...args: any[]) {
+  const msg = args.join(' ');
+  // 过滤掉 pdfjs-dist 的 canvas 和字体相关警告
+  if (msg.includes('canvas') || 
+      msg.includes('Path2D') || 
+      msg.includes('loadFont') || 
+      msg.includes('fetchStandardFontData') ||
+      msg.includes('CMap')) {
+    return; // 静默忽略
+  }
+  originalConsoleWarn.apply(console, args);
+};
+
+console.error = function(...args: any[]) {
+  const msg = args.join(' ');
+  // 过滤掉 pdfjs-dist 的 canvas 相关错误
+  if (msg.includes('canvas.node') || 
+      msg.includes('Cannot find module')) {
+    return; // 静默忽略
+  }
+  originalConsoleError.apply(console, args);
+};
+
 // 【修复】延迟加载 pdf.js，避免模块级别 require 导致的问题
 let pdfjsLib: any = null;
 let pdfjsInitialized = false;
@@ -34,8 +62,27 @@ function getPdfJsLib() {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
       
+      // 【关键修复】在设置 worker 之前禁用所有警告
+      // pdfjs-dist 有自己的日志系统，需要直接禁用
+      if (pdfjsLib.verbosity !== undefined) {
+        pdfjsLib.verbosity = pdfjsLib.VerbosityLevel.ERRORS; // 只显示错误
+      }
+      
       // 设置 worker
       pdfjsLib.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
+      
+      // 【修复】配置 CMap 和字体路径，防止内存泄漏
+      const path = require('path');
+      const pdfjsDistPath = path.dirname(require.resolve('pdfjs-dist'));
+      
+      pdfjsLib.GlobalWorkerOptions.cMapUrl = path.join(pdfjsDistPath, 'cmaps/') + '/';
+      pdfjsLib.GlobalWorkerOptions.cMapPacked = true;
+      pdfjsLib.GlobalWorkerOptions.standardFontDataUrl = path.join(pdfjsDistPath, 'standard_fonts/') + '/';
+      
+      // 【关键修复】禁用 canvas 相关功能，防止 Worker 中 OOM
+      // 我们只需要文本提取，不需要渲染
+      pdfjsLib.GlobalWorkerOptions.disableFontFace = true;
+      pdfjsLib.GlobalWorkerOptions.useSystemFonts = true;
       
       pdfjsInitialized = true;
     } catch (error) {

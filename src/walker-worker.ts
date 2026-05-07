@@ -80,6 +80,9 @@ async function startWalking(config: WalkerConfig) {
       
       // 检查扩展名
       let shouldProcess: boolean;
+      let isFiltered = false;  // 【新增】是否被过滤
+      let isSkipped = false;   // 【新增】是否被跳过
+      
       if (selectedExtensions.includes('*')) {
         shouldProcess = SUPPORTED_EXTENSIONS.includes(ext);
         console.log(`[Walker] 检查扩展名: ${ext} in SUPPORTED_EXTENSIONS=${SUPPORTED_EXTENSIONS.includes(ext)}`);
@@ -88,7 +91,17 @@ async function startWalking(config: WalkerConfig) {
         console.log(`[Walker] 检查扩展名: ${ext} in selectedExtensions=${selectedExtensions.includes(ext)}`);
       }
       
-      console.log(`[Walker] shouldProcess=${shouldProcess}, size=${stat.size}`);
+      // 扩展名不匹配视为过滤
+      if (!shouldProcess) {
+        isFiltered = true;
+      }
+      
+      // 空文件视为过滤
+      if (stat.size === 0) {
+        isFiltered = true;
+      }
+      
+      console.log(`[Walker] shouldProcess=${shouldProcess}, size=${stat.size}, isFiltered=${isFiltered}, isSkipped=${isSkipped}`);
       
       if (shouldProcess && stat.size > 0) {
         // 检查文件大小
@@ -105,14 +118,18 @@ async function startWalking(config: WalkerConfig) {
               mtime: stat.mtime.toISOString()
             }
           });
+        } else {
+          // 文件过大视为跳过
+          isSkipped = true;
         }
       }
       
       // 发送完成信号
       parentPort?.postMessage({
         type: 'walking-complete',
-        fileCount: shouldProcess && stat.size > 0 ? 1 : 0,
-        skippedCount: shouldProcess && stat.size > 0 ? 0 : 1
+        fileCount: !isFiltered && !isSkipped ? 1 : 0,
+        filteredCount: isFiltered ? 1 : 0,  // 【新增】传递过滤计数
+        skippedCount: isSkipped ? 1 : 0
       });
       return;
     }
@@ -153,6 +170,7 @@ async function startWalking(config: WalkerConfig) {
         parentPort?.postMessage({
           type: 'walking-complete',
           fileCount,
+          filteredCount,  // 【新增】传递过滤计数
           skippedCount
         });
         resolve();
@@ -242,16 +260,16 @@ async function startWalking(config: WalkerConfig) {
         return;
       }
 
-      // 发送文件信息到主线程
-      fileCount++;
-      
-      // 【新增】去重检查（使用 realpath 标准化路径）
+      // 【关键修复】先去重，再计数
       const realPath = path.resolve(filePath);
       if (seenFiles.has(realPath)) {
-        // 已处理过，跳过
+        // 已处理过，跳过（不计入 fileCount）
         return;
       }
       seenFiles.add(realPath);
+      
+      // 发送文件信息到主线程
+      fileCount++;
       
       parentPort?.postMessage({
         type: 'file-found',

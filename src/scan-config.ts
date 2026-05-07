@@ -19,8 +19,8 @@ export const MS_TO_DAYS = 1000 * 60 * 60 * 24;
 /** Consumer Worker 最大旧生代内存（MB）- 提高到 768MB，支持超大型文件解析 */
 export const WORKER_MAX_OLD_GENERATION_MB = 768;
 
-/** Consumer Worker 最大新生代内存（MB）- 提高到 96MB */
-export const WORKER_MAX_YOUNG_GENERATION_MB = 96;
+/** Consumer Worker 最大新生代内存（MB）- 提高到 128MB，减少 GC 压力 */
+export const WORKER_MAX_YOUNG_GENERATION_MB = 128;
 
 // ==================== 超时时间配置 ====================
 
@@ -67,18 +67,18 @@ export const PREVIEW_MAX_TIMEOUT = 20000; // 20 秒
  * @returns 超时时间（毫秒）
  */
 export function calculateParserTimeout(fileSizeBytes: number): number {
-  const sizeMB = fileSizeBytes / BYTES_TO_MB;
-  
-  // 基础超时 + 按大小增长的超时
-  let timeoutMs = PARSER_BASE_TIMEOUT + (sizeMB * PARSER_TIMEOUT_PER_MB);
-  
-  // 限制在最大超时范围内
-  timeoutMs = Math.min(timeoutMs, PARSER_MAX_TIMEOUT);
-  
-  // 确保至少为基础超时
-  timeoutMs = Math.max(timeoutMs, PARSER_BASE_TIMEOUT);
-  
-  return Math.floor(timeoutMs);
+    const sizeMB = fileSizeBytes / BYTES_TO_MB;
+
+    // 基础超时 + 按大小增长的超时
+    let timeoutMs = PARSER_BASE_TIMEOUT + (sizeMB * PARSER_TIMEOUT_PER_MB);
+
+    // 限制在最大超时范围内
+    timeoutMs = Math.min(timeoutMs, PARSER_MAX_TIMEOUT);
+
+    // 确保至少为基础超时
+    timeoutMs = Math.max(timeoutMs, PARSER_BASE_TIMEOUT);
+
+    return Math.floor(timeoutMs);
 }
 
 /**
@@ -87,18 +87,18 @@ export function calculateParserTimeout(fileSizeBytes: number): number {
  * @returns 超时时间（毫秒）
  */
 export function calculateWorkerTimeout(fileSizeBytes: number): number {
-  const sizeMB = fileSizeBytes / BYTES_TO_MB;
-  
-  // 基础超时 + 按大小增长的超时
-  let timeoutMs = WORKER_BASE_TIMEOUT + (sizeMB * WORKER_TIMEOUT_PER_MB);
-  
-  // 限制在最大超时范围内
-  timeoutMs = Math.min(timeoutMs, WORKER_MAX_TIMEOUT);
-  
-  // 确保至少为基础超时
-  timeoutMs = Math.max(timeoutMs, WORKER_BASE_TIMEOUT);
-  
-  return Math.floor(timeoutMs);
+    const sizeMB = fileSizeBytes / BYTES_TO_MB;
+
+    // 基础超时 + 按大小增长的超时
+    let timeoutMs = WORKER_BASE_TIMEOUT + (sizeMB * WORKER_TIMEOUT_PER_MB);
+
+    // 限制在最大超时范围内
+    timeoutMs = Math.min(timeoutMs, WORKER_MAX_TIMEOUT);
+
+    // 确保至少为基础超时
+    timeoutMs = Math.max(timeoutMs, WORKER_BASE_TIMEOUT);
+
+    return Math.floor(timeoutMs);
 }
 
 /**
@@ -107,18 +107,18 @@ export function calculateWorkerTimeout(fileSizeBytes: number): number {
  * @returns 超时时间（毫秒）
  */
 export function calculatePreviewTimeout(fileSizeBytes: number): number {
-  const sizeMB = fileSizeBytes / BYTES_TO_MB;
-  
-  // 基础超时 + 按大小增长的超时
-  let timeoutMs = PREVIEW_BASE_TIMEOUT + (sizeMB * PREVIEW_TIMEOUT_PER_MB);
-  
-  // 限制在最大超时范围内
-  timeoutMs = Math.min(timeoutMs, PREVIEW_MAX_TIMEOUT);
-  
-  // 确保至少为基础超时
-  timeoutMs = Math.max(timeoutMs, PREVIEW_BASE_TIMEOUT);
-  
-  return Math.floor(timeoutMs);
+    const sizeMB = fileSizeBytes / BYTES_TO_MB;
+
+    // 基础超时 + 按大小增长的超时
+    let timeoutMs = PREVIEW_BASE_TIMEOUT + (sizeMB * PREVIEW_TIMEOUT_PER_MB);
+
+    // 限制在最大超时范围内
+    timeoutMs = Math.min(timeoutMs, PREVIEW_MAX_TIMEOUT);
+
+    // 确保至少为基础超时
+    timeoutMs = Math.max(timeoutMs, PREVIEW_BASE_TIMEOUT);
+
+    return Math.floor(timeoutMs);
 }
 
 // ==================== 文件大小限制配置 ====================
@@ -134,9 +134,9 @@ export const MAX_TEXT_CONTENT_SIZE_MB = 25;
 
 /** 文件大小限制配置对象 */
 export const FILE_SIZE_LIMITS = {
-  defaultMaxSizeMB: DEFAULT_MAX_FILE_SIZE_MB,
-  pdfMaxSizeMB: DEFAULT_MAX_PDF_SIZE_MB,
-  maxTextContentSizeMB: MAX_TEXT_CONTENT_SIZE_MB
+    defaultMaxSizeMB: DEFAULT_MAX_FILE_SIZE_MB,
+    pdfMaxSizeMB: DEFAULT_MAX_PDF_SIZE_MB,
+    maxTextContentSizeMB: MAX_TEXT_CONTENT_SIZE_MB
 };
 
 // ==================== PDF 解析配置 ====================
@@ -150,7 +150,7 @@ export const PDF_TOTAL_TIMEOUT_MS = 60000; // 60秒
 /** PDF OCR 功能开关 - 当前未启用，预留扩展接口 */
 export const PDF_OCR_ENABLED = false;
 
-/** 
+/**
  * PDF 纯图页面检测策略
  * - 如果页面没有任何文本项，判定为纯图
  * - OCR 未启用时跳过纯图页面
@@ -176,13 +176,13 @@ export const PREVIEW_CHUNK_SIZE = 1000;
 // ==================== 停滞检测配置 ====================
 
 /** 停滞检测检查间隔（毫秒） */
-export const STAGNATION_CHECK_INTERVAL = 5000; // 5 秒
+export const STAGNATION_CHECK_INTERVAL = 1000; // 1 秒
 
 /** 停滞判定阈值（毫秒） */
-export const STAGNATION_THRESHOLD = 30000; // 30 秒
+export const STAGNATION_THRESHOLD = 15000; // 15 秒
 
 /** 兜底超时时间（毫秒）- 保留作为最后保护 */
-export const MAX_IDLE_TIME = 120000; // 2 分钟
+export const MAX_IDLE_TIME = 120000; //  120 秒
 
 // ==================== IPC 节流配置 ====================
 
@@ -213,7 +213,7 @@ export const LOG_RETENTION_DAYS = 30;
 // ==================== 并发数配置 ====================
 
 /** 每个 Worker 预估内存占用（GB） */
-export const MEMORY_PER_WORKER_GB = 0.25;
+export const MEMORY_PER_WORKER_GB = 0.3;
 
 /** 并发数绝对最大值 */
 export const CONCURRENCY_ABSOLUTE_MAX = 6;
@@ -270,3 +270,17 @@ export const FILE_STAT_TIMEOUT_MS = 3000;  // 3秒
 
 /** 文件关闭超时时间（毫秒） */
 export const FILE_CLOSE_TIMEOUT_MS = 1000;  // 1秒
+
+// ==================== Worker 智能调度配置 ====================
+
+/** 是否启用智能调度（默认启用） */
+export const ENABLE_SMART_SCHEDULING = true;
+
+/** 大文件大小阈值（MB）- 超过此值视为大文件 */
+export const LARGE_FILE_THRESHOLD_MB = 10;
+
+/** 最大并发大文件数 - 防止多个大文件同时处理导致 OOM */
+export const MAX_LARGE_FILES_CONCURRENT = 2;
+
+/** 类型互斥超时时间（毫秒）- 如果超过此时间找不到不同类型，允许同类型 */
+export const TYPE_MUTEX_TIMEOUT_MS = 5000;

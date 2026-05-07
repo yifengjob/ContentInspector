@@ -127,18 +127,9 @@
       </div>
       <div class="status-divider"></div>
       <div class="status-item">
-        <span class="status-label">已扫描：</span>
-        <span class="status-value mono-font">{{ formatNumber(scannedCount) }}{{ totalCount > 0 ? ' / ' + formatNumber(totalCount) : '' }}</span>
-      </div>
-      <div class="status-divider"></div>
-      <div class="status-item">
-        <span class="status-label">已过滤：</span>
-        <span class="status-value mono-font">{{ formatNumber(filteredCount) }}</span>
-      </div>
-      <div class="status-divider"></div>
-      <div class="status-item">
-        <span class="status-label">跳过/错误：</span>
-        <span class="status-value error mono-font">{{ formatNumber(skippedCount) }}</span>
+        <!-- 【修复】已处理 = 已扫描 + 已过滤 + 已跳过，总数 = walker遍历的所有文件 -->
+        <span class="status-label">已处理：</span>
+        <span class="status-value mono-font">{{ formatNumber(scannedCount + filteredCount + skippedCount) }}{{ totalCount > 0 ? ' / ' + formatNumber(totalCount) : '' }}</span>
       </div>
       <div class="status-divider"></div>
       <div class="status-item">
@@ -301,6 +292,15 @@ onMounted(async () => {
     isScanning.value = false
     isCancelling.value = false // 【新增】重置取消状态
     stopElapsedTimeTimer()  // 【UI优化】停止耗时更新定时器
+    
+    // 【关键修复】扫描完成时，确保已处理数等于总数
+    // 已处理 = 已扫描 + 已过滤 + 已跳过 = 总数（walker遍历的所有文件）
+    const expectedTotal = totalCount.value
+    const actualProcessed = scannedCount.value + filteredCount.value + skippedCount.value
+    if (actualProcessed < expectedTotal) {
+      // 修正 scannedCount，使已处理数等于总数
+      scannedCount.value = expectedTotal - filteredCount.value - skippedCount.value
+    }
   })
 
   await onScanError(async (error) => {

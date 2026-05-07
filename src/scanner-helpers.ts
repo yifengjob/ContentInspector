@@ -5,7 +5,13 @@
 
 import {BrowserWindow} from 'electron';
 import {ScanState} from './scan-state';
-import {BYTES_TO_MB, MAX_LOG_ENTRIES, WORKER_BASE_TIMEOUT, WORKER_TIMEOUT_PER_MB, WORKER_MAX_TIMEOUT} from './scan-config';
+import {
+    BYTES_TO_MB,
+    MAX_LOG_ENTRIES,
+    WORKER_BASE_TIMEOUT,
+    WORKER_TIMEOUT_PER_MB,
+    WORKER_MAX_TIMEOUT
+} from './scan-config';
 
 /**
  * 日志级别枚举
@@ -34,8 +40,8 @@ interface LogConfig {
  */
 const DEFAULT_LOG_CONFIG: LogConfig = {
     fileLevel: LogLevel.WARN,
-    frontendLevel: LogLevel.INFO,  // 【修复】改为 INFO，让前端能收到实时日志
-    memoryLevel: LogLevel.INFO
+    frontendLevel: LogLevel.WARN,  // 【修复】改为 INFO，让前端能收到实时日志
+    memoryLevel: LogLevel.WARN,
 };
 
 /**
@@ -65,11 +71,14 @@ export function createLogger(
     const logs = new Array<string>(MAX_LOG_ENTRIES);
     let logIndex = 0;
     let logCount = 0;
-    
+
     // 【性能优化】缓存转换后的数组，避免每次日志都重新创建
     // 注意：此变量通过 scanState.logs 对外提供，供前端读取
     let cachedLogsArray: string[] = [];
     let needsUpdate = false;
+
+    // 【性能优化】限制日志更新频率，防止 OOM
+    let lastLogUpdateTime = 0;
 
     // 【核心】内部日志处理函数
     const logInternal = (msg: string, level: LogLevel = LogLevel.INFO) => {
@@ -77,12 +86,12 @@ export function createLogger(
         const shouldSaveToMemory = level >= config.memoryLevel;
         const shouldSendToFrontend = level >= config.frontendLevel;
         const shouldWriteToFile = level >= config.fileLevel;
-        
+
         // 如果都不需要，直接返回
         if (!shouldSaveToMemory && !shouldSendToFrontend && !shouldWriteToFile) {
             return;
         }
-        
+
         const now = new Date();
         // 【修复】显式指定 Asia/Shanghai 时区，确保显示北京时间
         const timeStr = now.toLocaleTimeString('zh-CN', {
@@ -92,45 +101,38 @@ export function createLogger(
             second: '2-digit',
             timeZone: 'Asia/Shanghai'  // 强制使用北京时间
         });
-        
+
         // 【新增】添加级别前缀
         const levelPrefix = LogLevel[level];
         const logWithTime = `[${timeStr}] [${levelPrefix}] ${msg}`;
 
         // 【优化】只有需要保存到内存时才执行
         if (shouldSaveToMemory) {
-            // 【修复】限制日志数组大小，防止内存泄漏
-            setImmediate(() => {
-                // 【B1 优化】环形缓冲区：O(1) 时间复杂度
-                logs[logIndex % MAX_LOG_ENTRIES] = logWithTime;
-                logIndex++;
-                logCount = Math.min(logCount + 1, MAX_LOG_ENTRIES);
-                
-                // 【性能优化】标记需要更新，但不立即转换
-                needsUpdate = true;
-            });
-            
-            // 【性能优化】延迟批量转换，减少数组创建次数
-            setImmediate(() => {
-                if (needsUpdate) {
-                    // 将环形缓冲区转换为普通数组（供前端显示）
-                    if (logCount < MAX_LOG_ENTRIES) {
-                        // 未满时，直接截取
-                        cachedLogsArray = logs.slice(0, logCount);
-                    } else {
-                        // 已满时，从当前位置开始循环读取
-                        const start = logIndex % MAX_LOG_ENTRIES;
-                        cachedLogsArray = [
-                            ...logs.slice(start),
-                            ...logs.slice(0, start)
-                        ];
-                    }
-                    
-                    // 更新到 scanState
-                    scanState.logs = cachedLogsArray;
-                    needsUpdate = false;
+            // 【B1 优化】环形缓冲区：O(1) 时间复杂度
+            logs[logIndex % MAX_LOG_ENTRIES] = logWithTime;
+            logIndex++;
+            logCount = Math.min(logCount + 1, MAX_LOG_ENTRIES);
+
+            // 【性能优化】限制更新频率，每 50 条日志或每秒更新一次
+            const now = Date.now();
+            if (!lastLogUpdateTime || now - lastLogUpdateTime >= 1000 || logCount % 50 === 0) {
+                // 将环形缓冲区转换为普通数组（供前端显示）
+                if (logCount < MAX_LOG_ENTRIES) {
+                    // 未满时，直接截取
+                    cachedLogsArray = logs.slice(0, logCount);
+                } else {
+                    // 已满时，从当前位置开始循环读取
+                    const start = logIndex % MAX_LOG_ENTRIES;
+                    cachedLogsArray = [
+                        ...logs.slice(start),
+                        ...logs.slice(0, start)
+                    ];
                 }
-            });
+
+                // 更新到 scanState
+                scanState.logs = cachedLogsArray;
+                lastLogUpdateTime = now;
+            }
         }
 
         // 【优化】只有需要发送到前端时才执行
@@ -141,7 +143,7 @@ export function createLogger(
                 }
             });
         }
-        
+
         // 【优化】只有需要写入文件时才执行
         if (shouldWriteToFile) {
             setImmediate(() => {
@@ -149,14 +151,14 @@ export function createLogger(
             });
         }
     };
-    
+
     // 【新增】创建带便捷方法的日志记录器
     const logger = logInternal as Logger;
     logger.debug = (msg: string) => logInternal(msg, LogLevel.DEBUG);
     logger.info = (msg: string) => logInternal(msg, LogLevel.INFO);
     logger.warn = (msg: string) => logInternal(msg, LogLevel.WARN);
     logger.error = (msg: string) => logInternal(msg, LogLevel.ERROR);
-    
+
     return logger;
 }
 
@@ -180,7 +182,7 @@ export function createProgressUpdater(
 ): (currentFile?: string) => void {
     let lastProgressTime = 0;
     let lastScannedCount = 0;
-    
+
     // 【B3 优化】自适应节流参数
     const MIN_THROTTLE = 200;   // 最小间隔 200ms（快速更新）
     const MAX_THROTTLE = 1000;  // 最大间隔 1000ms（慢速更新）
@@ -189,12 +191,12 @@ export function createProgressUpdater(
 
     return (currentFile: string = '') => {
         const now = Date.now();
-        
+
         // 【B3 优化】计算当前扫描速度（文件/秒）
         const timeDiff = (now - lastProgressTime) / 1000; // 转换为秒
         const countDiff = getConsumerProcessedCount() - lastScannedCount;
         const speed = timeDiff > 0 ? countDiff / timeDiff : 0;
-        
+
         // 【B3 优化】根据速度动态调整节流间隔
         let adaptiveInterval = baseThrottleInterval;
         if (speed > FAST_THRESHOLD) {
@@ -204,14 +206,14 @@ export function createProgressUpdater(
             // 慢速扫描：增加更新频率，提升用户体验
             adaptiveInterval = Math.max(MIN_THROTTLE, baseThrottleInterval * 0.7);
         }
-        
+
         if (!lastProgressTime || now - lastProgressTime >= adaptiveInterval) {
             if (mainWindow && !mainWindow.isDestroyed()) {
                 // 【修复】确保 totalCount 不小于 scannedCount，避免 Windows 平台因时序问题导致显示异常
                 const currentScanned = getConsumerProcessedCount();
                 const currentTotal = getWalkerTotalCount();
                 const safeTotalCount = Math.max(currentTotal, currentScanned);
-                
+
                 mainWindow.webContents.send('scan-progress', {
                     currentFile,
                     scannedCount: currentScanned,
@@ -283,16 +285,16 @@ export function sendToMainWindow(
  */
 export function calculateTimeout(fileSize: number): number {
     const sizeMB = fileSize / BYTES_TO_MB;
-    
+
     // 基础超时 + 按大小增长的超时
     let timeoutMs = WORKER_BASE_TIMEOUT + (sizeMB * WORKER_TIMEOUT_PER_MB);
-    
+
     // 限制在最大超时范围内
     timeoutMs = Math.min(timeoutMs, WORKER_MAX_TIMEOUT);
-    
+
     // 确保至少为基础超时
     timeoutMs = Math.max(timeoutMs, WORKER_BASE_TIMEOUT);
-    
+
     return Math.floor(timeoutMs);
 }
 

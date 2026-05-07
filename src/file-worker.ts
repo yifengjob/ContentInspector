@@ -6,6 +6,31 @@
 // 【关键】首先导入日志抑制工具（必须在任何其他导入之前）
 import './log-utils';
 
+// 【新增】拦截 stderr，抑制 PDF 字体警告（防止前端卡死）
+const originalStderrWrite = process.stderr.write;
+process.stderr.write = function(chunk: any, encoding?: BufferEncoding | ((err?: Error | null) => void), cb?: (err?: Error | null) => void): boolean {
+    const str = chunk.toString();
+    // 过滤 PDF.js 的所有警告（包括字体、CMap、canvas 等）
+    if (str.includes('Warning:') && 
+        (str.includes('fetchStandardFontData') || 
+         str.includes('loadFont - translateFont failed') ||
+         str.includes('CMap') ||
+         str.includes('baseUrl') ||
+         str.includes('Path2D') ||
+         str.includes('canvas.node') ||
+         str.includes('TT: undefined') ||
+         str.includes('TT: invalid') ||
+         str.includes('Indexing all PDF objects') ||
+         str.includes('Ran out of space in font'))) {
+        return true;  // 抑制输出
+    }
+    return originalStderrWrite.call(process.stderr, chunk, encoding as any, cb);
+};
+
+// 【新增】设置环境变量抑制 pdfjs-dist 警告（Worker 进程中也需要）
+process.env.PDFJS_DISABLE_WARNINGS = '1';
+process.env.NODE_NO_WARNINGS = '1';
+
 // 【修复】初始化 PDF.js 所需的 polyfill
 import { setupAllPdfPolyfills } from './pdf-polyfills';
 setupAllPdfPolyfills();

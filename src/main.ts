@@ -99,14 +99,35 @@ function setupLogFile() {
     };
 
     console.warn = function (...args) {
-        // 注意：具体的警告过滤已由 log-utils 统一处理
+        // 【关键修复】先检查是否需要抑制警告（与 log-utils 保持一致）
+        const message = args.join(' ');
+        const SUPPRESS_PATTERNS = [
+            'Warning: TT: undefined function',
+            'Warning: TT: invalid offset',
+            'Warning: Indexing all PDF objects',
+            'Warning: Ran out of space in font private use area',
+            'Warning: TT: undefined subroutine',
+            'Warning: TT: invalid glyph index',
+            'Warning: Required "glyf" table is not found -- trying to recover.',
+            'Warning: fetchStandardFontData: failed to fetch file',
+            'Warning: loadFont - translateFont failed:',
+            'Cannot polyfill `Path2D`',
+            'Cannot find module',
+            'canvas.node',
+        ];
+        
+        const shouldSuppress = SUPPRESS_PATTERNS.some(pattern => message.includes(pattern));
+        if (shouldSuppress) {
+            return; // 静默丢弃，不写入日志文件
+        }
+        
         // 【修复】使用本地时间（北京时间），24小时制
         const timestamp = new Date().toLocaleString('zh-CN', {
             timeZone: 'Asia/Shanghai',
             hour12: false  // 24小时制
         });
-        const message = `[${timestamp}] [WARN] ${args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')}\n`;
-        logStream.write(message);
+        const warnMessage = `[${timestamp}] [WARN] ${args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')}\n`;
+        logStream.write(warnMessage);
         originalWarn.apply(console, args);
     };
 

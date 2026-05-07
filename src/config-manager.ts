@@ -196,11 +196,50 @@ export async function saveConfig(config: AppConfig): Promise<void> {
 }
 
 /**
+ * 【修复】获取 macOS 真实可用内存（包括文件系统缓存）
+ * macOS 的 os.freemem() 只返回真正空闲的物理内存，不包括可回收的缓存
+ */
+function getAvailableMemoryGB(): number {
+    if (process.platform === 'darwin') {
+        try {
+            // macOS: 使用 vm_stat 获取真实的可用内存
+            const { execSync } = require('child_process');
+            const output = execSync('vm_stat', { encoding: 'utf-8' });
+            
+            // 解析 vm_stat 输出
+            const pageSizeMatch = output.match(/page size of (\d+) bytes/);
+            const freeMatch = output.match(/Pages free:\s+(\d+)/);
+            const inactiveMatch = output.match(/Pages inactive:\s+(\d+)/);
+            const speculativeMatch = output.match(/Pages speculative:\s+(\d+)/);
+            
+            if (pageSizeMatch && freeMatch && inactiveMatch) {
+                const pageSize = parseInt(pageSizeMatch[1]);
+                const freePages = parseInt(freeMatch[1]);
+                const inactivePages = parseInt(inactiveMatch[1]);
+                const speculativePages = speculativeMatch ? parseInt(speculativeMatch[1]) : 0;
+                
+                // 可用内存 = 空闲页 + 非活跃页 + 推测页（这些都可以被回收）
+                const availableBytes = (freePages + inactivePages + speculativePages) * pageSize;
+                const availableGB = availableBytes / BYTES_TO_GB;
+                
+                return availableGB;
+            }
+        } catch (error) {
+            // 如果失败，降级到 os.freemem()
+            console.warn('[内存计算] vm_stat 失败，使用 os.freemem()');
+        }
+    }
+    
+    // Windows/Linux: 使用 os.freemem()
+    return os.freemem() / BYTES_TO_GB;
+}
+
+/**
  * 根据系统硬件资源智能计算推荐的并发数
  */
 export function calculateRecommendedConcurrency(): number {
     const cpuCount = os.cpus().length;
-    const freeMemoryGB = os.freemem() / BYTES_TO_GB;
+    const freeMemoryGB = getAvailableMemoryGB();
     const maxByMemory = Math.floor(freeMemoryGB * CONCURRENCY_MEMORY_RATIO / MEMORY_PER_WORKER_GB);
     const calculatedMaxConcurrency = Math.min(cpuCount, maxByMemory, CONCURRENCY_ABSOLUTE_MAX);
     return Math.max(calculatedMaxConcurrency, DEFAULT_CONCURRENCY_MIN);
@@ -218,7 +257,7 @@ export function calculateActualConcurrency(configuredConcurrency: number): {
     freeMemoryGB: number;
 } {
     const cpuCount = os.cpus().length;
-    const freeMemoryGB = os.freemem() / BYTES_TO_GB;
+    const freeMemoryGB = getAvailableMemoryGB();
     const maxByMemory = Math.floor(freeMemoryGB * CONCURRENCY_MEMORY_RATIO / MEMORY_PER_WORKER_GB);
     const calculatedMaxConcurrency = Math.min(cpuCount, maxByMemory, CONCURRENCY_ABSOLUTE_MAX);
     const maxAllowedConcurrency = Math.max(calculatedMaxConcurrency, DEFAULT_CONCURRENCY_MIN);
