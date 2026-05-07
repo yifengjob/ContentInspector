@@ -30,7 +30,7 @@ export async function extractWithSheetJS(filePath: string): Promise<ExtractorRes
     const timeoutId = setTimeout(() => {
       if (!isResolved) {
         isResolved = true;
-        console.warn(`[extractWithSheetJS] 解析超时 (${timeoutMs/1000}秒)，跳过: ${path.basename(filePath)}`);
+        logError('extractWithSheetJS', new Error(`解析超时 (${timeoutMs/1000}秒)`), 'warn');
         resolve({ text: '', unsupportedPreview: true });
       }
     }, timeoutMs);
@@ -49,6 +49,13 @@ export async function extractWithSheetJS(filePath: string): Promise<ExtractorRes
           codepage: 65001,  // 【修复】强制 UTF-8 编码，防止中文乱码
           raw: false,  // 【修复】启用原始数据处理
         });
+        
+        // 【关键修复】检查 workbook 是否有效
+        if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+          logError('extractWithSheetJS', new Error('无效的工作簿或空文件'), 'warn');
+          resolve({ text: '', unsupportedPreview: true });
+          return;
+        }
         
         // 提取所有工作表的文本
         let allText = '';
@@ -93,7 +100,7 @@ export async function extractWithSheetJS(filePath: string): Promise<ExtractorRes
           if (errorMsg.includes('password') || 
               errorMsg.includes('encryption') || 
               errorMsg.includes('Encryption')) {
-            console.warn(`[extractWithSheetJS] 文件可能已加密或损坏: ${path.basename(filePath)}`);
+            logError('extractWithSheetJS', new Error('文件可能已加密或损坏'), 'warn');
             resolve({ text: '', unsupportedPreview: true });
             return;
           }
