@@ -5,6 +5,8 @@
  * 此模块提供完整的 polyfill，确保 pdf.js 能正常工作
  */
 
+import {logger} from "./logger";
+
 /**
  * 为 pdf.js 设置浏览器环境 polyfill
  * 必须在加载 pdf.js 之前调用
@@ -39,7 +41,7 @@ export function setupPdfJsPolyfills(context: any = global): void {
       } catch (e) {
         // 在开发环境下输出警告，帮助诊断问题
         if (process.env.NODE_ENV === 'development') {
-          console.warn('[PDF Polyfill] ReadableStream 不可用，pdf.js 可能无法正常工作');
+          logger.warn('[PDF Polyfill] ReadableStream 不可用，pdf.js 可能无法正常工作');
         }
       }
     }
@@ -76,7 +78,7 @@ export function setupPdfJsPolyfills(context: any = global): void {
     // 模拟 HTMLElement 类
     context.HTMLElement = class HTMLElement {};
   } catch (error) {
-    console.error('[PDF Polyfill] 设置失败:', error);
+    logger.error('[PDF Polyfill] 设置失败:', error);
     throw error;
   }
 }
@@ -190,7 +192,7 @@ export function setupAllPdfPolyfills(context: any = global): void {
     setupDomMatrix(context);
     setupPdfJsPolyfills(context);
   } catch (error) {
-    console.error('[PDF Polyfill] 设置失败:', error);
+    logger.error('[PDF Polyfill] 设置失败:', error);
     throw error;
   }
 }

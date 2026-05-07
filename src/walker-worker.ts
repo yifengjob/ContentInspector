@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import { SUPPORTED_EXTENSIONS } from './file-types';
 // 【优化】导入配置常量
 import { BYTES_TO_MB } from './scan-config';
+import {workerLogger} from "./logger";
 
 // 动态导入 walkdir（避免顶层 import 导致的问题）
 let walkdir: any;
@@ -64,7 +65,7 @@ async function startWalking(config: WalkerConfig) {
     try {
       stat = await fs.promises.stat(rootPath);
     } catch (error: any) {
-      console.error(`[Walker] 无法访问路径: ${rootPath}`, error.message);
+      workerLogger.error(`[Walker] 无法访问路径: ${rootPath}`, error.message);
       parentPort?.postMessage({
         type: 'walking-error',
         error: `无法访问路径: ${rootPath}`
@@ -74,9 +75,9 @@ async function startWalking(config: WalkerConfig) {
     
     // 如果是文件，直接处理该文件
     if (stat.isFile()) {
-      console.log(`[Walker] 检测到文件: ${rootPath}, 大小: ${stat.size} bytes`);
+      workerLogger.info(`[Walker] 检测到文件: ${rootPath}, 大小: ${stat.size} bytes`);
       const ext = path.extname(rootPath).toLowerCase().replace('.', '');
-      console.log(`[Walker] 文件扩展名: '${ext}'`);
+      workerLogger.info(`[Walker] 文件扩展名: '${ext}'`);
       
       // 检查扩展名
       let shouldProcess: boolean;
@@ -85,10 +86,10 @@ async function startWalking(config: WalkerConfig) {
       
       if (selectedExtensions.includes('*')) {
         shouldProcess = SUPPORTED_EXTENSIONS.includes(ext);
-        console.log(`[Walker] 检查扩展名: ${ext} in SUPPORTED_EXTENSIONS=${SUPPORTED_EXTENSIONS.includes(ext)}`);
+        workerLogger.info(`[Walker] 检查扩展名: ${ext} in SUPPORTED_EXTENSIONS=${SUPPORTED_EXTENSIONS.includes(ext)}`);
       } else {
         shouldProcess = selectedExtensions.includes(ext);
-        console.log(`[Walker] 检查扩展名: ${ext} in selectedExtensions=${selectedExtensions.includes(ext)}`);
+        workerLogger.info(`[Walker] 检查扩展名: ${ext} in selectedExtensions=${selectedExtensions.includes(ext)}`);
       }
       
       // 扩展名不匹配视为过滤
@@ -100,8 +101,8 @@ async function startWalking(config: WalkerConfig) {
       if (stat.size === 0) {
         isFiltered = true;
       }
-      
-      console.log(`[Walker] shouldProcess=${shouldProcess}, size=${stat.size}, isFiltered=${isFiltered}, isSkipped=${isSkipped}`);
+
+      workerLogger.info(`[Walker] shouldProcess=${shouldProcess}, size=${stat.size}, isFiltered=${isFiltered}, isSkipped=${isSkipped}`);
       
       if (shouldProcess && stat.size > 0) {
         // 检查文件大小
@@ -159,7 +160,7 @@ async function startWalking(config: WalkerConfig) {
       const seenFiles = new Set<string>();
       
       // 【调试】输出 walker 配置
-      console.log(`[Walker] 创建 walker: rootPath=${rootPath}, follow_symlinks=false`);
+      workerLogger.info(`[Walker] 创建 walker: rootPath=${rootPath}, follow_symlinks=false`);
       
       // 【新增】超时保护 - 如果 30 秒内没有完成，强制 resolve（调试用）
       const timeoutId = setTimeout(() => {
@@ -337,7 +338,7 @@ async function processNextTask() {
   while (taskQueue.length > 0 || isWalking) {
     if (taskQueue.length === 0) {
       // 队列为空，等待新任务
-      console.log(`[Walker] 队列为空，等待新任务`);
+      workerLogger.info(`[Walker] 队列为空，等待新任务`);
       parentPort?.postMessage({
         type: 'walker-log',
         message: `[Walker] 队列为空，等待新任务`
@@ -346,7 +347,7 @@ async function processNextTask() {
     }
     
     const config = taskQueue.shift();
-    console.log(`[Walker] 开始遍历: ${config.rootPath}`);
+    workerLogger.info(`[Walker] 开始遍历: ${config.rootPath}`);
     parentPort?.postMessage({
       type: 'walker-log',
       message: `[Walker] 开始遍历: ${config.rootPath}`
@@ -358,8 +359,8 @@ async function processNextTask() {
       // 遍历完成
       isWalking = false;
       const queueLength = taskQueue.length;
-      console.log(`[Walker] .then() 回调被调用: ${config.rootPath}`);
-      console.log(`[Walker] 遍历完成: ${config.rootPath}, 队列长度: ${queueLength}`);
+      workerLogger.info(`[Walker] .then() 回调被调用: ${config.rootPath}`);
+      workerLogger.info(`[Walker] 遍历完成: ${config.rootPath}, 队列长度: ${queueLength}`);
       parentPort?.postMessage({
         type: 'walker-log',
         message: `[Walker] 遍历完成: ${config.rootPath}, 队列长度: ${queueLength}`
@@ -370,7 +371,7 @@ async function processNextTask() {
         error: error.message || String(error)
       });
       isWalking = false;
-      console.log(`[Walker] 从队列中取出下一个任务（错误恢复）: ${taskQueue.length > 0 ? taskQueue[0].rootPath : 'none'}`);
+      workerLogger.info(`[Walker] 从队列中取出下一个任务（错误恢复）: ${taskQueue.length > 0 ? taskQueue[0].rootPath : 'none'}`);
     }
   }
 }
@@ -379,7 +380,7 @@ parentPort?.on('message', (message: any) => {
   if (message.type === 'start-walking') {
     // 【修复】如果正在遍历，将任务加入队列
     if (isWalking) {
-      console.log(`[Walker] 正在遍历中，将任务加入队列: ${message.config.rootPath}`);
+      workerLogger.info(`[Walker] 正在遍历中，将任务加入队列: ${message.config.rootPath}`);
       taskQueue.push(message.config);
       return;
     }
@@ -390,7 +391,7 @@ parentPort?.on('message', (message: any) => {
     void processNextTask(); // 启动迭代处理（忽略返回值）
   } else if (message.type === 'cancel-all') {
     // 【内存安全】清空所有待处理的任务
-    console.log(`[Walker] 收到取消信号，清空队列 (${taskQueue.length} 个任务)`);
+    workerLogger.info(`[Walker] 收到取消信号，清空队列 (${taskQueue.length} 个任务)`);
     taskQueue.length = 0;
     isWalking = false;
   }

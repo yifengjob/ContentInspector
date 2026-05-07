@@ -5,9 +5,9 @@ import * as fs from 'fs';
 // 【关键】首先导入日志抑制工具（必须在任何其他导入之前）
 import './log-utils';
 
-// 【新增】设置环境变量抑制 pdfjs-dist 警告
-process.env.PDFJS_DISABLE_WARNINGS = '1';
-process.env.NODE_NO_WARNINGS = '1';
+// 【新增】设置日志文件
+import { setupFileLogger, mainLogger } from './logger';
+setupFileLogger();
 
 // 【新增】启用 V8 垃圾回收 API（用于扫描完成后释放内存）
 app.commandLine.appendSwitch('js-flags', '--expose-gc');
@@ -43,107 +43,13 @@ import {
     LOG_RETENTION_DAYS// 【方案 C】预览文件大小限制
 } from './scan-config';
 
-// 【新增】设置日志文件
-function setupLogFile() {
-    const logDir = path.join(app.getPath('userData'), 'logs');
-    if (!fs.existsSync(logDir)) {
-        fs.mkdirSync(logDir, {recursive: true});
-    }
-
-    // 【修复】使用北京时间生成日志文件名
-    const now = new Date();
-    // 直接格式化为北京时间的字符串
-    const beijingTimeStr = now.toLocaleString('zh-CN', {
-        timeZone: 'Asia/Shanghai',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-    });
-    // 将 "2026/5/1 18:45:50" 转换为 "2026-05-01T18-45-50"
-    const timeStr = beijingTimeStr
-        .replace(/\//g, '-')
-        .replace(/ /g, 'T')
-        .replace(/:/g, '-');
-    const logFile = path.join(logDir, `app-${timeStr}.log`);
-    const logStream = fs.createWriteStream(logFile, {flags: 'a'});
-
-    // 重定向 console 输出到文件
-    const originalLog = console.log;
-    const originalError = console.error;
-    const originalWarn = console.warn;
-
-    console.log = function (...args) {
-        // 【修复】使用本地时间（北京时间），24小时制
-        const timestamp = new Date().toLocaleString('zh-CN', {
-            timeZone: 'Asia/Shanghai',
-            hour12: false  // 24小时制
-        });
-        const message = `[${timestamp}] [INFO] ${args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')}\n`;
-        logStream.write(message);
-        originalLog.apply(console, args);
-    };
-
-    console.error = function (...args) {
-        // 【修复】使用本地时间（北京时间），24小时制
-        const timestamp = new Date().toLocaleString('zh-CN', {
-            timeZone: 'Asia/Shanghai',
-            hour12: false  // 24小时制
-        });
-        const message = `[${timestamp}] [ERROR] ${args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')}\n`;
-        logStream.write(message);
-        originalError.apply(console, args);
-    };
-
-    console.warn = function (...args) {
-        // 【关键修复】先检查是否需要抑制警告（与 log-utils 保持一致）
-        const message = args.join(' ');
-        const SUPPRESS_PATTERNS = [
-            'Warning: TT: undefined function',
-            'Warning: TT: invalid offset',
-            'Warning: Indexing all PDF objects',
-            'Warning: Ran out of space in font private use area',
-            'Warning: TT: undefined subroutine',
-            'Warning: TT: invalid glyph index',
-            'Warning: Required "glyf" table is not found -- trying to recover.',
-            'Warning: fetchStandardFontData: failed to fetch file',
-            'Warning: loadFont - translateFont failed:',
-            'Cannot polyfill `Path2D`',
-            'Cannot find module',
-            'canvas.node',
-        ];
-        
-        const shouldSuppress = SUPPRESS_PATTERNS.some(pattern => message.includes(pattern));
-        if (shouldSuppress) {
-            return; // 静默丢弃，不写入日志文件
-        }
-        
-        // 【修复】使用本地时间（北京时间），24小时制
-        const timestamp = new Date().toLocaleString('zh-CN', {
-            timeZone: 'Asia/Shanghai',
-            hour12: false  // 24小时制
-        });
-        const warnMessage = `[${timestamp}] [WARN] ${args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')}\n`;
-        logStream.write(warnMessage);
-        originalWarn.apply(console, args);
-    };
-
-    console.log(`日志文件已创建: ${logFile}`);
-}
-
-// 在应用启动时设置日志文件
-setupLogFile();
-
 // 【修复】添加全局未处理异常处理器，防止 Windows 闪退
 process.on('unhandledRejection', (reason, _promise) => {
-    console.error('[全局错误] 未处理的 Promise Rejection:', reason);
+    mainLogger.error('[全局错误] 未处理的 Promise Rejection:', reason);
 });
 
 process.on('uncaughtException', (error) => {
-    console.error('[全局错误] 未捕获的异常:', error);
+    mainLogger.error('[全局错误] 未捕获的异常:', error);
     // 【关键】不退出进程，让应用继续运行
     // 注意：某些致命错误（如 OOM）可能无法阻止退出
 });
@@ -156,7 +62,7 @@ process.on('exit', (code) => {
         timeZone: 'Asia/Shanghai',
         hour12: false  // 24小时制
     });
-    console.log(`[进程退出] 代码: ${code}, 时间: ${timestamp}`);
+    mainLogger.info(`[进程退出] 代码: ${code}, 时间: ${timestamp}`);
 });
 
 let mainWindow: BrowserWindow | null = null;
@@ -190,12 +96,12 @@ function getWindowBounds(): { x?: number; y?: number; width: number; height: num
         const x = workArea.x + Math.floor((workArea.width - width) / 2);
         const y = workArea.y + Math.floor((workArea.height - height) / 2);
 
-        console.log(`窗口位置: (${x}, ${y}), 尺寸: ${width}x${height}`);
-        console.log(`显示器工作区: ${workArea.width}x${workArea.height}, 缩放: ${display.scaleFactor}x`);
+        mainLogger.info(`窗口位置: (${x}, ${y}), 尺寸: ${width}x${height}`);
+        mainLogger.info(`显示器工作区: ${workArea.width}x${workArea.height}, 缩放: ${display.scaleFactor}x`);
 
         return {x, y, width, height};
     } catch (error) {
-        console.error('计算窗口位置失败，使用默认值:', error);
+        mainLogger.error('计算窗口位置失败，使用默认值:', error);
         // 降级方案：使用默认尺寸，系统会自动居中
         return {width: WINDOW_DEFAULT_WIDTH, height: WINDOW_DEFAULT_HEIGHT};
     }
@@ -213,15 +119,15 @@ function createWindow() {
             ? path.join(__dirname, '../build/icon.icns')
             : path.join(__dirname, '../build/icon.png');
 
-        console.log('尝试加载图标，路径:', iconPath);
+        mainLogger.info('尝试加载图标，路径:', iconPath);
         if (fs.existsSync(iconPath)) {
             icon = nativeImage.createFromPath(iconPath);
-            console.log('✓ 图标加载成功，尺寸:', icon.getSize());
+            mainLogger.info('✓ 图标加载成功，尺寸:', icon.getSize());
         } else {
-            console.warn('⚠ 图标文件不存在:', iconPath);
+            mainLogger.warn('⚠ 图标文件不存在:', iconPath);
         }
     } catch (error) {
-        console.error('✗ 加载图标失败:', error);
+        mainLogger.error('✗ 加载图标失败:', error);
     }
 
     mainWindow = new BrowserWindow({
@@ -246,7 +152,7 @@ function createWindow() {
     // macOS下设置Dock图标（开发模式）
     if (process.platform === 'darwin' && icon && !icon.isEmpty()) {
         app.dock.setIcon(icon);
-        console.log('✓ 已设置Dock图标');
+        mainLogger.info('✓ 已设置Dock图标');
     }
 
     // 检查是否为开发模式
@@ -255,17 +161,17 @@ function createWindow() {
         process.env.ELECTRON_IS_DEV === '1' ||
         !require('fs').existsSync(path.join(__dirname, '../dist/renderer/index.html'));
 
-    console.log('运行模式:', isDev ? '开发模式 (Vite)' : '生产模式 (文件)');
+    mainLogger.info('运行模式:', isDev ? '开发模式 (Vite)' : '生产模式 (文件)');
 
     if (isDev) {
-        console.log('加载开发服务器: http://localhost:1420');
+        mainLogger.info('加载开发服务器: http://localhost:1420');
         mainWindow.loadURL('http://localhost:1420').catch((err) => {
-            console.error('加载开发服务器失败:', err);
-            console.log('尝试加载本地文件...');
+            mainLogger.error('加载开发服务器失败:', err);
+            mainLogger.info('尝试加载本地文件...');
             // 如果开发服务器不可用，尝试加载本地文件
             if (mainWindow) {
                 mainWindow.loadFile(path.join(__dirname, '../dist/renderer/index.html')).catch((fileErr) => {
-                    console.error('加载本地文件也失败:', fileErr);
+                    mainLogger.error('加载本地文件也失败:', fileErr);
                 });
             }
         });
@@ -274,26 +180,26 @@ function createWindow() {
         // 生产模式：使用 app.getAppPath() 获取正确的路径
         const appPath = app.getAppPath();
         const indexPath = path.join(appPath, 'dist', 'renderer', 'index.html');
-        console.log('应用路径:', appPath);
-        console.log('加载本地文件:', indexPath);
+        mainLogger.info('应用路径:', appPath);
+        mainLogger.info('加载本地文件:', indexPath);
 
         // 检查文件是否存在
         const fs = require('fs');
         if (!fs.existsSync(indexPath)) {
-            console.error('前端文件不存在:', indexPath);
+            mainLogger.error('前端文件不存在:', indexPath);
             // 尝试其他可能的路径
             const altPath = path.join(__dirname, '..', 'dist', 'renderer', 'index.html');
-            console.log('尝试备用路径:', altPath);
+            mainLogger.info('尝试备用路径:', altPath);
             if (fs.existsSync(altPath)) {
                 mainWindow.loadFile(altPath).catch((err) => {
-                    console.error('加载备用路径失败:', err);
+                    mainLogger.error('加载备用路径失败:', err);
                 });
             } else {
-                console.error('所有路径都失败，请检查打包配置');
+                mainLogger.error('所有路径都失败，请检查打包配置');
             }
         } else {
             mainWindow.loadFile(indexPath).catch((err) => {
-                console.error('加载前端文件失败:', err);
+                mainLogger.error('加载前端文件失败:', err);
             });
         }
     }
@@ -308,7 +214,7 @@ function createWindow() {
         // 【新增】窗口关闭时停止电源阻止器
         if (powerSaveBlockerId !== null) {
             powerSaveBlocker.stop(powerSaveBlockerId);
-            console.log(`[电源管理] 窗口关闭，已停止电源阻止器 (ID: ${powerSaveBlockerId})`);
+            mainLogger.info(`[电源管理] 窗口关闭，已停止电源阻止器 (ID: ${powerSaveBlockerId})`);
             powerSaveBlockerId = null;
         }
         
@@ -389,12 +295,12 @@ function setupIpcHandlers() {
             // 【新增】启动电源阻止器，防止锁屏/休眠导致扫描中断
             if (powerSaveBlockerId === null && !powerSaveBlocker.isStarted(0)) {
                 powerSaveBlockerId = powerSaveBlocker.start('prevent-app-suspension');
-                console.log(`[电源管理] 已启动电源阻止器 (ID: ${powerSaveBlockerId})，防止系统休眠`);
+                mainLogger.info(`[电源管理] 已启动电源阻止器 (ID: ${powerSaveBlockerId})，防止系统休眠`);
             }
             
             // 不 await，让扫描在后台进行
             startScan(config, mainWindow, scanState).catch(error => {
-                console.error('扫描异常:', error);
+                mainLogger.error('扫描异常:', error);
                 if (mainWindow) {
                     mainWindow.webContents.send('scan-error', error.message);
                 }
@@ -418,12 +324,12 @@ function setupIpcHandlers() {
             const checkInterval = setInterval(() => {
                 if (!scanState.isScanning) {
                     clearInterval(checkInterval);
-                    console.log('[scan-cancel] 扫描已安全取消');
+                    mainLogger.info('[scan-cancel] 扫描已安全取消');
                     
                     // 【新增】停止电源阻止器
                     if (powerSaveBlockerId !== null) {
                         powerSaveBlocker.stop(powerSaveBlockerId);
-                        console.log(`[电源管理] 已停止电源阻止器 (ID: ${powerSaveBlockerId})`);
+                        mainLogger.info(`[电源管理] 已停止电源阻止器 (ID: ${powerSaveBlockerId})`);
                         powerSaveBlockerId = null;
                     }
                     
@@ -435,14 +341,14 @@ function setupIpcHandlers() {
             setTimeout(() => {
                 clearInterval(checkInterval);
                 if (scanState.isScanning) {
-                    console.warn(`[scan-cancel] 警告: 等待 ${CANCEL_SCAN_MAX_WAIT / 1000} 秒后扫描仍未结束，强制重置状态`);
+                    mainLogger.warn(`[scan-cancel] 警告: 等待 ${CANCEL_SCAN_MAX_WAIT / 1000} 秒后扫描仍未结束，强制重置状态`);
                     scanState.isScanning = false;
                 }
                 
                 // 【新增】停止电源阻止器
                 if (powerSaveBlockerId !== null) {
                     powerSaveBlocker.stop(powerSaveBlockerId);
-                    console.log(`[电源管理] 已停止电源阻止器 (ID: ${powerSaveBlockerId})`);
+                    mainLogger.info(`[电源管理] 已停止电源阻止器 (ID: ${powerSaveBlockerId})`);
                     powerSaveBlockerId = null;
                 }
                 
@@ -487,7 +393,7 @@ function setupIpcHandlers() {
                         const stat = await fs.promises.stat(filePath);
                         return calculatePreviewTimeout(stat.size);
                     } catch (error) {
-                        console.warn('[预览] 无法获取文件大小，使用默认超时');
+                        mainLogger.warn('[预览] 无法获取文件大小，使用默认超时');
                         return PREVIEW_BASE_TIMEOUT; // 使用基础超时
                     }
                 };
@@ -600,7 +506,7 @@ function setupIpcHandlers() {
     ipcMain.handle('cancel-preview', (_, taskId: number) => {
         const worker = previewWorkers.get(taskId);
         if (worker) {
-            console.log(`[预览取消] 终止 Worker (taskId: ${taskId})`);
+            mainLogger.info(`[预览取消] 终止 Worker (taskId: ${taskId})`);
             worker.terminate();  // 强制终止
             previewWorkers.delete(taskId);  // 清理
         }
@@ -748,7 +654,7 @@ function setupIpcHandlers() {
                 for (const logFile of logFiles) {
                     // 跳过当前正在使用的日志文件
                     if (logFile === currentLogFile) {
-                        console.log(`[clear-cache] 保留当前日志: ${logFile}`);
+                        mainLogger.info(`[clear-cache] 保留当前日志: ${logFile}`);
                         continue;
                     }
 
@@ -761,7 +667,7 @@ function setupIpcHandlers() {
                             cleanedFiles.push(`logs/${logFile}`);
                         }
                     } catch (e) {
-                        console.warn(`[clear-cache] 无法删除日志文件 ${logFile}:`, e);
+                        mainLogger.warn(`[clear-cache] 无法删除日志文件 ${logFile}:`, e);
                     }
                 }
 
@@ -770,9 +676,9 @@ function setupIpcHandlers() {
                 if (fs.existsSync(currentLogPath)) {
                     try {
                         fs.writeFileSync(currentLogPath, '');
-                        console.log('[clear-cache] 已清空当前日志文件内容');
+                        mainLogger.info('[clear-cache] 已清空当前日志文件内容');
                     } catch (e) {
-                        console.warn('[clear-cache] 清空当前日志失败:', e);
+                        mainLogger.warn('[clear-cache] 清空当前日志失败:', e);
                     }
                 }
             }
@@ -799,12 +705,12 @@ function setupIpcHandlers() {
             }
 
             const cleanedSizeMB = Math.round(cleanedSize / BYTES_TO_MB);
-            console.log(`[clear-cache] 缓存清理完成，释放 ${cleanedSizeMB} MB 空间`);
-            console.log(`[clear-cache] 清理的文件: ${cleanedFiles.join(', ') || '无'}`);
+            mainLogger.info(`[clear-cache] 缓存清理完成，释放 ${cleanedSizeMB} MB 空间`);
+            mainLogger.info(`[clear-cache] 清理的文件: ${cleanedFiles.join(', ') || '无'}`);
 
             return {success: true, cleanedSize, cleanedFiles};
         } catch (error: any) {
-            console.error('[clear-cache] 清理缓存失败:', error);
+            mainLogger.error('[clear-cache] 清理缓存失败:', error);
             return {error: error.message};
         }
     });
@@ -832,7 +738,7 @@ function setupScanFinishedListener() {
                 // 扫描完成时停止电源阻止器
                 if (powerSaveBlockerId !== null) {
                     powerSaveBlocker.stop(powerSaveBlockerId);
-                    console.log(`[电源管理] 扫描完成，已停止电源阻止器 (ID: ${powerSaveBlockerId})`);
+                    mainLogger.info(`[电源管理] 扫描完成，已停止电源阻止器 (ID: ${powerSaveBlockerId})`);
                     powerSaveBlockerId = null;
                 }
             }

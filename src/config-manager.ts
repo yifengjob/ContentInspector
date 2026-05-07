@@ -5,22 +5,19 @@ import {app} from 'electron';
 import {AppConfig} from './types';
 // 【优化】导入配置常量
 import {
-    DEFAULT_MAX_FILE_SIZE_MB,
-    DEFAULT_MAX_PDF_SIZE_MB,
-    MEMORY_PER_WORKER_GB,
+    BYTES_TO_GB,
     CONCURRENCY_ABSOLUTE_MAX,
     CONCURRENCY_MEMORY_RATIO,
     DEFAULT_CONCURRENCY_CPU_RATIO,
     DEFAULT_CONCURRENCY_MAX,
     DEFAULT_CONCURRENCY_MIN,
-    BYTES_TO_GB
+    DEFAULT_MAX_FILE_SIZE_MB,
+    DEFAULT_MAX_PDF_SIZE_MB,
+    MEMORY_PER_WORKER_GB
 } from './scan-config';
 // 【D3 优化】导入错误处理工具
-import {
-    createConfigLoadError,
-    createConfigSaveError,
-    logError
-} from './error-utils';
+import {createConfigSaveError,} from './error-utils';
+import {logger} from "./logger";
 
 const CONFIG_FILE = path.join(app.getPath('userData'), 'config.json');
 
@@ -178,8 +175,8 @@ export async function loadConfig(): Promise<AppConfig> {
 
             return mergedConfig;
         }
-    } catch (error) {
-        logError('loadConfig', createConfigLoadError(error));
+    } catch (error: any) {
+        logger.error(`loadConfig: ${error.message}`);
     }
 
     return getDefaultConfig();
@@ -189,8 +186,8 @@ export async function saveConfig(config: AppConfig): Promise<void> {
     try {
         const data = JSON.stringify(config, null, 2);
         await fs.promises.writeFile(CONFIG_FILE, data, 'utf-8');
-    } catch (error) {
-        logError('saveConfig', createConfigSaveError(error));
+    } catch (error: any) {
+        logger.error(`saveConfig: ${error.message}`);
         throw createConfigSaveError(error);
     }
 }
@@ -203,33 +200,31 @@ function getAvailableMemoryGB(): number {
     if (process.platform === 'darwin') {
         try {
             // macOS: 使用 vm_stat 获取真实的可用内存
-            const { execSync } = require('child_process');
-            const output = execSync('vm_stat', { encoding: 'utf-8' });
-            
+            const {execSync} = require('child_process');
+            const output = execSync('vm_stat', {encoding: 'utf-8'});
+
             // 解析 vm_stat 输出
             const pageSizeMatch = output.match(/page size of (\d+) bytes/);
             const freeMatch = output.match(/Pages free:\s+(\d+)/);
             const inactiveMatch = output.match(/Pages inactive:\s+(\d+)/);
             const speculativeMatch = output.match(/Pages speculative:\s+(\d+)/);
-            
+
             if (pageSizeMatch && freeMatch && inactiveMatch) {
                 const pageSize = parseInt(pageSizeMatch[1]);
                 const freePages = parseInt(freeMatch[1]);
                 const inactivePages = parseInt(inactiveMatch[1]);
                 const speculativePages = speculativeMatch ? parseInt(speculativeMatch[1]) : 0;
-                
+
                 // 可用内存 = 空闲页 + 非活跃页 + 推测页（这些都可以被回收）
                 const availableBytes = (freePages + inactivePages + speculativePages) * pageSize;
-                const availableGB = availableBytes / BYTES_TO_GB;
-                
-                return availableGB;
+                return availableBytes / BYTES_TO_GB;
             }
         } catch (error) {
             // 如果失败，降级到 os.freemem()
-            console.warn('[内存计算] vm_stat 失败，使用 os.freemem()');
+            logger.warn('[内存计算] vm_stat 失败，使用 os.freemem()');
         }
     }
-    
+
     // Windows/Linux: 使用 os.freemem()
     return os.freemem() / BYTES_TO_GB;
 }
@@ -264,17 +259,17 @@ export function calculateActualConcurrency(configuredConcurrency: number): {
 
     // 【调试】输出详细的计算过程（仅开发环境）
     if (process.env.NODE_ENV === 'development') {
-        console.log(`[并发数计算] CPU: ${cpuCount}核, 可用内存: ${freeMemoryGB.toFixed(1)}GB`);
-        console.log(`[并发数计算] 内存限制: ${maxByMemory}, CPU限制: ${cpuCount}, 绝对最大值: ${CONCURRENCY_ABSOLUTE_MAX}`);
-        console.log(`[并发数计算] 计算最大值: ${calculatedMaxConcurrency}, 最大允许值: ${maxAllowedConcurrency}`);
-        console.log(`[并发数计算] 配置值: ${configuredConcurrency}`);
+        logger.info(`[并发数计算] CPU: ${cpuCount}核, 可用内存: ${freeMemoryGB.toFixed(1)}GB`);
+        logger.info(`[并发数计算] 内存限制: ${maxByMemory}, CPU限制: ${cpuCount}, 绝对最大值: ${CONCURRENCY_ABSOLUTE_MAX}`);
+        logger.info(`[并发数计算] 计算最大值: ${calculatedMaxConcurrency}, 最大允许值: ${maxAllowedConcurrency}`);
+        logger.info(`[并发数计算] 配置值: ${configuredConcurrency}`);
     }
 
     let actualConcurrency: number;
     if (configuredConcurrency && configuredConcurrency > 0) {
         actualConcurrency = Math.min(configuredConcurrency, maxAllowedConcurrency);
         if (process.env.NODE_ENV === 'development') {
-            console.log(`[并发数计算] 使用配置值: min(${configuredConcurrency}, ${maxAllowedConcurrency}) = ${actualConcurrency}`);
+            logger.info(`[并发数计算] 使用配置值: min(${configuredConcurrency}, ${maxAllowedConcurrency}) = ${actualConcurrency}`);
         }
     } else {
         // 【优化】更保守的默认并发数，避免 CPU 过载
@@ -285,12 +280,12 @@ export function calculateActualConcurrency(configuredConcurrency: number): {
             DEFAULT_CONCURRENCY_MAX
         );
         if (process.env.NODE_ENV === 'development') {
-            console.log(`[并发数计算] 使用自动计算: min(max(floor(${cpuCount} * ${DEFAULT_CONCURRENCY_CPU_RATIO}), ${DEFAULT_CONCURRENCY_MIN}), ${DEFAULT_CONCURRENCY_MAX}) = ${actualConcurrency}`);
+            logger.info(`[并发数计算] 使用自动计算: min(max(floor(${cpuCount} * ${DEFAULT_CONCURRENCY_CPU_RATIO}), ${DEFAULT_CONCURRENCY_MIN}), ${DEFAULT_CONCURRENCY_MAX}) = ${actualConcurrency}`);
         }
     }
 
     if (process.env.NODE_ENV === 'development') {
-        console.log(`[并发数计算] 最终并发数: ${actualConcurrency}`);
+        logger.info(`[并发数计算] 最终并发数: ${actualConcurrency}`);
     }
 
     return {

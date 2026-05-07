@@ -12,6 +12,7 @@
 import { unzipSync, strFromU8 } from 'fflate';
 import { FILE_READ_TIMEOUT_STANDARD_MS } from './scan-config';  // 【新增】导入超时配置
 import { readFileWithTimeout } from './file-utils';
+import {logger} from "./logger";
 
 /**
  * ZIP 文件条目
@@ -101,7 +102,7 @@ export function extractEntriesText(
     try {
       return strFromU8(entry.data);
     } catch (error) {
-      console.warn(`无法解码条目 ${entry.name}:`, error);
+      logger.warn(`无法解码条目 ${entry.name}:`, error);
       return '';
     }
   }).filter(text => text.trim().length > 0);

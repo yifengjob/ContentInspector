@@ -10,18 +10,10 @@ import {
     MAX_LOG_ENTRIES,
     WORKER_BASE_TIMEOUT,
     WORKER_TIMEOUT_PER_MB,
-    WORKER_MAX_TIMEOUT
+    WORKER_MAX_TIMEOUT, SCAN_LOG_FILE_LEVEL, SCAN_LOG_FRONTEND_LEVEL, SCAN_LOG_MEMORY_LEVEL
 } from './scan-config';
+import {LogLevel} from "./types";
 
-/**
- * 日志级别枚举
- */
-export enum LogLevel {
-    DEBUG = 0,    // 调试信息（最详细，仅开发环境）
-    INFO = 1,     // 一般信息（默认级别）
-    WARN = 2,     // 警告信息
-    ERROR = 3     // 错误信息（最重要）
-}
 
 /**
  * 日志配置
@@ -39,9 +31,9 @@ interface LogConfig {
  * - 内存：记录 INFO 及以上（保留必要历史）
  */
 const DEFAULT_LOG_CONFIG: LogConfig = {
-    fileLevel: LogLevel.WARN,
-    frontendLevel: LogLevel.WARN,  // 【修复】改为 INFO，让前端能收到实时日志
-    memoryLevel: LogLevel.WARN,
+    fileLevel: SCAN_LOG_FILE_LEVEL,
+    frontendLevel: SCAN_LOG_FRONTEND_LEVEL,
+    memoryLevel: SCAN_LOG_MEMORY_LEVEL,
 };
 
 /**
@@ -57,6 +49,13 @@ export interface Logger {
 
 /**
  * 创建日志函数（支持分级控制 + 便捷方法）
+ *
+ * 【注意】这是扫描器专用的高性能日志记录器，与 logger.ts 中的 createLogger 不同：
+ * - ✅ 环形缓冲区优化（O(1) 时间复杂度）
+ * - ✅ 前端 IPC 实时通信
+ * - ✅ 自适应更新频率（防止 OOM）
+ * - ❌ 依赖 ScanState 和 BrowserWindow（仅适用于 scanner.ts）
+ *
  * @param scanState 扫描状态
  * @param mainWindow 主窗口
  * @param config 日志配置（可选）
@@ -75,7 +74,6 @@ export function createLogger(
     // 【性能优化】缓存转换后的数组，避免每次日志都重新创建
     // 注意：此变量通过 scanState.logs 对外提供，供前端读取
     let cachedLogsArray: string[] = [];
-    let needsUpdate = false;
 
     // 【性能优化】限制日志更新频率，防止 OOM
     let lastLogUpdateTime = 0;

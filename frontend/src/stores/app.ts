@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type {ScanResultItem, AppConfig, DirectoryNode} from '@/types'
 // 【D2 优化】导入 UI 配置常量
-import { UI_BATCH_UPDATE_INTERVAL, UI_LOG_BATCH_INTERVAL } from '@/config/ui-config'
+import {MAX_FRONTEND_LOGS, UI_BATCH_UPDATE_INTERVAL, UI_LOG_BATCH_INTERVAL} from '@/config/ui-config'
 
 export const useAppStore = defineStore('app', () => {
   // 扫描结果
@@ -140,10 +140,7 @@ export const useAppStore = defineStore('app', () => {
   
   // 【新增】日志版本号，用于触发 watch
   const logVersion = ref(0)
-  
-  // 【新增】前端日志最大长度（防止内存泄漏）
-  const MAX_FRONTEND_LOGS = 2000
-  
+
   function addScanResult(item: ScanResultItem) {
     pendingResults.push(item)
     

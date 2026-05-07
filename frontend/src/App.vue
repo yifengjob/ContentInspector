@@ -473,7 +473,6 @@ const getThemeTooltip = () => {
   width: 1.5em; /* 相对于按钮字体 */
   height: 1.5em;
   flex-shrink: 0;
-  /* 【修复】移除 color: currentColor，让 SVG 自然继承父元素的 color */
   fill: currentColor;
   transition: color 0.3s ease; /* 主题切换时图标颜色平滑过渡 */
 }
@@ -724,6 +723,7 @@ const getThemeTooltip = () => {
   /* 【优化】使用主题色，自动适配明暗主题 */
   /* 注：如果浏览器不支持 rgb(from ...), 会使用 fallback 值 */
   background-color: rgba(250, 173, 20, 0.1);  /* fallback: 亮色主题 */
+  color: var(--success-color);
   background-color: rgb(from var(--success-color) r g b / 0.1);  /* 现代浏览器 */
   border-radius: 4px;
 }
@@ -731,13 +731,12 @@ const getThemeTooltip = () => {
 .power-icon {
   width: 16px;
   height: 16px;
-  color: var(--success-color);
+  fill: currentColor;
   /* 【优化】闪电图标呼吸效果，类似扫描状态 */
   animation: power-breathe 1.5s ease-in-out infinite;
 }
 
 .power-text {
-  color: var(--success-color);
   font-weight: 500;
   font-size: 12px;
 }

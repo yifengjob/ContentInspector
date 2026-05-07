@@ -5,6 +5,7 @@ import * as ExcelJS from 'exceljs';
 import { getSensitiveRules } from './sensitive-detector';
 // 【优化】导入配置常量
 import { BYTES_TO_MB } from './scan-config';
+import {logger} from "./logger";
 
 export async function exportReport(
   results: ScanResultItem[],
@@ -47,7 +48,7 @@ export async function exportReport(
         throw new Error(`不支持的导出格式: ${format}`);
     }
   } catch (error) {
-    console.error('[Export] 导出失败:', error);
+    logger.error('[Export] 导出失败:', error);
     throw error;
   }
 }

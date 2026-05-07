@@ -3,9 +3,8 @@ import './log-utils';
 
 import * as path from 'path';
 // 【重构】从 file-types.ts 导入配置和辅助函数
-import { getFileExtractor, SUPPORTED_EXTENSIONS } from './file-types';
-// 【D3 优化】导入错误处理工具
-import { logError } from './error-utils';
+import { getFileExtractor } from './file-types';
+import {fileLogger} from "./logger";
 
 /**
  * 从文件中提取文本的主入口函数
@@ -30,7 +29,7 @@ export async function extractTextFromFile(filePath: string): Promise<{ text: str
     // 不支持的文件类型
     return { text: '', unsupportedPreview: true };
   } catch (error: any) {
-    logError('extractTextFromFile', error);
+    fileLogger.error('extractTextFromFile: ', error.message);
     throw error;
   }
 }

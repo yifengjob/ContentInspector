@@ -5,6 +5,8 @@
 
 // ==================== 单位转换常量 ====================
 
+import {LogLevel} from "./types";
+
 /** 字节到 MB 的转换因子 */
 export const BYTES_TO_MB = 1024 * 1024;
 
@@ -284,3 +286,13 @@ export const MAX_LARGE_FILES_CONCURRENT = 2;
 
 /** 类型互斥超时时间（毫秒）- 如果超过此时间找不到不同类型，允许同类型 */
 export const TYPE_MUTEX_TIMEOUT_MS = 5000;
+
+// ==================== 扫描日志级别配置 ====================
+/** 扫描日志文件级别 */
+export const SCAN_LOG_FILE_LEVEL: LogLevel = LogLevel.WARN;
+
+/** 扫描日志前端级别 */
+export const SCAN_LOG_FRONTEND_LEVEL: LogLevel = LogLevel.INFO;
+
+/** 扫描日志内存级别 */
+export const SCAN_LOG_MEMORY_LEVEL: LogLevel = LogLevel.INFO;

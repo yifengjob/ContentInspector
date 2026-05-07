@@ -4,10 +4,9 @@
  */
 
 import * as fs from 'fs';
-import * as path from 'path';
 import * as XLSX from 'xlsx';
 import { calculateParserTimeout, FILE_READ_TIMEOUT_STANDARD_MS } from '../scan-config';  // 【新增】导入超时配置
-import { logError } from '../error-utils';
+import { extractorLogger } from '../logger';
 import type { ExtractorResult } from './types';
 import { readFileWithTimeout } from '../file-utils';
 
@@ -20,7 +19,7 @@ export async function extractWithSheetJS(filePath: string): Promise<ExtractorRes
   try {
     stat = await fs.promises.stat(filePath);
   } catch (error: any) {
-    logError('extractWithSheetJS', error);
+    extractorLogger.error(`extractWithSheetJS: ${error.message}`);
     return { text: '', unsupportedPreview: true };
   }
   
@@ -30,7 +29,7 @@ export async function extractWithSheetJS(filePath: string): Promise<ExtractorRes
     const timeoutId = setTimeout(() => {
       if (!isResolved) {
         isResolved = true;
-        logError('extractWithSheetJS', new Error(`解析超时 (${timeoutMs/1000}秒)`), 'warn');
+        extractorLogger.warn(`extractWithSheetJS: 解析超时 (${timeoutMs/1000}秒)`);
         resolve({ text: '', unsupportedPreview: true });
       }
     }, timeoutMs);
@@ -52,7 +51,7 @@ export async function extractWithSheetJS(filePath: string): Promise<ExtractorRes
         
         // 【关键修复】检查 workbook 是否有效
         if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
-          logError('extractWithSheetJS', new Error('无效的工作簿或空文件'), 'warn');
+          extractorLogger.warn('extractWithSheetJS: 无效的工作簿或空文件');
           resolve({ text: '', unsupportedPreview: true });
           return;
         }
@@ -100,12 +99,12 @@ export async function extractWithSheetJS(filePath: string): Promise<ExtractorRes
           if (errorMsg.includes('password') || 
               errorMsg.includes('encryption') || 
               errorMsg.includes('Encryption')) {
-            logError('extractWithSheetJS', new Error('文件可能已加密或损坏'), 'warn');
+            extractorLogger.warn('extractWithSheetJS: 文件可能已加密或损坏');
             resolve({ text: '', unsupportedPreview: true });
             return;
           }
           
-          logError('extractWithSheetJS', error);
+          extractorLogger.error(`extractWithSheetJS: ${error.message}`);
           resolve({ text: '', unsupportedPreview: true });
         }
       }

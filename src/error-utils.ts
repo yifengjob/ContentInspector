@@ -214,27 +214,6 @@ export function convertNodeError(error: any, filePath?: string, context?: string
 }
 
 /**
- * 错误日志记录器
- * @param context 错误发生的上下文（如模块名、函数名）
- * @param error 错误对象
- * @param level 日志级别（error 或 warn）
- */
-export function logError(context: string, error: any, level: 'error' | 'warn' = 'error'): void {
-  const logFunction = level === 'error' ? console.error : console.warn;
-  
-  if (error instanceof AppError) {
-    // 结构化错误，输出简洁信息
-    logFunction(`[${context}] [${error.code}] ${error.message}`);
-    if (error.originalError) {
-      logFunction(`[原始错误]`, error.originalError.message || error.originalError);
-    }
-  } else {
-    // 非结构化错误，输出完整信息
-    logFunction(`[${context}]`, error?.message || error);
-  }
-}
-
-/**
  * 检查是否为 AppError 实例
  */
 export function isAppError(error: any): error is AppError {

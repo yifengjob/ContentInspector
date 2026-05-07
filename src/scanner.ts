@@ -230,7 +230,7 @@ export async function startScan(
                     return ((freePages + inactivePages + speculativePages) * pageSize) / BYTES_TO_MB;
                 }
             } catch (error) {
-                console.warn('[内存计算] vm_stat 失败，使用 os.freemem()');
+                log.warn('[内存计算] vm_stat 失败，使用 os.freemem()');
             }
             return os.freemem() / BYTES_TO_MB;
         })()

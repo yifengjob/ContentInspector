@@ -13,3 +13,7 @@ export const UI_LOG_BATCH_INTERVAL = 300;  // 【优化】从 200ms 增加到 30
 
 /** 搜索防抖延迟（毫秒） */
 export const UI_SEARCH_DEBOUNCE_DELAY = 300;
+
+// ==================== UI 优化配置 ====================
+/** 前端日志最大长度（防止内存泄漏） */
+export const MAX_FRONTEND_LOGS = 2000;

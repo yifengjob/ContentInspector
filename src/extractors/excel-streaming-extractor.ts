@@ -6,11 +6,10 @@
  */
 
 import * as fs from 'fs';
-import * as path from 'path';
 import { createReadStream } from 'fs';
 import * as ExcelJS from 'exceljs';
 import { calculateParserTimeout } from '../scan-config';
-import { logError } from '../error-utils';
+import { extractorLogger } from '../logger';
 import type { ExtractorResult } from './types';
 
 export async function extractWithExcelJS(filePath: string): Promise<ExtractorResult> {
@@ -22,7 +21,7 @@ export async function extractWithExcelJS(filePath: string): Promise<ExtractorRes
   try {
     stat = await fs.promises.stat(filePath);
   } catch (error: any) {
-    logError('extractWithExcelJS', error);
+    extractorLogger.error(`extractWithExcelJS: ${error.message}`);
     return { text: '', unsupportedPreview: true };
   }
   
@@ -32,7 +31,7 @@ export async function extractWithExcelJS(filePath: string): Promise<ExtractorRes
     const timeoutId = setTimeout(() => {
       if (!isResolved) {
         isResolved = true;
-        console.warn(`[extractWithExcelJS] 解析超时 (${timeoutMs/1000}秒)，跳过: ${path.basename(filePath)}`);
+        extractorLogger.warn(`extractWithExcelJS: 解析超时 (${timeoutMs/1000}秒)`);
         resolve({ text: '', unsupportedPreview: true });
       }
     }, timeoutMs);
@@ -101,7 +100,7 @@ export async function extractWithExcelJS(filePath: string): Promise<ExtractorRes
         clearTimeout(timeoutId);
         if (!isResolved) {
           isResolved = true;
-          logError('extractWithExcelJS', error);
+          extractorLogger.error(`extractWithExcelJS: ${error.message}`);
           resolve({ text: '', unsupportedPreview: true });
         }
       }

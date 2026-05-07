@@ -78,3 +78,13 @@ export interface EnvironmentCheck {
   isReady: boolean;
   issues: EnvironmentIssue[];
 }
+
+/**
+ * 日志级别枚举
+ */
+export enum LogLevel {
+  DEBUG = 0,
+  INFO = 1,
+  WARN = 2,
+  ERROR = 3
+}

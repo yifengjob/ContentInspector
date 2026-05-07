@@ -91,13 +91,10 @@ export function addSuppressPatterns(patterns: string[]): void {
 export function restoreConsoleWarn(): void {
     // 注意：这只恢复 console.warn，不恢复 stderr
     // 如果需要完全恢复，需要保存更多的原始引用
-    console.warn = function (...args: any[]) {
-        const message = args.join(' ');
-        const originalWarn = (console as any)._originalWarn;
-        if (originalWarn) {
-            originalWarn.apply(console, args);
-        }
-    };
+    const originalWarn = (console as any)._originalWarn;
+    if (originalWarn) {
+        console.warn = originalWarn;
+    }
 }
 
 // 【关键】模块加载时立即执行抑制逻辑

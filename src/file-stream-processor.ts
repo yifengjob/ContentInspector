@@ -315,7 +315,7 @@ export class FileStreamProcessor {
 
     // 【扫描模式】累加计数
     if (enabledTypes.length > 0) {
-      this.accumulateCounts(newHighlights, chunk);
+      this.accumulateCounts(newHighlights);
     }
 
     return newHighlights;
@@ -324,12 +324,8 @@ export class FileStreamProcessor {
   /**
    * 累加敏感词计数 (扫描模式)
    */
-  private accumulateCounts(
-    highlights: HighlightRange[],
-    chunk: string
-  ): void {
+  private accumulateCounts(highlights: HighlightRange[]): void {
     for (const highlight of highlights) {
-      const keyword = chunk.substring(highlight.start, highlight.end);
       this.accumulatedCounts[highlight.typeId] = 
         (this.accumulatedCounts[highlight.typeId] || 0) + 1;
       this.totalCount++;
