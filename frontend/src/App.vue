@@ -128,7 +128,7 @@
       <div class="status-divider"></div>
       <div class="status-item">
         <!-- 【修复】已处理 = 已扫描 + 已过滤 + 已跳过，总数 = walker遍历的所有文件 -->
-        <span class="status-label">已处理：</span>
+        <span class="status-label">进度：</span>
         <span class="status-value mono-font">{{ formatNumber(scannedCount + filteredCount + skippedCount) }}{{ totalCount > 0 ? ' / ' + formatNumber(totalCount) : '' }}</span>
       </div>
       <div class="status-divider"></div>
