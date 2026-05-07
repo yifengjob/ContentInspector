@@ -473,7 +473,8 @@ const getThemeTooltip = () => {
   width: 1.5em; /* 相对于按钮字体 */
   height: 1.5em;
   flex-shrink: 0;
-  color: currentColor;
+  /* 【修复】移除 color: currentColor，让 SVG 自然继承父元素的 color */
+  fill: currentColor;
   transition: color 0.3s ease; /* 主题切换时图标颜色平滑过渡 */
 }
 
@@ -533,7 +534,7 @@ const getThemeTooltip = () => {
 }
 
 .theme-toggle .btn-icon {
-  color: var(--text-color); /* 明确指定使用主题文本颜色 */
+  //color: var(--text-color); /* 明确指定使用主题文本颜色 */
   transition: color 0.2s ease;
 }
 
@@ -723,25 +724,25 @@ const getThemeTooltip = () => {
   /* 【优化】使用主题色，自动适配明暗主题 */
   /* 注：如果浏览器不支持 rgb(from ...), 会使用 fallback 值 */
   background-color: rgba(250, 173, 20, 0.1);  /* fallback: 亮色主题 */
-  background-color: rgb(from var(--warning-color) r g b / 0.1);  /* 现代浏览器 */
+  background-color: rgb(from var(--success-color) r g b / 0.1);  /* 现代浏览器 */
   border-radius: 4px;
 }
 
 .power-icon {
   width: 16px;
   height: 16px;
-  color: var(--warning-color);
+  color: var(--success-color);
   /* 【优化】闪电图标呼吸效果，类似扫描状态 */
   animation: power-breathe 1.5s ease-in-out infinite;
 }
 
 .power-text {
-  color: var(--warning-color);
+  color: var(--success-color);
   font-weight: 500;
   font-size: 12px;
 }
 
-/* 【优化】闪电图标呼吸动画 */
+/* 【优化】图标呼吸动画 */
 @keyframes power-breathe {
   0%, 100% {
     opacity: 1;

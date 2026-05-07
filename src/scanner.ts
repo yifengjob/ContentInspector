@@ -801,21 +801,24 @@ export async function startScan(
         // 安全终止 Worker
         safelyTerminateWorker(consumer.worker, consumer, log);
 
-        // 删除并重建 Consumer
-        const consumerId = consumer.id;
-        consumers.delete(consumerId);
-        createConsumer(consumerId);
-
-        // 强制 GC
-        if ((global as any).gc) {
-            log.info(`[Worker重启] 执行强制垃圾回收...${taskId !== undefined ? ` (任务 ${taskId})` : ''}`);
-            (global as any).gc();
-        }
-
-        // 延迟调度新任务
+        // 【修复】延迟 100ms 确保旧 Worker 完全终止后再创建新 Worker
         setTimeout(() => {
-            tryDispatch();
-        }, 50);
+            // 删除并重建 Consumer
+            const consumerId = consumer.id;
+            consumers.delete(consumerId);
+            createConsumer(consumerId);
+
+            // 强制 GC
+            if ((global as any).gc) {
+                log.info(`[Worker重启] 执行强制垃圾回收...${taskId !== undefined ? ` (任务 ${taskId})` : ''}`);
+                (global as any).gc();
+            }
+
+            // 延迟调度新任务
+            setTimeout(() => {
+                tryDispatch();
+            }, 50);
+        }, 100);
     }
 
     /**

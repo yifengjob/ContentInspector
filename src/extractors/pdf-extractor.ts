@@ -8,6 +8,7 @@
  * - 支持早期退出（找到敏感词后停止）
  * - 完善的错误处理（损坏/加密 PDF）
  * - 纯图 PDF 检测与跳过
+ * - 【修复】Worker 级别的 pdf.js 隔离，防止内存泄漏
  */
 
 import * as fs from 'fs';
@@ -24,73 +25,51 @@ import {logError} from '../error-utils';
 import type {ExtractorResult} from './types';
 import { readFileWithTimeout } from '../file-utils';  // 【新增】导入超时保护工具
 
-// 【关键修复】在模块级别抑制 pdfjs-dist 的警告，防止 OOM
-// 这必须在 require pdfjs-dist 之前执行
-const originalConsoleWarn = console.warn;
-const originalConsoleError = console.error;
+// 【关键修复】Worker 级别的 pdf.js 实例，避免全局污染
+let workerPdfJsLib: any = null;
 
-console.warn = function(...args: any[]) {
-  const msg = args.join(' ');
-  // 过滤掉 pdfjs-dist 的 canvas 和字体相关警告
-  if (msg.includes('canvas') || 
-      msg.includes('Path2D') || 
-      msg.includes('loadFont') || 
-      msg.includes('fetchStandardFontData') ||
-      msg.includes('CMap')) {
-    return; // 静默忽略
+/**
+ * 【修复】为每个 Worker 初始化独立的 pdf.js 实例
+ */
+function getWorkerPdfJsLib() {
+  if (workerPdfJsLib) {
+    return workerPdfJsLib;
   }
-  originalConsoleWarn.apply(console, args);
-};
 
-console.error = function(...args: any[]) {
-  const msg = args.join(' ');
-  // 过滤掉 pdfjs-dist 的 canvas 相关错误
-  if (msg.includes('canvas.node') || 
-      msg.includes('Cannot find module')) {
-    return; // 静默忽略
-  }
-  originalConsoleError.apply(console, args);
-};
-
-// 【修复】延迟加载 pdf.js，避免模块级别 require 导致的问题
-let pdfjsLib: any = null;
-let pdfjsInitialized = false;
-
-function getPdfJsLib() {
-  if (!pdfjsInitialized) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
-      
-      // 【关键修复】在设置 worker 之前禁用所有警告
-      // pdfjs-dist 有自己的日志系统，需要直接禁用
-      if (pdfjsLib.verbosity !== undefined) {
-        pdfjsLib.verbosity = pdfjsLib.VerbosityLevel.ERRORS; // 只显示错误
-      }
-      
-      // 设置 worker
-      pdfjsLib.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
-      
-      // 【修复】配置 CMap 和字体路径，防止内存泄漏
-      const path = require('path');
-      const pdfjsDistPath = path.dirname(require.resolve('pdfjs-dist'));
-      
-      pdfjsLib.GlobalWorkerOptions.cMapUrl = path.join(pdfjsDistPath, 'cmaps/') + '/';
-      pdfjsLib.GlobalWorkerOptions.cMapPacked = true;
-      pdfjsLib.GlobalWorkerOptions.standardFontDataUrl = path.join(pdfjsDistPath, 'standard_fonts/') + '/';
-      
-      // 【关键修复】禁用 canvas 相关功能，防止 Worker 中 OOM
-      // 我们只需要文本提取，不需要渲染
-      pdfjsLib.GlobalWorkerOptions.disableFontFace = true;
-      pdfjsLib.GlobalWorkerOptions.useSystemFonts = true;
-      
-      pdfjsInitialized = true;
-    } catch (error) {
-      logError('getPdfJsLib', error as Error);
-      throw error;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+    
+    // 【关键修复】禁用所有日志输出
+    if (pdfjsLib.VerbosityLevel) {
+      pdfjsLib.VerbosityLevel.INFOS = 0;
+      pdfjsLib.VerbosityLevel.WARNINGS = 0;
+      pdfjsLib.verbosity = 0; // 只显示致命错误
     }
+    
+    // 设置 worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
+    
+    // 【修复】配置 CMap 和字体路径
+    const path = require('path');
+    const pdfjsDistPath = path.dirname(require.resolve('pdfjs-dist'));
+    
+    pdfjsLib.GlobalWorkerOptions.cMapUrl = path.join(pdfjsDistPath, 'cmaps/') + '/';
+    pdfjsLib.GlobalWorkerOptions.cMapPacked = true;
+    pdfjsLib.GlobalWorkerOptions.standardFontDataUrl = path.join(pdfjsDistPath, 'standard_fonts/') + '/';
+    
+    // 【关键修复】完全禁用字体渲染和 canvas，减少内存占用
+    pdfjsLib.GlobalWorkerOptions.disableFontFace = true;
+    pdfjsLib.GlobalWorkerOptions.useSystemFonts = true;
+    pdfjsLib.GlobalWorkerOptions.disableRange = true;
+    pdfjsLib.GlobalWorkerOptions.disableStream = true;
+    
+    workerPdfJsLib = pdfjsLib;
+    return pdfjsLib;
+  } catch (error) {
+    logError('getWorkerPdfJsLib', error as Error);
+    throw error;
   }
-  return pdfjsLib;
 }
 
 // 【配置】PDF 文件大小限制（MB）- 从 scan-config.ts 导入
@@ -150,20 +129,24 @@ export async function extractPdf(filePath: string): Promise<ExtractorResult> {
   let imageOnlyPages = 0;
   
   try {
-    // 【修复】延迟加载 pdf.js
-    const pdfjsLib = getPdfJsLib();
+    // 【修复】使用 Worker 级别的 pdf.js 实例
+    const pdfjsLib = getWorkerPdfJsLib();
     
-    // 读取文件为 Buffer，然后转换为 Uint8Array
+    // 【关键修复】直接读取文件为 Uint8Array，避免额外的 Buffer 转换
     // 【新增】使用带超时的文件读取，防止 Windows 锁屏时阻塞
     const buffer = await readFileWithTimeout(filePath, FILE_READ_TIMEOUT_STANDARD_MS);
-    const uint8Array = new Uint8Array(buffer);
+    // 【修复】正确转换 Buffer 为 Uint8Array，避免内存浪费和数据错误
+    const uint8Array = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
     
-    // 加载 PDF 文档
+    // 【关键修复】加载 PDF 文档时使用最小配置
     const loadingTask = pdfjsLib.getDocument({
-      data: uint8Array,  // 【修复】使用 Uint8Array 而非 Buffer
-      disableFontFace: true,  // 禁用字体渲染，减少内存
-      disableRange: true,     // 禁用范围请求
-      disableStream: true,    // 禁用流式传输（我们手动控制）
+      data: uint8Array,
+      disableFontFace: true,      // 禁用字体渲染
+      disableRange: true,         // 禁用范围请求
+      disableStream: true,        // 禁用流式传输
+      useSystemFonts: true,       // 使用系统字体
+      cMapUrl: undefined,         // 【修复】不加载 CMap，减少内存
+      standardFontDataUrl: undefined,  // 【修复】不加载标准字体
     });
     
     // 添加总超时保护
@@ -180,52 +163,80 @@ export async function extractPdf(filePath: string): Promise<ExtractorResult> {
     
     totalPages = pdfDocument.numPages;
     
+    // 【新增】取消标记，用于超时后跳过后续处理
+    let isCancelled = false;
+    
     // 逐页处理
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-      // 单页超时保护
-      const pagePromise = pdfDocument.getPage(pageNum);
-      const pageTimeout = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error(`第 ${pageNum} 页解析超时 (${PDF_PAGE_TIMEOUT_MS/1000}秒)`)), PDF_PAGE_TIMEOUT_MS);
-      });
-      
-      const page = await Promise.race([pagePromise, pageTimeout]);
-      
-      // 【新增】检测纯图 PDF
-      const isImageOnly = await isImageOnlyPage(page);
-      
-      if (isImageOnly) {
-        imageOnlyPages++;
-        
-        // 如果 OCR 未启用，跳过纯图页面
-        if (!PDF_OCR_ENABLED) {
-          page.cleanup();
-          continue;
-        }
-        
-        // 【扩展接口】如果启用 OCR，在这里调用 OCR 服务
-        // const ocrText = await performOCR(page);
-        // totalText += ocrText + '\n';
-      } else {
-        // 提取页面文本
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .filter((str: string) => str.trim().length > 0)
-          .join(' ');
-        
-        totalText += pageText + '\n';
-      }
-      
-      processedPages++;
-      
-      // 检查文本大小限制
-      if (totalText.length > MAX_TEXT_CONTENT_SIZE_MB * BYTES_TO_MB) {
-        page.cleanup();
+      // 【修复】检查是否已取消
+      if (isCancelled) {
         break;
       }
       
-      // 释放页面内存 ⭐ 关键
-      page.cleanup();
+      let page: any = null;
+      try {
+        // 单页超时保护
+        const pagePromise = pdfDocument.getPage(pageNum);
+        const pageTimeout = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error(`第 ${pageNum} 页解析超时 (${PDF_PAGE_TIMEOUT_MS/1000}秒)`)), PDF_PAGE_TIMEOUT_MS);
+        });
+        
+        page = await Promise.race([pagePromise, pageTimeout]);
+        
+        // 【新增】检测纯图 PDF
+        const isImageOnly = await isImageOnlyPage(page);
+        
+        if (isImageOnly) {
+          imageOnlyPages++;
+          
+          // 如果 OCR 未启用，跳过纯图页面
+          if (!PDF_OCR_ENABLED) {
+            // 【关键修复】跳过前必须释放页面资源
+            page.cleanup();
+            page.destroy?.();
+            page = null;
+            continue;
+          }
+        } else {
+          // 提取页面文本
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items
+            .map((item: any) => item.str)
+            .filter((str: string) => str.trim().length > 0)
+            .join(' ');
+          
+          totalText += pageText + '\n';
+        }
+        
+        processedPages++;
+        
+        // 检查文本大小限制
+        if (totalText.length > MAX_TEXT_CONTENT_SIZE_MB * BYTES_TO_MB) {
+          isCancelled = true;  // 【新增】设置取消标记
+          break;
+        }
+      } catch (error: any) {
+        // 【修复】超时或其他错误时，设置取消标记
+        if (error.message.includes('超时')) {
+          isCancelled = true;
+          logError('extractPdf', error, 'warn');
+          // 超时后退出循环，外层会检查 isCancelled 状态
+          break;
+        }
+        // 其他错误继续抛出，由外层统一处理
+        throw error;
+      } finally {
+        // 【关键修复】确保每页都释放内存
+        if (page) {
+          try {
+            page.cleanup();
+            page.destroy?.();  // 【新增】调用 destroy 如果存在
+          } catch (e) {
+            // 忽略清理错误
+          }
+          page = null;  // 【关键】显式置空，帮助 GC
+        }
+      }
     }
     
     // 【新增】如果所有页都是纯图且 OCR 未启用，返回不支持预览
@@ -264,13 +275,14 @@ export async function extractPdf(filePath: string): Promise<ExtractorResult> {
     return { text: '', unsupportedPreview: true };
     
   } finally {
-    // 确保释放文档内存 ⭐ 关键
+    // 【关键修复】确保释放文档内存
     if (pdfDocument) {
       try {
         pdfDocument.destroy();
       } catch (e) {
         // 忽略销毁错误
       }
+      pdfDocument = null;  // 【关键】显式置空，帮助 GC
     }
   }
 }

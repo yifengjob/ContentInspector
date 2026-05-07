@@ -1038,7 +1038,7 @@ const handleBatchDelete = async () => {
 }
 
 .highlight-count {
-  color: #ff4d4f;
+  color: var(--error-color);
   font-weight: 600;
 }
 
@@ -1083,7 +1083,7 @@ const handleBatchDelete = async () => {
 }
 
 .btn-delete:hover {
-  background-color: rgba(255, 77, 79, 0.1);
+  background-color: rgb(from var(--error-color) r g b / 10%);
 }
 
 .btn-delete:active {
