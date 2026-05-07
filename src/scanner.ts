@@ -25,7 +25,7 @@ import {
 } from './scan-config';
 // 【新增】导入辅助函数
 import {
-    createLogger,
+    createScannerLogger,  // 【重命名】扫描器专用日志器
     createProgressUpdater,
     markConsumerIdle,
     sendToMainWindow,
@@ -52,8 +52,8 @@ export async function startScan(
     clearAllowedPaths();
     config.selectedPaths.forEach(p => addAllowedPath(p));
 
-    // 【重构】使用辅助函数创建 logger
-    const log = createLogger(scanState, mainWindow);
+    // 【重构】使用辅助函数创建扫描器专用日志器
+    const log = createScannerLogger(scanState, mainWindow);
 
     log.info('开始扫描...');
     log.info(`扫描路径数: ${config.selectedPaths.length}`);

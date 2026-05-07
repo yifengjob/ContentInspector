@@ -25,6 +25,16 @@ import type {ExtractorResult} from './types';
 import {readFileWithTimeout} from '../file-utils';
 import {extractorLogger} from "../logger";  // 【新增】导入超时保护工具
 
+/** PDF 文档配置 */
+const PDF_DOCUMENT_OPTIONS = {
+    disableFontFace: true,           // 禁用字体渲染
+    disableRange: true,              // 禁用范围请求
+    disableStream: true,             // 禁用流式传输
+    useSystemFonts: true,            // 使用系统字体
+    cMapUrl: undefined,              // 不加载 CMap，减少内存
+    standardFontDataUrl: undefined,  // 不加载标准字体
+} as const;
+
 // 【关键修复】Worker 级别的 pdf.js 实例，避免全局污染
 let workerPdfJsLib: any = null;
 
@@ -141,12 +151,7 @@ export async function extractPdf(filePath: string): Promise<ExtractorResult> {
         // 【关键修复】加载 PDF 文档时使用最小配置
         const loadingTask = pdfjsLib.getDocument({
             data: uint8Array,
-            disableFontFace: true,      // 禁用字体渲染
-            disableRange: true,         // 禁用范围请求
-            disableStream: true,        // 禁用流式传输
-            useSystemFonts: true,       // 使用系统字体
-            cMapUrl: undefined,         // 【修复】不加载 CMap，减少内存
-            standardFontDataUrl: undefined,  // 【修复】不加载标准字体
+            ...PDF_DOCUMENT_OPTIONS
         });
 
         // 添加总超时保护

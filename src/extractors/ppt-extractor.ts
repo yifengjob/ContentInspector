@@ -41,7 +41,8 @@ export async function extractPptx(filePath: string): Promise<ExtractorResult> {
                 // 查找所有幻灯片 XML 文件
                 const slideEntries = findZipEntries(entries, 'ppt/slides/slide');
 
-                let allText = '';
+                // 【优化】使用数组收集文本块，避免字符串拼接产生大量临时对象
+                const textChunks: string[] = [];
 
                 for (const entry of slideEntries) {
                     try {
@@ -57,7 +58,7 @@ export async function extractPptx(filePath: string): Promise<ExtractorResult> {
                             }).filter((t: string) => t.trim());
 
                             if (texts.length > 0) {
-                                allText += '\n' + texts.join(' ');
+                                textChunks.push(texts.join(' '));
                             }
                         }
                     } catch (e) {
@@ -69,6 +70,8 @@ export async function extractPptx(filePath: string): Promise<ExtractorResult> {
                 if (!isResolved) {
                     isResolved = true;
 
+                    // 【优化】使用 join 合并所有文本块
+                    const allText = textChunks.join('\n');
                     const hasContent = allText && allText.trim().length > 0;
 
                     resolve({
@@ -81,7 +84,14 @@ export async function extractPptx(filePath: string): Promise<ExtractorResult> {
                 clearTimeout(timeoutId);
                 if (!isResolved) {
                     isResolved = true;
-                    extractorLogger.error(`extractPptx: ${error.message}`);
+
+                    // 【新增】识别加密或损坏的 PPTX 文件
+                    if (error.message.includes('unknown compression type')) {
+                        extractorLogger.warn('PPTX 文件可能已加密或损坏，跳过: {}', filePath);
+                    } else {
+                        extractorLogger.error(`extractPptx: ${error.message}`);
+                    }
+
                     resolve({text: '', unsupportedPreview: true});
                 }
             }

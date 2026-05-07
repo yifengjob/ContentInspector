@@ -13,6 +13,8 @@ import {
     WORKER_MAX_TIMEOUT, SCAN_LOG_FILE_LEVEL, SCAN_LOG_FRONTEND_LEVEL, SCAN_LOG_MEMORY_LEVEL
 } from './scan-config';
 import {LogLevel} from "./types";
+// 【新增】导入公共工具函数
+import {getBeijingTimestamp, formatLogMessage} from './logger';
 
 
 /**
@@ -37,31 +39,40 @@ const DEFAULT_LOG_CONFIG: LogConfig = {
 };
 
 /**
- * 日志记录器接口（提供便捷的日志方法）
+ * 日志记录器接口（提供便捷的日志方法，支持可变参数和占位符）
  */
 export interface Logger {
-    (msg: string, level?: LogLevel): void;  // 默认调用方式
-    debug(msg: string): void;                // log.debug()
-    info(msg: string): void;                 // log.info()
-    warn(msg: string): void;                 // log.warn()
-    error(msg: string): void;                // log.error()
+    (...args: any[]): void;              // 默认调用方式，支持可变参数
+    debug(...args: any[]): void;         // log.debug()
+    info(...args: any[]): void;          // log.info()
+    warn(...args: any[]): void;          // log.warn()
+    error(...args: any[]): void;         // log.error()
 }
 
 /**
- * 创建日志函数（支持分级控制 + 便捷方法）
+ * 创建扫描器专用日志记录器（高性能版本）
  *
- * 【注意】这是扫描器专用的高性能日志记录器，与 logger.ts 中的 createLogger 不同：
+ * 【适用场景】
+ * - 扫描过程的高频日志
+ * - 需要实时更新前端 UI
+ * - 需要保存到 ScanState 供前端查询
+ *
+ * 【注意】
+ * - 仅适用于主进程（依赖 BrowserWindow）
+ * - Worker 线程请使用 logger.ts 的 createLogger
+ *
+ * 【性能优化】
  * - ✅ 环形缓冲区优化（O(1) 时间复杂度）
  * - ✅ 前端 IPC 实时通信
  * - ✅ 自适应更新频率（防止 OOM）
- * - ❌ 依赖 ScanState 和 BrowserWindow（仅适用于 scanner.ts）
+ * - ✅ 缓存转换后的数组，避免重复创建
  *
  * @param scanState 扫描状态
  * @param mainWindow 主窗口
  * @param config 日志配置（可选）
  * @returns 日志记录器（可调用 + 便捷方法）
  */
-export function createLogger(
+export function createScannerLogger(
     scanState: ScanState,
     mainWindow: BrowserWindow | null,
     config: LogConfig = DEFAULT_LOG_CONFIG
@@ -78,8 +89,19 @@ export function createLogger(
     // 【性能优化】限制日志更新频率，防止 OOM
     let lastLogUpdateTime = 0;
 
-    // 【核心】内部日志处理函数
-    const logInternal = (msg: string, level: LogLevel = LogLevel.INFO) => {
+    // 【核心】内部日志处理函数（支持可变参数和占位符）
+    const logInternal = (...args: any[]) => {
+        processLogEntry(args, LogLevel.INFO);
+    };
+
+    // 【新增】创建带便捷方法的日志记录器（支持可变参数和占位符）
+    const logger = logInternal as Logger;
+    
+    // 【重构】提取公共日志处理逻辑，避免代码重复
+    function processLogEntry(args: any[], level: LogLevel): void {
+        // 【复用】使用 logger.ts 的 formatLogMessage 支持占位符
+        const msg = formatLogMessage(args);
+        
         // 【优化】根据级别判断是否需要处理
         const shouldSaveToMemory = level >= config.memoryLevel;
         const shouldSendToFrontend = level >= config.frontendLevel;
@@ -90,17 +112,8 @@ export function createLogger(
             return;
         }
 
-        const now = new Date();
-        // 【修复】显式指定 Asia/Shanghai 时区，确保显示北京时间
-        const timeStr = now.toLocaleTimeString('zh-CN', {
-            hour12: false,
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            timeZone: 'Asia/Shanghai'  // 强制使用北京时间
-        });
-
-        // 【新增】添加级别前缀
+        // 【复用】使用 logger.ts 的公共工具函数
+        const timeStr = getBeijingTimestamp();
         const levelPrefix = LogLevel[level];
         const logWithTime = `[${timeStr}] [${levelPrefix}] ${msg}`;
 
@@ -148,14 +161,12 @@ export function createLogger(
                 console.log(logWithTime);  // 通过 console.log 写入日志文件
             });
         }
-    };
-
-    // 【新增】创建带便捷方法的日志记录器
-    const logger = logInternal as Logger;
-    logger.debug = (msg: string) => logInternal(msg, LogLevel.DEBUG);
-    logger.info = (msg: string) => logInternal(msg, LogLevel.INFO);
-    logger.warn = (msg: string) => logInternal(msg, LogLevel.WARN);
-    logger.error = (msg: string) => logInternal(msg, LogLevel.ERROR);
+    }
+    
+    logger.debug = (...args: any[]) => processLogEntry(args, LogLevel.DEBUG);
+    logger.info = (...args: any[]) => processLogEntry(args, LogLevel.INFO);
+    logger.warn = (...args: any[]) => processLogEntry(args, LogLevel.WARN);
+    logger.error = (...args: any[]) => processLogEntry(args, LogLevel.ERROR);
 
     return logger;
 }

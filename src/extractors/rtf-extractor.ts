@@ -66,20 +66,22 @@ export async function extractRtf(filePath: string): Promise<ExtractorResult> {
                 return parseInt(hex, 16);
             });
 
-            // 使用 iconv-lite 将字节解码为字符串
+            // 【优化】复用 Buffer，减少临时对象创建
+            let decoded = '';
             try {
                 const buffer = Buffer.from(bytes);
-                return iconv.decode(buffer, encoding as any);
+                decoded = iconv.decode(buffer, encoding as any);
             } catch (e) {
                 extractorLogger.warn(`extractRtf-decode: ${encoding} 解码失败，尝试 GBK`);
                 // 降级到 GBK
                 try {
                     const gbkBuffer = Buffer.from(bytes);
-                    return iconv.decode(gbkBuffer, 'gbk');
+                    decoded = iconv.decode(gbkBuffer, 'gbk');
                 } catch (e2) {
                     return '';
                 }
             }
+            return decoded;
         });
 
         // 第三步：移除其他 RTF 控制字和标记

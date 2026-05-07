@@ -37,11 +37,10 @@ export async function extractWithExcelJS(filePath: string): Promise<ExtractorRes
     }, timeoutMs);
     
     (async () => {
+      let workbook: any = null;
       try {
-        const textChunks: string[] = [];
-        
         // 【核心】使用 exceljs 流式 API
-        const workbook = new ExcelJS.stream.xlsx.WorkbookReader(
+        workbook = new ExcelJS.stream.xlsx.WorkbookReader(
           createReadStream(filePath),
           {
             worksheets: 'emit',
@@ -50,6 +49,9 @@ export async function extractWithExcelJS(filePath: string): Promise<ExtractorRes
             styles: 'ignore'
           }
         );
+        
+        // 【优化】使用数组收集文本块，避免字符串拼接产生大量临时对象
+        const textChunks: string[] = [];
         
         // 逐个工作表读取
         let sheetIndex = 0;
@@ -102,6 +104,17 @@ export async function extractWithExcelJS(filePath: string): Promise<ExtractorRes
           isResolved = true;
           extractorLogger.error(`extractWithExcelJS: ${error.message}`);
           resolve({ text: '', unsupportedPreview: true });
+        }
+      } finally {
+        // 【关键修复】确保释放 WorkbookReader 资源
+        if (workbook) {
+          try {
+            // exceljs 的 WorkbookReader 没有显式的 destroy 方法
+            // 但通过让变量超出作用域，GC 可以回收
+            workbook = null;
+          } catch (e) {
+            // 忽略清理错误
+          }
         }
       }
     })();

@@ -1,6 +1,6 @@
 {
   "name": "DataGuardScanner",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "个人敏感信息扫描工具",
   "main": "dist/main.js",
   "scripts": {
@@ -62,7 +62,10 @@
         {
           "from": "node_modules/electron/dist/",
           "to": ".",
-          "filter": ["ffmpeg.dll", "d3dcompiler_47.dll"]
+          "filter": [
+            "ffmpeg.dll",
+            "d3dcompiler_47.dll"
+          ]
         }
       ]
     },

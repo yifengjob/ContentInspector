@@ -7,7 +7,8 @@ import './log-utils';
 
 // 【新增】设置日志文件
 import { setupFileLogger, mainLogger } from './logger';
-setupFileLogger();
+const logDir = path.join(app.getPath('userData'), 'logs');
+setupFileLogger(logDir);
 
 // 【新增】启用 V8 垃圾回收 API（用于扫描完成后释放内存）
 app.commandLine.appendSwitch('js-flags', '--expose-gc');
