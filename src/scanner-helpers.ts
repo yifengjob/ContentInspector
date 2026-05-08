@@ -14,7 +14,7 @@ import {
 } from './scan-config';
 import {LogLevel} from "./types";
 // 【新增】导入公共工具函数
-import {getBeijingTimestamp, formatLogMessage} from './logger';
+import {getBeijingTimestamp, formatLogMessage, Logger} from './logger';
 
 
 /**
@@ -37,17 +37,6 @@ const DEFAULT_LOG_CONFIG: LogConfig = {
     frontendLevel: SCAN_LOG_FRONTEND_LEVEL,
     memoryLevel: SCAN_LOG_MEMORY_LEVEL,
 };
-
-/**
- * 日志记录器接口（提供便捷的日志方法，支持可变参数和占位符）
- */
-export interface Logger {
-    (...args: any[]): void;              // 默认调用方式，支持可变参数
-    debug(...args: any[]): void;         // log.debug()
-    info(...args: any[]): void;          // log.info()
-    warn(...args: any[]): void;          // log.warn()
-    error(...args: any[]): void;         // log.error()
-}
 
 /**
  * 创建扫描器专用日志记录器（高性能版本）
@@ -167,6 +156,22 @@ export function createScannerLogger(
     logger.info = (...args: any[]) => processLogEntry(args, LogLevel.INFO);
     logger.warn = (...args: any[]) => processLogEntry(args, LogLevel.WARN);
     logger.error = (...args: any[]) => processLogEntry(args, LogLevel.ERROR);
+
+    // 【新增】添加销毁方法，清理资源
+    logger.destroy = () => {
+        // 清空日志数组
+        logs.fill('');
+        logIndex = 0;
+        logCount = 0;
+        
+        // 清空缓存数组
+        cachedLogsArray = [];
+        
+        // 清空 scanState 中的引用
+        scanState.logs = [];
+        
+        lastLogUpdateTime = 0;
+    };
 
     return logger;
 }
@@ -323,5 +328,121 @@ export function safelyTerminateWorker(
         worker.terminate();
     } catch (error: any) {
         log(`终止 Worker 失败: ${error.message}`);
+    }
+}
+
+/**
+ * 【P3优化】批量发送管理器
+ * 用于减少 IPC 通信频率，提升性能（特别是 Windows 平台）
+ */
+export class BatchSender {
+    private buffer: any[] = [];
+    private timer: NodeJS.Timeout | null = null;
+    private readonly batchSize: number;
+    private readonly batchInterval: number;
+    
+    constructor(batchSize: number = 100, batchInterval: number = 500) {
+        this.batchSize = batchSize;
+        this.batchInterval = batchInterval;
+    }
+    
+    send(mainWindow: BrowserWindow | null, channel: string, data: any): void {
+        this.buffer.push(data);
+        
+        // 如果达到批量大小，立即发送
+        if (this.buffer.length >= this.batchSize) {
+            this.flush(mainWindow, channel);
+            return;
+        }
+        
+        // 否则等待间隔时间后发送
+        if (!this.timer) {
+            this.timer = setTimeout(() => {
+                this.flush(mainWindow, channel);
+            }, this.batchInterval);
+        }
+    }
+    
+    private flush(mainWindow: BrowserWindow | null, channel: string): void {
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
+        
+        if (mainWindow && !mainWindow.isDestroyed() && this.buffer.length > 0) {
+            // 批量发送
+            mainWindow.webContents.send(channel, this.buffer);
+            this.buffer = [];
+        }
+    }
+    
+    destroy(): void {
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
+        this.buffer = [];
+    }
+}
+
+// 导出单例（用于扫描结果批量发送）
+export const resultBatchSender = new BatchSender(100, 500);
+
+/**
+ * 【P3优化】日志抑制器 - 基于数量和时间的双重触发机制
+ * 
+ * 【使用场景】
+ * - 高频日志输出需要抑制频率
+ * - 既要保证进度可见性，又要避免日志过多
+ * - 数量触发 + 时间触发，谁先达到就执行
+ * 
+ * 【示例】
+ * ```typescript
+ * const logThrottler = new LogThrottler({
+ *   countInterval: 100,      // 每 100 条输出一次
+ *   timeIntervalMs: 2000     // 或每 2 秒输出一次
+ * });
+ * 
+ * if (logThrottler.shouldLog()) {
+ *   log.info(`处理进度: ${count}`);
+ * }
+ * ```
+ */
+export class LogThrottler {
+    private lastLogTime: number = 0;
+    private readonly countInterval: number;     // 数量间隔
+    private readonly timeIntervalMs: number;    // 时间间隔（毫秒）
+    
+    constructor(options: {
+        countInterval: number;      // 每多少条输出一次
+        timeIntervalMs: number;     // 至少多少毫秒输出一次
+    }) {
+        this.countInterval = options.countInterval;
+        this.timeIntervalMs = options.timeIntervalMs;
+    }
+    
+    /**
+     * 判断是否应该输出日志（数量 + 时间双重触发）
+     * @param currentCount 当前计数
+     * @returns 是否应该输出日志
+     */
+    shouldLog(currentCount: number): boolean {
+        const now = Date.now();
+        const shouldLogByCount = (currentCount % this.countInterval === 0);
+        const shouldLogByTime = (now - this.lastLogTime >= this.timeIntervalMs);
+        
+        if (shouldLogByCount || shouldLogByTime) {
+            this.lastLogTime = now;
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * 重置状态（用于扫描重新开始）
+     */
+    reset(): void {
+        this.lastLogTime = 0;
     }
 }

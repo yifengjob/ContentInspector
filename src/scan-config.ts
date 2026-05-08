@@ -289,10 +289,10 @@ export const TYPE_MUTEX_TIMEOUT_MS = 5000;
 
 // ==================== 扫描日志级别配置 ====================
 /** 扫描日志文件级别 */
-export const SCAN_LOG_FILE_LEVEL: LogLevel = LogLevel.WARN;
+export const SCAN_LOG_FILE_LEVEL: LogLevel = LogLevel.INFO;
 
 /** 扫描日志前端级别 */
-export const SCAN_LOG_FRONTEND_LEVEL: LogLevel = LogLevel.INFO;
+export const SCAN_LOG_FRONTEND_LEVEL: LogLevel = LogLevel.WARN;
 
 /** 扫描日志内存级别 */
-export const SCAN_LOG_MEMORY_LEVEL: LogLevel = LogLevel.INFO;
+export const SCAN_LOG_MEMORY_LEVEL: LogLevel = LogLevel.WARN;

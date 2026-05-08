@@ -157,6 +157,26 @@ export const useAppStore = defineStore('app', () => {
     }
   }
   
+  // 【P3优化】批量添加扫描结果（用于批量模式）
+  function addScanResults(items: ScanResultItem[]) {
+    if (items.length === 0) return
+    
+    // 直接批量添加到 pendingResults
+    pendingResults.push(...items)
+    
+    // 如果还没有定时器，设置一个批处理定时器
+    if (batchTimer === null) {
+      batchTimer = window.setTimeout(() => {
+        // 批量添加所有待处理的结果
+        if (pendingResults.length > 0) {
+          scanResults.value.push(...pendingResults)
+          pendingResults.length = 0  // 清空数组
+        }
+        batchTimer = null
+      }, UI_BATCH_UPDATE_INTERVAL)  // 使用配置的批量更新间隔
+    }
+  }
+  
   function addLog(log: string) {
     pendingLogs.push(log)
     
@@ -241,14 +261,6 @@ export const useAppStore = defineStore('app', () => {
     }
   }
   
-  function selectAllPaths(paths: string[]) {
-    paths.forEach(p => selectedPaths.value.add(p))
-  }
-  
-  function deselectAllPaths() {
-    selectedPaths.value.clear()
-  }
-  
   // 全选所有目录
   function selectAllDirectories(allNodes: DirectoryNode[]) {
     // 【修复】选择所有节点（包括文件和目录）
@@ -312,14 +324,13 @@ export const useAppStore = defineStore('app', () => {
     startElapsedTimeTimer,  // 【UI优化】导出启动定时器函数
     stopElapsedTimeTimer,   // 【UI优化】导出停止定时器函数
     addScanResult,
+    addScanResults,  // 【P3优化】导出批量添加方法
     addLog,  // 【新增】批量添加日志
     clearScanResults,
     removeResult,
     togglePath,
     smartToggleNode,
     getNodeCheckState,
-    selectAllPaths,
-    deselectAllPaths,
     selectAllDirectories,
     deselectAllDirectories,
     getEffectiveScanPaths,

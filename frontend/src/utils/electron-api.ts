@@ -35,7 +35,7 @@ declare global {
             }) => Promise<{ response: number }>;
             clearCache: () => Promise<{ success: boolean; cleanedSize?: number; error?: string }>;
             onScanProgress: (callback: (data: any) => void) => () => void;
-            onScanResult: (callback: (data: any) => void) => () => void;
+            onScanResult: (callback: (data: any) => void, batchMode?: boolean) => () => void;  // 【P3优化】支持批量模式
             onScanFinished: (callback: () => void) => () => void;
             onScanError: (callback: (error: string) => void) => () => void;
             onScanLog: (callback: (msg: string) => void) => () => void;
@@ -156,9 +156,12 @@ export async function onScanProgress(callback: (data: any) => void): Promise<() 
     return window.electronAPI.onScanProgress(callback)
 }
 
-// 监听扫描结果事件
-export async function onScanResult(callback: (data: ScanResultItem) => void): Promise<() => void> {
-    return window.electronAPI.onScanResult(callback)
+// 监听扫描结果事件（支持批量模式）
+export async function onScanResult(
+    callback: (data: ScanResultItem | ScanResultItem[]) => void,
+    batchMode: boolean = false  // 【P3优化】是否启用批量模式
+): Promise<() => void> {
+    return window.electronAPI.onScanResult(callback, batchMode)
 }
 
 // 监听扫描完成事件

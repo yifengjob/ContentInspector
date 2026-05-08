@@ -55,6 +55,8 @@ async function initWalkdir() {
  * 开始遍历
  */
 async function startWalking(config: WalkerConfig) {
+  let timeoutId: NodeJS.Timeout | undefined;
+  
   try {
     await initWalkdir();
     
@@ -209,7 +211,17 @@ async function startWalking(config: WalkerConfig) {
     });
 
     walker.on('path', (filePath: string, stat: any) => {
-      // 只处理文件
+      // 【关键】跳过符号链接文件（包括文件和目录）
+      if (stat.isSymbolicLink && stat.isSymbolicLink()) {
+        skippedCount++;
+        parentPort?.postMessage({
+          type: 'walker-log',
+          message: `[Walker] 跳过符号链接: ${filePath}`
+        });
+        return;
+      }
+      
+      // 只处理普通文件
       if (!stat.isFile()) return;
 
       // 检查扩展名
@@ -321,6 +333,11 @@ async function startWalking(config: WalkerConfig) {
     }); // 【修复】关闭 Promise
 
   } catch (error: any) {
+    // 【P2修复】在异常路径也清除超时定时器
+    if (typeof timeoutId !== 'undefined') {
+      clearTimeout(timeoutId);
+    }
+    
     parentPort?.postMessage({
       type: 'walking-error',
       error: error.message

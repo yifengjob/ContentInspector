@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import './log-utils';
 
 // 【新增】设置日志文件
-import { setupFileLogger, mainLogger } from './logger';
+import { setupFileLogger, mainLogger, flushLogStream } from './logger';
 const logDir = path.join(app.getPath('userData'), 'logs');
 setupFileLogger(logDir);
 
@@ -64,6 +64,18 @@ process.on('exit', (code) => {
         hour12: false  // 24小时制
     });
     mainLogger.info(`[进程退出] 代码: ${code}, 时间: ${timestamp}`);
+});
+
+// 【新增】监听应用即将退出，flush 日志确保完整性
+app.on('before-quit', async () => {
+    mainLogger.info('[应用退出] 正在 flush 日志...');
+    try {
+        await flushLogStream();
+        mainLogger.info('[应用退出] 日志已 flush 完成');
+    } catch (error) {
+        // 使用 process.stderr 避免循环依赖
+        process.stderr.write(`[应用退出] 日志 flush 失败: ${error}\n`);
+    }
 });
 
 let mainWindow: BrowserWindow | null = null;

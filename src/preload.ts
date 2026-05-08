@@ -56,8 +56,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('scan-progress', listener);
   },
   
-  onScanResult: (callback: (data: any) => void) => {
-    const listener = (_event: any, data: any) => callback(data);
+  onScanResult: (callback: (data: any) => void, batchMode: boolean = false) => {
+    const listener = (_event: any, data: any) => {
+      if (batchMode && Array.isArray(data)) {
+        // 【P3优化】批量模式：直接传递数组给 callback
+        callback(data);
+      } else if (Array.isArray(data)) {
+        // 兼容模式：遍历数组，逐个调用 callback
+        data.forEach(item => callback(item));
+      } else {
+        // 单个消息：直接调用 callback（向后兼容）
+        callback(data);
+      }
+    };
     ipcRenderer.on('scan-result', listener);
     return () => ipcRenderer.removeListener('scan-result', listener);
   },

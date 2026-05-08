@@ -157,88 +157,93 @@ parentPort?.on('message', async (task: WorkerTask) => {
     // 创建流式处理器（使用默认限制作为安全兜底）
     const processor = new FileStreamProcessor();
     
-    // 【重构】提取公共回调函数，消除重复代码
-    const createCallbacks = () => ({
-      onChunk: (chunkData: any) => {
-        if (previewMode) {
-          parentPort?.postMessage({
-            type: 'chunk',
-            chunkIndex: chunkData.chunkIndex,
-            lines: chunkData.lines,
-            highlights: chunkData.highlights,
-            startLine: chunkData.startLine
-          });
-        }
-      },
-      
-      onComplete: (stats: any) => {
-        if (previewMode) {
-          parentPort?.postMessage({
-            type: 'complete',
-            totalChunks: stats.totalChunks
-          });
-        } else {
-          // 返回累计的检测结果
+    try {
+      // 【重构】提取公共回调函数，消除重复代码
+      const createCallbacks = () => ({
+        onChunk: (chunkData: any) => {
+          if (previewMode) {
+            parentPort?.postMessage({
+              type: 'chunk',
+              chunkIndex: chunkData.chunkIndex,
+              lines: chunkData.lines,
+              highlights: chunkData.highlights,
+              startLine: chunkData.startLine
+            });
+          }
+        },
+        
+        onComplete: (stats: any) => {
+          if (previewMode) {
+            parentPort?.postMessage({
+              type: 'complete',
+              totalChunks: stats.totalChunks
+            });
+          } else {
+            // 返回累计的检测结果
+            parentPort?.postMessage({
+              taskId,
+              filePath,
+              fileSize: stat.size,
+              modifiedTime: stat.mtime.toISOString(),
+              counts: processor.getAccumulatedCounts(),
+              total: processor.getTotalCount(),
+              unsupportedPreview: false
+            } as WorkerResult);
+          }
+        },
+        
+        onError: (error: Error) => {
           parentPort?.postMessage({
             taskId,
             filePath,
-            fileSize: stat.size,
-            modifiedTime: stat.mtime.toISOString(),
-            counts: processor.getAccumulatedCounts(),
-            total: processor.getTotalCount(),
-            unsupportedPreview: false
+            error: error.message
           } as WorkerResult);
         }
-      },
+      });
       
-      onError: (error: Error) => {
-        parentPort?.postMessage({
-          taskId,
-          filePath,
-          error: error.message
-        } as WorkerResult);
-      }
-    });
-    
-    // 【关键决策】根据 supportsStreaming 选择处理路径
-    if (config.supportsStreaming) {
-      // ✅ 路径A: 真正的流式处理 (txt/log/csv等)
-      await Promise.race([
-        processor.processFile(filePath, {
+      // 【关键决策】根据 supportsStreaming 选择处理路径
+      if (config.supportsStreaming) {
+        // ✅ 路径A: 真正的流式处理 (txt/log/csv等)
+        await Promise.race([
+          processor.processFile(filePath, {
+            mode: previewMode ? 'preview' : 'detect',
+            enabledTypes: enabledSensitiveTypes,
+            ...createCallbacks()
+          }),
+          timeoutPromise
+        ]);
+        
+      } else {
+        // ❌ 路径B: 先解析,再流式发送 (docx/xlsx/pdf等)
+        const extractPromise = extractTextFromFile(filePath);
+        const { text, unsupportedPreview } = await Promise.race([
+          extractPromise,
+          timeoutPromise
+        ]) as { text: string; unsupportedPreview: boolean };
+        
+        // 清除超时
+        if (timeoutId) clearTimeout(timeoutId);
+        
+        if (unsupportedPreview || !text) {
+          parentPort?.postMessage({
+            taskId,
+            filePath,
+            text: '',
+            unsupportedPreview: true
+          } as WorkerResult);
+          return;
+        }
+        
+        // 对提取后的文本进行流式分块
+        await processor.processFile('', {
           mode: previewMode ? 'preview' : 'detect',
           enabledTypes: enabledSensitiveTypes,
           ...createCallbacks()
-        }),
-        timeoutPromise
-      ]);
-      
-    } else {
-      // ❌ 路径B: 先解析,再流式发送 (docx/xlsx/pdf等)
-      const extractPromise = extractTextFromFile(filePath);
-      const { text, unsupportedPreview } = await Promise.race([
-        extractPromise,
-        timeoutPromise
-      ]) as { text: string; unsupportedPreview: boolean };
-      
-      // 清除超时
-      if (timeoutId) clearTimeout(timeoutId);
-      
-      if (unsupportedPreview || !text) {
-        parentPort?.postMessage({
-          taskId,
-          filePath,
-          text: '',
-          unsupportedPreview: true
-        } as WorkerResult);
-        return;
+        }, text); // 传入预提取的文本
       }
-      
-      // 对提取后的文本进行流式分块
-      await processor.processFile('', {
-        mode: previewMode ? 'preview' : 'detect',
-        enabledTypes: enabledSensitiveTypes,
-        ...createCallbacks()
-      }, text); // 传入预提取的文本
+    } finally {
+      // 【修复】确保无论成功还是失败，都清理资源
+      processor.destroy();
     }
     
   } catch (error: any) {

@@ -359,4 +359,12 @@ export class FileStreamProcessor {
     this.accumulatedCounts = {};
     this.totalCount = 0;
   }
+
+  /**
+   * 【新增】销毁处理器，释放资源
+   * 与 reset() 功能相同，语义更明确
+   */
+  destroy(): void {
+    this.reset();
+  }
 }

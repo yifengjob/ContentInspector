@@ -284,9 +284,16 @@ onMounted(async () => {
     }
   })
 
-  await onScanResult((item) => {
-    appStore.addScanResult(item)
-  })
+  await onScanResult((items) => {
+    // 【P3优化】支持批量和单个消息
+    if (Array.isArray(items)) {
+      // 批量添加：一次性添加到 pendingResults
+      appStore.addScanResults(items);
+    } else {
+      // 单个添加（向后兼容）
+      appStore.addScanResult(items);
+    }
+  }, true)  // 启用批量模式
 
   await onScanFinished(() => {
     isScanning.value = false

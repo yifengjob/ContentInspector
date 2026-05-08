@@ -23,14 +23,15 @@ const MAX_LOG_ENTRIES = 1000;
 const LOG_UPDATE_INTERVAL = 1000;
 
 /**
- * 日志记录器接口（支持可变参数，类似 console）
+ * 日志记录器接口（提供便捷的日志方法，支持可变参数和占位符）
  */
 export interface Logger {
-    (...args: any[]): void;           // 默认调用方式，支持可变参数
-    debug(...args: any[]): void;      // log.debug()
-    info(...args: any[]): void;       // log.info()
-    warn(...args: any[]): void;       // log.warn()
-    error(...args: any[]): void;      // log.error()
+    (...args: any[]): void;              // 默认调用方式，支持可变参数
+    debug(...args: any[]): void;         // log.debug()
+    info(...args: any[]): void;          // log.info()
+    warn(...args: any[]): void;          // log.warn()
+    error(...args: any[]): void;         // log.error()
+    destroy?: () => void;                // 【新增】销毁方法，清理资源
 }
 
 /**
@@ -42,6 +43,9 @@ interface LogConfig {
     enableFrontend?: boolean;     // 是否发送到前端
     enableMemory?: boolean;       // 是否保存到内存
 }
+
+// 【新增】全局日志流引用（用于应用退出时 flush）
+let globalLogStream: fs.WriteStream | null = null;
 
 /**
  * 设置日志文件（重定向 console 输出）
@@ -79,6 +83,9 @@ export function setupFileLogger(logDir: string): void {
 
     const logFile = path.join(logDir, `app-${timeStr}.log`);
     const logStream = fs.createWriteStream(logFile, {flags: 'a'});
+    
+    // 【新增】保存全局引用，用于应用退出时 flush
+    globalLogStream = logStream;
 
     console.log(`日志文件已创建: ${logFile}`);
 
@@ -88,26 +95,62 @@ export function setupFileLogger(logDir: string): void {
     const originalDebug = console.debug;
     const originalWarn = console.warn;
 
-    // 重定向 console.log
+    // 重定向 console.log（带日志抑制）
     console.log = function (...args) {
+        const message = args.join(' ');
+        
+        // 【改进】统一日志抑制逻辑
+        if (shouldSuppressLog(message)) {
+            return; // 静默丢弃
+        }
+        
         const timestamp = getBeijingTimestamp();
-        const message = `[${timestamp}] [INFO] ${formatLogMessage(args)}\n`;
-        logStream.write(message);
+        const logMessage = `[${timestamp}] [INFO] ${formatLogMessage(args)}\n`;
+        logStream.write(logMessage, (err) => {
+            if (err) {
+                // 【改进】使用 process.stderr 避免递归日志
+                process.stderr.write(`[日志写入失败] ${err.message}\n`);
+            }
+        });
         originalLog.apply(console, args);
     };
-    // 重定向 console.debug
+    // 重定向 console.debug（带日志抑制）
     console.debug = function (...args) {
+        const message = args.join(' ');
+        
+        // 【改进】统一日志抑制逻辑
+        if (shouldSuppressLog(message)) {
+            return; // 静默丢弃
+        }
+        
         const timestamp = getBeijingTimestamp();
-        const message = `[${timestamp}] [DEBUG] ${formatLogMessage(args)}\n`;
-        logStream.write(message);
+        const debugMessage = `[${timestamp}] [DEBUG] ${formatLogMessage(args)}\n`;
+        logStream.write(debugMessage, (err) => {
+            if (err) {
+                // 【改进】使用 process.stderr 避免递归日志
+                process.stderr.write(`[日志写入失败] ${err.message}\n`);
+            }
+        });
         originalDebug.apply(console, args);
     };
 
-    // 重定向 console.error
+    // 重定向 console.error（带日志抑制）
     console.error = function (...args) {
+        const message = args.join(' ');
+        
+        // 【改进】统一日志抑制逻辑
+        if (shouldSuppressLog(message)) {
+            return; // 静默丢弃
+        }
+        
         const timestamp = getBeijingTimestamp();
-        const message = `[${timestamp}] [ERROR] ${formatLogMessage(args)}\n`;
-        logStream.write(message);
+        const errorMessage = `[${timestamp}] [ERROR] ${formatLogMessage(args)}\n`;
+        logStream.write(errorMessage, (err) => {
+            if (err) {
+                // 【改进】使用 process.stderr 避免递归日志
+                process.stderr.write(`[日志写入失败] ${err.message}\n`);
+            }
+        });
         originalError.apply(console, args);
     };
 
@@ -122,7 +165,12 @@ export function setupFileLogger(logDir: string): void {
 
         const timestamp = getBeijingTimestamp();
         const warnMessage = `[${timestamp}] [WARN] ${formatLogMessage(args)}\n`;
-        logStream.write(warnMessage);
+        logStream.write(warnMessage, (err) => {
+            if (err) {
+                // 【改进】使用 process.stderr 避免递归日志
+                process.stderr.write(`[日志写入失败] ${err.message}\n`);
+            }
+        });
         originalWarn.apply(console, args);
     };
 }
@@ -363,6 +411,24 @@ function cleanupOldLogs(logDir: string): void {
     } catch (error) {
         console.error('清理旧日志文件失败:', error);
     }
+}
+
+/**
+ * 【新增】flush 日志流，确保所有日志写入磁盘
+ * 应该在应用退出前调用
+ */
+export function flushLogStream(): Promise<void> {
+    return new Promise((resolve) => {
+        if (!globalLogStream) {
+            resolve();
+            return;
+        }
+        
+        // 等待所有写入操作完成
+        globalLogStream.end(() => {
+            resolve();
+        });
+    });
 }
 
 // 【导出】预创建的常用日志实例
