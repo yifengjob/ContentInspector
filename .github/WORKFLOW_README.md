@@ -163,7 +163,7 @@ permissions:
    - ❌ 依赖安装失败 → 检查 pnpm-lock.yaml
    - ❌ TypeScript 编译错误 → 本地运行 `npx tsc -p tsconfig.main.json`
    - ❌ 前端构建失败 → 本地运行 `pnpm build:renderer`
-   - ❌ 图标文件缺失 → 确认 build/ 目录有 icon.ico, icon.icns, icon.png
+   - ❌ 图标文件缺失 → 确认 build/icons 目录有 icon.ico, icon.icns, icon.png
 
 3. **本地测试**
    ```bash

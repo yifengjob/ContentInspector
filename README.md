@@ -194,7 +194,7 @@ pnpm build
 #### 前置准备
 
 1. **准备应用图标**
-   - 将图标文件放入 `build/` 目录
+   - 将图标文件放入 `build/icons` 目录
    - Windows: `icon.ico` (256x256, 多尺寸ICO格式)
    - macOS: `icon.icns` (包含16x16到1024x1024多个尺寸)
    - Linux: `icon.png` (512x512 PNG格式)

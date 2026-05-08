@@ -70,11 +70,11 @@ DataGuardScanner/
 │   ├── QUICK_START.md       # 快速开始
 │   ├── OPTIMIZATION_NOTES.md # 优化说明
 │   └── NODE_VERSION_EXPLANATION.md # Node 版本说明
-├── build/                    # 应用图标
+├── build/icons/             # 应用图标
 │   ├── icon.icns            # macOS
 │   ├── icon.ico             # Windows
 │   └── icon.png             # Linux
-├── frontend/                 # Vue 前端
+├── frontend/                # Vue 前端
 │   ├── src/
 │   ├── package.json
 │   └── ...

@@ -129,8 +129,8 @@ function createWindow() {
     try {
         // macOS优先使用.icns，其他平台使用.png
         const iconPath = process.platform === 'darwin'
-            ? path.join(__dirname, '../build/icon.icns')
-            : path.join(__dirname, '../build/icon.png');
+            ? path.join(__dirname, '../build/icons/icon.icns')
+            : path.join(__dirname, '../build/icons/icon.png');
 
         mainLogger.info('尝试加载图标，路径:', iconPath);
         if (fs.existsSync(iconPath)) {

@@ -57,7 +57,7 @@
           ]
         }
       ],
-      "icon": "build/icon.ico",
+      "icon": "build/icons/icon.ico",
       "extraFiles": [
         {
           "from": "node_modules/electron/dist/",
@@ -81,7 +81,7 @@
         "zip"
       ],
       "category": "public.app-category.developer-tools",
-      "icon": "build/icon.icns"
+      "icon": "build/icons/icon.icns"
     },
     "dmg": {
       "artifactName": "${name}-${platform}-${version}-${arch}.${ext}"
@@ -111,7 +111,7 @@
         }
       ],
       "category": "Development",
-      "icon": "build/icon.png",
+      "icon": "build/icons",
       "desktop": {
         "StartupNotify": "false",
         "Encoding": "UTF-8",
