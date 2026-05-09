@@ -4,6 +4,7 @@
       class="node-content" 
       :style="{ paddingLeft: (level * 16 + 8) + 'px' }"
       :class="{ selected: checkState === 'checked', hidden: node.isHidden }"
+      :data-path="node.path"
     >
       <span 
         v-if="node.isDir && node.hasChildren" 

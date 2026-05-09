@@ -205,26 +205,62 @@ const handleToggleExpand = () => {
   }
 }
 
-// 【辅助方法】递归展开所有节点（通过触发 TreeNode 的点击事件）
-const expandAllNodes = () => {
-  const treeNodes = document.querySelectorAll('.tree-node')
-  treeNodes.forEach((nodeElement) => {
-    const expandIcon = nodeElement.querySelector('.expand-icon') as HTMLElement
-    if (expandIcon && expandIcon.textContent === '▶') {
-      expandIcon.click()
+// 【修复】递归展开所有节点
+const expandAllNodes = (nodes?: DirectoryNode[]) => {
+  const targetNodes = nodes || rootNodes.value
+  targetNodes.forEach(node => {
+    if (node.isDir && node.hasChildren) {
+      // 找到对应的 DOM 元素并触发点击
+      const nodeElement = findNodeElement(node.path)
+      if (nodeElement) {
+        const expandIcon = nodeElement.querySelector('.expand-icon') as HTMLElement
+        if (expandIcon) {
+          expandIcon.click()
+        }
+      }
+      // 递归展开子节点（需要先加载）
+      if (node.children && node.children.length > 0) {
+        expandAllNodes(node.children)
+      }
     }
   })
 }
 
-// 【辅助方法】递归折叠所有节点
-const collapseAllNodes = () => {
-  const treeNodes = document.querySelectorAll('.tree-node')
-  treeNodes.forEach((nodeElement) => {
-    const expandIcon = nodeElement.querySelector('.expand-icon') as HTMLElement
-    if (expandIcon && expandIcon.textContent === '▼') {
-      expandIcon.click()
+// 【修复】递归折叠所有节点
+const collapseAllNodes = (nodes?: DirectoryNode[]) => {
+  const targetNodes = nodes || rootNodes.value
+  // 先递归折叠子节点
+  targetNodes.forEach(node => {
+    if (node.isDir && node.hasChildren && node.children && node.children.length > 0) {
+      collapseAllNodes(node.children)
     }
   })
+  
+  // 再折叠当前层级
+  targetNodes.forEach(node => {
+    if (node.isDir && node.hasChildren) {
+      const nodeElement = findNodeElement(node.path)
+      if (nodeElement) {
+        const expandIcon = nodeElement.querySelector('.expand-icon') as HTMLElement
+        if (expandIcon && expandIcon.querySelector('svg use')?.getAttribute('href') === '#icon-arrow-down') {
+          expandIcon.click()
+        }
+      }
+    }
+  })
+}
+
+// 【新增】根据路径查找节点 DOM 元素
+const findNodeElement = (path: string): HTMLElement | null => {
+  // 通过 data-path 属性查找（需要在 TreeNode 中添加）
+  const allNodes = document.querySelectorAll('.tree-node')
+  for (const nodeElement of Array.from(allNodes)) {
+    const content = nodeElement.querySelector('.node-content') as HTMLElement
+    if (content && content.getAttribute('data-path') === path) {
+      return nodeElement as HTMLElement
+    }
+  }
+  return null
 }
 
 // 【新增】刷新目录树

@@ -1,11 +1,11 @@
 import * as fs from 'fs';
 import { dialog } from 'electron';
-import { ScanResultItem } from './types';
+import { ScanResultItem } from '../types';
 import * as ExcelJS from 'exceljs';
-import { getSensitiveRules } from './sensitive-detector';
+import { getSensitiveRules } from '../detection/sensitive-detector';
 // 【优化】导入配置常量
-import { BYTES_TO_MB } from './scan-config';
-import {logger} from "./logger";
+import { BYTES_TO_MB } from '../core/scan-config';
+import {logger} from "../logger/logger";
 
 export async function exportReport(
   results: ScanResultItem[],

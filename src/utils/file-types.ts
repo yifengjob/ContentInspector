@@ -5,7 +5,7 @@
 
 import * as path from 'path';
 // 【修复】导入文件大小限制常量
-import {FILE_SIZE_LIMITS} from './scan-config';
+import {FILE_SIZE_LIMITS} from '../core/scan-config';
 // 【重构】导入所有提取器函数
 import {
     extractTextFile,
@@ -20,7 +20,7 @@ import {
     extractOdp,
     extractRtf,
     extractPdf
-} from './extractors';
+} from '../extractors';
 
 // 【新增】导入简单 PDF 提取器
 

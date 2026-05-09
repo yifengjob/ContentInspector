@@ -20,10 +20,10 @@ import {
     PDF_PAGE_TIMEOUT_MS,
     PDF_TOTAL_TIMEOUT_MS,
     FILE_READ_TIMEOUT_STANDARD_MS  // 【新增】导入文件读取超时配置
-} from '../scan-config';
+} from '../core/scan-config';
 import type {ExtractorResult} from './types';
-import {readFileWithTimeout} from '../file-utils';
-import {extractorLogger} from "../logger";  // 【新增】导入超时保护工具
+import {readFileWithTimeout} from '../utils/file-utils';
+import {extractorLogger} from "../logger/logger";  // 【新增】导入超时保护工具
 
 /** PDF 文档配置 */
 const PDF_DOCUMENT_OPTIONS = {

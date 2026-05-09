@@ -449,9 +449,9 @@ interface ProcessingStats {
 
 ## 📚 相关文档
 
-- [file-types.ts](../src/file-types.ts) - 文件类型配置
-- [scan-config.ts](../src/scan-config.ts) - 扫描配置常量
-- [file-worker.ts](../src/file-worker.ts) - Worker 线程实现
+- [file-types.ts](../src/utils/file-types.ts) - 文件类型配置
+- [scan-config.ts](../src/core/scan-config.ts) - 扫描配置常量
+- [file-worker.ts](../src/workers/file-worker.ts) - Worker 线程实现
 
 ---
 

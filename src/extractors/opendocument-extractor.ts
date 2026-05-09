@@ -3,8 +3,8 @@
  * 支持: odt, ods, odp
  */
 
-import {unzipFile, extractEntriesText} from '../zip-utils';
-import {extractorLogger} from '../logger';
+import {unzipFile, extractEntriesText} from '../utils/zip-utils';
+import {extractorLogger} from '../logger/logger';
 import type {ExtractorResult} from './types';
 
 /**

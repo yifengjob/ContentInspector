@@ -3,8 +3,8 @@ const fs = require('fs');
 const path = require('path');
 
 async function generateIcons() {
-    const svgPath = path.join(__dirname, '../frontend/src/assets/icon.svg');
-    const buildDir = path.join(__dirname, '../build');
+    const svgPath = path.join(__dirname, '..', 'frontend', 'src', 'assets', 'icon.svg');
+    const buildDir = path.join(__dirname, '..', 'build');
 
     if (!fs.existsSync(buildDir)) {
         fs.mkdirSync(buildDir, {recursive: true});
@@ -25,7 +25,7 @@ async function generateIcons() {
         await sharp(svgPath)
             .resize(256, 256)
             .png()
-            .toFile(path.join(buildDir,'icons', 'icon-256.png'));
+            .toFile(path.join(buildDir, 'icons', 'icon-256.png'));
         console.log('✓ 已生成: build/icons/icon-256.png (256x256)');
 
         console.log('\n✓ 图标生成完成！');

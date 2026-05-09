@@ -6,11 +6,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import WordExtractor from 'word-extractor';
-import {calculateParserTimeout, FILE_READ_TIMEOUT_FAST_MS} from '../scan-config';  // 【新增】导入超时配置
-import {extractorLogger} from '../logger';
+import {calculateParserTimeout, FILE_READ_TIMEOUT_FAST_MS} from '../core/scan-config';  // 【新增】导入超时配置
+import {extractorLogger} from '../logger/logger';
 import type {ExtractorResult} from './types';
 import {extractTextFromBinary} from './binary-extractor';
-import {readFileWithTimeout} from '../file-utils';
+import {readFileWithTimeout} from '../utils/file-utils';
 
 export async function extractWithWordExtractor(filePath: string): Promise<ExtractorResult> {
     // 【关键修复】添加智能超时保护，防止 word-extractor 卡死

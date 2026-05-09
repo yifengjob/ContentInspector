@@ -10,9 +10,9 @@
  */
 
 import { unzipSync, strFromU8 } from 'fflate';
-import { FILE_READ_TIMEOUT_STANDARD_MS } from './scan-config';  // 【新增】导入超时配置
+import { FILE_READ_TIMEOUT_STANDARD_MS } from '../core/scan-config';  // 【新增】导入超时配置
 import { readFileWithTimeout } from './file-utils';
-import {logger} from "./logger";
+import {logger} from "../logger/logger";
 
 /**
  * ZIP 文件条目

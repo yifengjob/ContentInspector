@@ -5,7 +5,7 @@
 
 // ==================== 单位转换常量 ====================
 
-import {LogLevel} from "./types";
+import {LogLevel} from "../types";
 
 /** 字节到 MB 的转换因子 */
 export const BYTES_TO_MB = 1024 * 1024;

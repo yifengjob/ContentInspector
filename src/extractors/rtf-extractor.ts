@@ -4,10 +4,10 @@
  */
 
 import * as iconv from 'iconv-lite';
-import {FILE_READ_TIMEOUT_STANDARD_MS} from '../scan-config';  // 【新增】导入超时配置
-import {extractorLogger} from "../logger";
+import {FILE_READ_TIMEOUT_STANDARD_MS} from '../core/scan-config';  // 【新增】导入超时配置
+import {extractorLogger} from "../logger/logger";
 import type {ExtractorResult} from './types';
-import {readFileWithTimeout} from '../file-utils';
+import {readFileWithTimeout} from '../utils/file-utils';
 
 export async function extractRtf(filePath: string): Promise<ExtractorResult> {
     try {

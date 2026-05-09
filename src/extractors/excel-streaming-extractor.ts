@@ -8,8 +8,8 @@
 import * as fs from 'fs';
 import { createReadStream } from 'fs';
 import * as ExcelJS from 'exceljs';
-import { calculateParserTimeout } from '../scan-config';
-import { extractorLogger } from '../logger';
+import { calculateParserTimeout } from '../core/scan-config';
+import { extractorLogger } from '../logger/logger';
 import type { ExtractorResult } from './types';
 
 export async function extractWithExcelJS(filePath: string): Promise<ExtractorResult> {

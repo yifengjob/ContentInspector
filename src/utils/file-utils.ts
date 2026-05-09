@@ -9,7 +9,7 @@ import {
   FILE_OPEN_TIMEOUT_MS, 
   FILE_STAT_TIMEOUT_MS, 
   FILE_CLOSE_TIMEOUT_MS 
-} from './scan-config';
+} from '../core/scan-config';
 
 /**
  * 带超时的文件读取（异步）

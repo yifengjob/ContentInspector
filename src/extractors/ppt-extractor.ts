@@ -4,9 +4,9 @@
  */
 
 import * as fs from 'fs';
-import {unzipFile, findZipEntries, extractEntriesText} from '../zip-utils';
-import {calculateParserTimeout} from '../scan-config';
-import {extractorLogger} from '../logger' ;
+import {unzipFile, findZipEntries, extractEntriesText} from '../utils/zip-utils';
+import {calculateParserTimeout} from '../core/scan-config';
+import {extractorLogger} from '../logger/logger' ;
 import type {ExtractorResult} from './types';
 
 export async function extractPptx(filePath: string): Promise<ExtractorResult> {

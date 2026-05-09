@@ -57,15 +57,30 @@ export class PreviewVirtualScroller {
    * 初始化数据（增量更新）
    */
   updateData(lines: string[]) {
+    if (!lines || !Array.isArray(lines) || lines.length === 0) return
+
+    // 【安全检查】防止异常大的数据块导致内存崩溃
+    if (lines.length > 50000) {
+      console.warn('[Scroller] 接收到超大数据块，行数:', lines.length)
+    }
+
     if (this.state.allLines.length === 0) {
-      // 首次加载
-      this.state.allLines = lines
-      this.state.totalLines = lines.length
+      // 首次加载：直接赋值，但确保是纯数组
+      this.state.allLines = Array.from(lines)
+      this.state.totalLines = this.state.allLines.length
       this.buildLineIndex()
     } else {
-      // 增量追加
+      // 增量追加：使用 for 循环逐项 push，彻底避开 spread 操作符的长度限制
       const currentLength = this.state.allLines.length
-      this.state.allLines.push(...lines)
+      
+      // 【关键修复】循环追加，虽然比 spread 慢一点，但绝对安全
+      for (let i = 0; i < lines.length; i++) {
+        // 确保存入的是字符串，防止非法对象导致后续渲染报错
+        if (typeof lines[i] === 'string') {
+          this.state.allLines.push(lines[i])
+        }
+      }
+      
       this.state.totalLines = this.state.allLines.length
       
       // 增量构建行索引

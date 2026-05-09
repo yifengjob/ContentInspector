@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import {DirectoryNode} from './types';
-import {logger} from "./logger";
+import {DirectoryNode} from '../types';
+import {logger} from "../logger/logger";
 
 export async function getDirectoryTree(dirPath: string, showHidden: boolean): Promise<DirectoryNode[]> {
     if (!fs.existsSync(dirPath)) {

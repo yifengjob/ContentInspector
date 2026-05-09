@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import {app} from 'electron';
-import {AppConfig} from './types';
+import {AppConfig} from '../types/';
 // 【优化】导入配置常量
 import {
     BYTES_TO_GB,
@@ -16,8 +16,8 @@ import {
     MEMORY_PER_WORKER_GB
 } from './scan-config';
 // 【D3 优化】导入错误处理工具
-import {createConfigSaveError,} from './error-utils';
-import {logger} from "./logger";
+import {createConfigSaveError,} from '../utils/error-utils';
+import {logger} from "../logger/logger";
 
 const CONFIG_FILE = path.join(app.getPath('userData'), 'config.json');
 

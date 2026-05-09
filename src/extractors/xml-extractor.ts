@@ -5,11 +5,11 @@
 
 import {createReadStream} from 'fs';
 import * as sax from 'sax';
-import {MAX_TEXT_CONTENT_SIZE_MB, BYTES_TO_MB} from '../scan-config';
-import {convertNodeError} from '../error-utils';
+import {MAX_TEXT_CONTENT_SIZE_MB, BYTES_TO_MB} from '../core/scan-config';
+import {convertNodeError} from '../utils/error-utils';
 import type {ExtractorResult} from './types';
 import {extractTextFile} from './text-extractor';
-import {extractorLogger} from "../logger";
+import {extractorLogger} from "../logger/logger";
 
 export async function extractXmlFile(filePath: string): Promise<ExtractorResult> {
     return new Promise((resolve, reject) => {

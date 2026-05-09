@@ -3,10 +3,10 @@
  * 支持: ppt, dps, zip, rar, 7z, tar, gz 等
  */
 
-import {FILE_READ_TIMEOUT_STANDARD_MS} from '../scan-config';  // 【新增】导入超时配置
-import {extractorLogger} from '../logger' ;
+import {FILE_READ_TIMEOUT_STANDARD_MS} from '../core/scan-config';  // 【新增】导入超时配置
+import {extractorLogger} from '../logger/logger' ;
 import type {ExtractorResult} from './types';
-import {readFileWithTimeout} from '../file-utils';
+import {readFileWithTimeout} from '../utils/file-utils';
 
 // 从二进制数据中提取可打印文本
 export function extractTextFromBinary(data: Buffer): string {

@@ -12,9 +12,9 @@ import {
   SLIDING_WINDOW_CHUNK_SIZE_MB,
   SLIDING_WINDOW_OVERLAP_SIZE,
   BYTES_TO_MB
-} from './scan-config';
-import { getHighlights } from './sensitive-detector';
-import type { HighlightRange } from './types';
+} from '../core/scan-config';
+import { getHighlights } from '../detection/sensitive-detector';
+import type { HighlightRange } from '../types';
 
 /**
  * 敏感词检测结果

@@ -8,7 +8,7 @@ export default defineConfig({
         vue(),
         createSvgIconsPlugin({
             // 指定需要缓存的图标文件夹（支持子目录）
-            iconDirs: [path.resolve(process.cwd(), 'src/assets/icons')],
+            iconDirs: [path.resolve(__dirname, 'src', 'assets', 'icons')],
             // 指定symbolId格式：统一为 icon-[name]，文件名需唯一
             // 例如：src/assets/icons/info.svg → icon-info
             //       src/assets/delete.svg → icon-delete
@@ -17,7 +17,7 @@ export default defineConfig({
     ],
     resolve: {
         alias: {
-            '@': path.resolve(__dirname, './src'),
+            '@': path.resolve(__dirname, 'src'),
         },
     },
     base: './',  // 使用相对路径，适配 Electron
@@ -36,7 +36,7 @@ export default defineConfig({
         target: 'es2020',  // Electron 22 支持 ES2020
         minify: 'esbuild',  // 生产环境自动启用，速度快 10-20 倍
         sourcemap: process.env.NODE_ENV !== 'production',
-        outDir: '../dist/renderer',  // 渲染进程输出到 dist/renderer，与主进程区分
+        outDir: path.resolve(__dirname, '..', 'dist', 'renderer'),  // 渲染进程输出到 dist/renderer，与主进程区分
         emptyOutDir: true,  // 每次构建前清空输出目录
         assetsDir: 'assets',
         assetsInlineLimit: 4096,  // 小于 4KB 的资源内联为 base64

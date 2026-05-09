@@ -4,8 +4,8 @@ import * as path from 'path';
 import {
     createPermissionError,
     createDeleteError,
-} from './error-utils';
-import {fileLogger} from "./logger";
+} from '../utils/error-utils';
+import {fileLogger} from "../logger/logger";
 
 // 允许的文件路径列表（由扫描模块维护）
 const allowedPaths = new Set<string>();

@@ -1,10 +1,10 @@
 // 【关键】首先导入日志抑制工具（必须在任何其他导入之前）
-import './log-utils';
+import '../utils/log-utils';
 
 import * as path from 'path';
 // 【重构】从 file-types.ts 导入配置和辅助函数
-import { getFileExtractor } from './file-types';
-import {fileLogger} from "./logger";
+import { getFileExtractor } from '../utils/file-types';
+import {fileLogger} from "../logger/logger";
 
 /**
  * 从文件中提取文本的主入口函数

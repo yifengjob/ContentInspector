@@ -1,4 +1,4 @@
-import { HighlightRange } from './types';
+import { HighlightRange } from '../types';
 
 interface SensitiveRule {
   id: string;

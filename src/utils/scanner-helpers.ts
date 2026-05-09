@@ -4,17 +4,17 @@
  */
 
 import {BrowserWindow} from 'electron';
-import {ScanState} from './scan-state';
+import {ScanState} from '../core/scan-state';
 import {
     BYTES_TO_MB,
     MAX_LOG_ENTRIES,
     WORKER_BASE_TIMEOUT,
     WORKER_TIMEOUT_PER_MB,
     WORKER_MAX_TIMEOUT, SCAN_LOG_FILE_LEVEL, SCAN_LOG_FRONTEND_LEVEL, SCAN_LOG_MEMORY_LEVEL
-} from './scan-config';
-import {LogLevel} from "./types";
+} from '../core/scan-config';
+import {LogLevel} from "../types";
 // 【新增】导入公共工具函数
-import {getBeijingTimestamp, formatLogMessage, Logger} from './logger';
+import {getBeijingTimestamp, formatLogMessage, Logger} from '../logger/logger';
 
 
 /**

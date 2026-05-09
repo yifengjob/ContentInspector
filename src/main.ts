@@ -3,10 +3,11 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 // 【关键】首先导入日志抑制工具（必须在任何其他导入之前）
-import './log-utils';
+import './utils/log-utils';
 
 // 【新增】设置日志文件
-import { setupFileLogger, mainLogger, flushLogStream } from './logger';
+import {setupFileLogger, mainLogger, flushLogStream} from './logger/logger';
+
 const logDir = path.join(app.getPath('userData'), 'logs');
 setupFileLogger(logDir);
 
@@ -14,17 +15,18 @@ setupFileLogger(logDir);
 app.commandLine.appendSwitch('js-flags', '--expose-gc');
 
 // 【修复】初始化 PDF.js 所需的 polyfill（包括 Promise.withResolvers、DOMMatrix、浏览器环境模拟）
-import { setupAllPdfPolyfills } from './pdf-polyfills';
+import {setupAllPdfPolyfills} from './utils/pdf-polyfills';
+
 setupAllPdfPolyfills();
 
-import {ScanState} from './scan-state';
-import {getDirectoryTree} from './directory-tree';
-import {cancelScan, startScan} from './scanner';
-import {deleteFile, openFile, openFileLocation} from './file-operations';
-import {exportReport} from './report-exporter';
-import {loadConfig, saveConfig, calculateRecommendedConcurrency} from './config-manager';
-import {checkEnvironment} from './environment-check';
-import {getSensitiveRules} from './sensitive-detector';
+import {ScanState} from './core/scan-state';
+import {getDirectoryTree} from './services/directory-tree';
+import {cancelScan, startScan} from './core/scanner';
+import {deleteFile, openFile, openFileLocation} from './services/file-operations';
+import {exportReport} from './services/report-exporter';
+import {loadConfig, saveConfig, calculateRecommendedConcurrency} from './core/config-manager';
+import {checkEnvironment} from './core/environment-check';
+import {getSensitiveRules} from './detection/sensitive-detector';
 // 【优化】导入配置常量
 import {
     CANCEL_SCAN_MAX_WAIT,
@@ -42,7 +44,7 @@ import {
     MS_TO_DAYS,
     BYTES_TO_MB,
     LOG_RETENTION_DAYS// 【方案 C】预览文件大小限制
-} from './scan-config';
+} from './core/scan-config';
 
 // 【修复】添加全局未处理异常处理器，防止 Windows 闪退
 process.on('unhandledRejection', (reason, _promise) => {
@@ -129,8 +131,8 @@ function createWindow() {
     try {
         // macOS优先使用.icns，其他平台使用.png
         const iconPath = process.platform === 'darwin'
-            ? path.join(__dirname, '../build/icons/icon.icns')
-            : path.join(__dirname, '../build/icons/icon.png');
+            ? path.join(__dirname, '..', 'build', 'icons', 'icon.icns')
+            : path.join(__dirname, '..', 'build', 'icons', 'icon.png');
 
         mainLogger.info('尝试加载图标，路径:', iconPath);
         if (fs.existsSync(iconPath)) {
@@ -172,7 +174,7 @@ function createWindow() {
     // 优先使用环境变量，其次检查dist目录是否存在
     const isDev = process.env.NODE_ENV === 'development' ||
         process.env.ELECTRON_IS_DEV === '1' ||
-        !require('fs').existsSync(path.join(__dirname, '../dist/renderer/index.html'));
+        !require('fs').existsSync(path.join(__dirname, '..', 'dist', 'renderer', 'index.html'));
 
     mainLogger.info('运行模式:', isDev ? '开发模式 (Vite)' : '生产模式 (文件)');
 
@@ -183,33 +185,24 @@ function createWindow() {
             mainLogger.info('尝试加载本地文件...');
             // 如果开发服务器不可用，尝试加载本地文件
             if (mainWindow) {
-                mainWindow.loadFile(path.join(__dirname, '../dist/renderer/index.html')).catch((fileErr) => {
+                mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'renderer', 'index.html')).catch((fileErr) => {
                     mainLogger.error('加载本地文件也失败:', fileErr);
                 });
             }
         });
         mainWindow.webContents.openDevTools();
     } else {
-        // 生产模式：使用 app.getAppPath() 获取正确的路径
-        const appPath = app.getAppPath();
-        const indexPath = path.join(appPath, 'dist', 'renderer', 'index.html');
-        mainLogger.info('应用路径:', appPath);
+        // 生产模式：使用 __dirname 确保路径准确
+        const indexPath = path.join(__dirname, '..', 'dist', 'renderer', 'index.html');
+        mainLogger.info('应用路径:', app.getAppPath());
         mainLogger.info('加载本地文件:', indexPath);
 
         // 检查文件是否存在
         const fs = require('fs');
         if (!fs.existsSync(indexPath)) {
             mainLogger.error('前端文件不存在:', indexPath);
-            // 尝试其他可能的路径
-            const altPath = path.join(__dirname, '..', 'dist', 'renderer', 'index.html');
-            mainLogger.info('尝试备用路径:', altPath);
-            if (fs.existsSync(altPath)) {
-                mainWindow.loadFile(altPath).catch((err) => {
-                    mainLogger.error('加载备用路径失败:', err);
-                });
-            } else {
-                mainLogger.error('所有路径都失败，请检查打包配置');
-            }
+            // 尝试打印 __dirname 看看实际指向哪里
+            mainLogger.error('当前 __dirname:', __dirname);
         } else {
             mainWindow.loadFile(indexPath).catch((err) => {
                 mainLogger.error('加载前端文件失败:', err);
@@ -223,17 +216,17 @@ function createWindow() {
             cancelScan(scanState);
             scanState.isScanning = false;
         }
-        
+
         // 【新增】窗口关闭时停止电源阻止器
         if (powerSaveBlockerId !== null) {
             powerSaveBlocker.stop(powerSaveBlockerId);
             mainLogger.info(`[电源管理] 窗口关闭，已停止电源阻止器 (ID: ${powerSaveBlockerId})`);
             powerSaveBlockerId = null;
         }
-        
+
         mainWindow = null;
     });
-    
+
     // 【新增】设置扫描完成监听器
     setupScanFinishedListener();
 }
@@ -310,7 +303,7 @@ function setupIpcHandlers() {
                 powerSaveBlockerId = powerSaveBlocker.start('prevent-app-suspension');
                 mainLogger.info(`[电源管理] 已启动电源阻止器 (ID: ${powerSaveBlockerId})，防止系统休眠`);
             }
-            
+
             // 不 await，让扫描在后台进行
             startScan(config, mainWindow, scanState).catch(error => {
                 mainLogger.error('扫描异常:', error);
@@ -338,18 +331,18 @@ function setupIpcHandlers() {
                 if (!scanState.isScanning) {
                     clearInterval(checkInterval);
                     mainLogger.info('[scan-cancel] 扫描已安全取消');
-                    
+
                     // 【新增】停止电源阻止器
                     if (powerSaveBlockerId !== null) {
                         powerSaveBlocker.stop(powerSaveBlockerId);
                         mainLogger.info(`[电源管理] 已停止电源阻止器 (ID: ${powerSaveBlockerId})`);
                         powerSaveBlockerId = null;
                     }
-                    
+
                     resolve({success: true});
                 }
             }, CANCEL_SCAN_CHECK_INTERVAL);
-            
+
             // 超时强制 resolve
             setTimeout(() => {
                 clearInterval(checkInterval);
@@ -357,14 +350,14 @@ function setupIpcHandlers() {
                     mainLogger.warn(`[scan-cancel] 警告: 等待 ${CANCEL_SCAN_MAX_WAIT / 1000} 秒后扫描仍未结束，强制重置状态`);
                     scanState.isScanning = false;
                 }
-                
+
                 // 【新增】停止电源阻止器
                 if (powerSaveBlockerId !== null) {
                     powerSaveBlocker.stop(powerSaveBlockerId);
                     mainLogger.info(`[电源管理] 已停止电源阻止器 (ID: ${powerSaveBlockerId})`);
                     powerSaveBlockerId = null;
                 }
-                
+
                 resolve({success: true, warning: '强制重置扫描状态'});
             }, CANCEL_SCAN_MAX_WAIT);
         });
@@ -383,7 +376,7 @@ function setupIpcHandlers() {
             const enabledTypes = config.enabledSensitiveTypes || [];
 
             // 创建 Worker
-            const workerPath = pathModule.join(__dirname, 'file-worker.js');
+            const workerPath = pathModule.join(__dirname, 'workers', 'file-worker.js');
             const taskId = Date.now();
             const worker = new Worker(workerPath, {
                 resourceLimits: {
@@ -471,7 +464,7 @@ function setupIpcHandlers() {
                     // 【P0修复】防止重复处理
                     if (isResolved) return;
                     isResolved = true;
-                    
+
                     if (timeout) clearTimeout(timeout);
                     previewWorkers.delete(taskId);
                     resolve({error: '预览失败：' + error.message});
@@ -480,7 +473,7 @@ function setupIpcHandlers() {
                 worker.on('exit', (code: number) => {
                     // 【P0修复】防止重复处理
                     if (isResolved) return;
-                    
+
                     if (code !== 0 && !messageReceived) {
                         isResolved = true;  // 【P0修复】标记已解决
                         if (timeout) clearTimeout(timeout);
@@ -746,7 +739,7 @@ let originalSend: any = null;
 function setupScanFinishedListener() {
     if (!originalSend && mainWindow) {
         originalSend = mainWindow.webContents.send.bind(mainWindow.webContents);
-        mainWindow.webContents.send = function(channel: string, ...args: any[]) {
+        mainWindow.webContents.send = function (channel: string, ...args: any[]) {
             if (channel === 'scan-finished') {
                 // 扫描完成时停止电源阻止器
                 if (powerSaveBlockerId !== null) {

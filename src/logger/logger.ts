@@ -11,7 +11,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import {LogLevel} from './types';
+import {LogLevel} from '../types';
 
 // 【配置】日志保留天数
 const LOG_RETENTION_DAYS = 30;

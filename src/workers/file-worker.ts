@@ -4,7 +4,7 @@
  */
 
 // 【关键】首先导入日志抑制工具（必须在任何其他导入之前）
-import './log-utils';
+import '../utils/log-utils';
 
 // 【新增】拦截 stderr，抑制 PDF 字体警告（防止前端卡死）
 const originalStderrWrite = process.stderr.write;
@@ -32,22 +32,22 @@ process.env.PDFJS_DISABLE_WARNINGS = '1';
 process.env.NODE_NO_WARNINGS = '1';
 
 // 【修复】初始化 PDF.js 所需的 polyfill
-import { setupAllPdfPolyfills } from './pdf-polyfills';
+import { setupAllPdfPolyfills } from '../utils/pdf-polyfills';
 setupAllPdfPolyfills();
 
 import { parentPort, threadId } from 'worker_threads';
 
-import { extractTextFromFile } from './file-parser';
+import { extractTextFromFile } from '../extractors';
 // 【新增】导入流式处理器
-import { FileStreamProcessor } from './file-stream-processor';
+import { FileStreamProcessor } from '../utils/file-stream-processor';
 // 【新增】导入文件类型配置
 import { 
   getFileTypeConfig, 
   FileProcessorType
-} from './file-types';
+} from '../utils/file-types';
 // 【优化】导入配置常量和智能超时计算函数
-import {calculateWorkerTimeout} from './scan-config';
-import {workerLogger} from "./logger";
+import {calculateWorkerTimeout} from '../core/scan-config';
+import {workerLogger} from "../logger/logger";
 
 interface WorkerTask {
   taskId: number;

@@ -102,12 +102,14 @@ interface PreviewChunk {
 
 const streamState = ref({
   receivedChunks: [] as PreviewChunk[],
-  renderedLines: [] as string[],
-  renderedHighlights: [] as GlobalHighlight[],
   isRendering: false,
   totalChunks: 0,
   receivedChunksCount: 0
 })
+
+// 【关键修复】使用非响应式数组存储海量数据，避免 Vue 响应式开销
+const allLines: string[] = []
+const allHighlights: GlobalHighlight[] = []
 
 // 【方案 D3】虚拟滚动器
 const scroller = new PreviewVirtualScroller(PREVIEW_CONFIG.LINE_HEIGHT, PREVIEW_CONFIG.BUFFER_LINES)
@@ -151,10 +153,11 @@ function scheduleRender() {
   if (renderScheduled) return
   
   renderScheduled = true
-  requestAnimationFrame(() => {
+  // 【修复】使用 setTimeout 替代 rAF，确保在当前宏任务结束后再执行，避开 Vue 响应式同步追踪
+  setTimeout(() => {
     renderScheduled = false
     performBatchRender()
-  })
+  }, 0)
 }
 
 async function performBatchRender() {
@@ -166,56 +169,48 @@ async function performBatchRender() {
     const chunksToRender = [...streamState.value.receivedChunks]
     streamState.value.receivedChunks = []
     
-    if (chunksToRender.length === 0) return
+    if (chunksToRender.length === 0) {
+      streamState.value.isRendering = false
+      return
+    }
     
-    // 【优化】检查是否已取消，避免不必要的处理
     if (!props.visible) {
       streamState.value.isRendering = false
       return
     }
     
-    // 按块索引排序
     chunksToRender.sort((a, b) => a.chunkIndex - b.chunkIndex)
     
-    // 合并行和高亮
+    // 【关键修复】直接操作非响应式数组，零开销
     for (const chunk of chunksToRender) {
-      streamState.value.renderedLines.push(...chunk.lines)
-      
-      // 【优化】后端已经发送全局偏移，直接保存
-      streamState.value.renderedHighlights.push(...chunk.highlights)
+      allLines.push(...chunk.lines)
+      allHighlights.push(...chunk.highlights)
     }
     
-    // 更新虚拟滚动器
-    scroller.updateData(chunksToRender.flatMap(c => c.lines))
+    // 更新虚拟滚动器（传入非响应式数组）
+    scroller.updateData(allLines)
     
-    // 如果是第一块，隐藏 loading
     if (streamState.value.receivedChunksCount <= chunksToRender.length) {
       loading.value = false
     }
     
-    // 【优化】再次检查是否已取消
     if (!props.visible) {
       streamState.value.isRendering = false
       return
     }
     
-    // 重新渲染可见区域
     await nextTick()
     renderVisibleContent()
     
+  } catch (e) {
+    console.error('Render error:', e)
   } finally {
     streamState.value.isRendering = false
     
-    // 如果还有新数据，继续渲染
     if (streamState.value.receivedChunks.length > 0 && props.visible) {
-      scheduleRender()
+      setTimeout(scheduleRender, 0)
     }
   }
-}
-
-// 【性能优化】使用虚拟滚动器的行索引缓存，O(1) 复杂度
-function getLineOffset(lineNumber: number): number {
-  return scroller.getLineOffset(lineNumber)
 }
 
 // 渲染可见区域
@@ -233,19 +228,17 @@ function renderVisibleContent() {
     return
   }
   
-  // 【优化】计算可见区域的字符范围
-  const visibleStartOffset = getLineOffset(startIndex)
-  const visibleEndOffset = getLineOffset(startIndex + lines.length)
+  // 【修复】直接从非响应式数组获取偏移量
+  const visibleStartOffset = scroller.getLineOffset(startIndex)
+  const visibleEndOffset = scroller.getLineOffset(startIndex + lines.length)
   
-  // 获取该行范围的高亮（修复：使用 < 而非 <=，允许跨边界高亮）
-  const visibleHighlights = streamState.value.renderedHighlights.filter(h => {
+  // 【修复】从非响应式数组过滤高亮
+  const visibleHighlights = allHighlights.filter(h => {
     return h.start < visibleEndOffset && h.end > visibleStartOffset
   })
   
-  // 转换为行内高亮
   const lineHighlightsMap = scroller.convertHighlights(visibleHighlights)
   
-  // 生成 HTML
   let html = ''
   for (let i = 0; i < lines.length; i++) {
     const lineIndex = startIndex + i
@@ -346,10 +339,10 @@ async function loadFile(filePath: string) {
   const taskId = Date.now()
   currentTaskId.value = taskId
   
-  // 【方案 D3】重置状态
+  // 【修复】重置非响应式数组
+  allLines.length = 0
+  allHighlights.length = 0
   streamState.value.receivedChunks = []
-  streamState.value.renderedLines = []
-  streamState.value.renderedHighlights = []
   streamState.value.isRendering = false
   streamState.value.totalChunks = 0
   streamState.value.receivedChunksCount = 0
@@ -425,8 +418,8 @@ const handleOpenFile = async () => {
 
 const handleCopyContent = async () => {
   try {
-    // 【方案 A】从流式状态中获取完整内容
-    const fullText = streamState.value.renderedLines.join('\n')
+    // 【修复】从非响应式数组获取内容
+    const fullText = allLines.join('\n')
     
     if (!fullText) {
       await showMessage('暂无内容可复制', { type: 'warning' })
@@ -452,20 +445,16 @@ const handleClose = () => {
     // 【优化】正常关闭前，先停止渲染调度，防止竞态条件
     renderScheduled = false
     
-    // 【优化】异步清空大数据，避免阻塞 UI 关闭动画
+    // 【优化】异步清空大数据
     setTimeout(() => {
-      // 清空流式状态
+      allLines.length = 0
+      allHighlights.length = 0
       streamState.value.receivedChunks = []
-      streamState.value.renderedLines = []
-      streamState.value.renderedHighlights = []
       streamState.value.isRendering = false
       streamState.value.totalChunks = 0
       streamState.value.receivedChunksCount = 0
       
-      // 清空虚拟滚动器
       scroller.reset()
-      
-      // 清空可见内容
       visibleContent.value = ''
     }, 0)
     

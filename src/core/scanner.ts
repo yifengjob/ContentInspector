@@ -3,9 +3,9 @@ import * as path from 'path';
 import * as os from 'os';
 import {BrowserWindow} from 'electron';
 import {Worker} from 'worker_threads';
-import {ScanConfig, ScanResultItem} from './types';
+import {ScanConfig, ScanResultItem} from '../types';
 import {ScanState} from './scan-state';
-import {addAllowedPath, clearAllowedPaths} from './file-operations';
+import {addAllowedPath, clearAllowedPaths} from '../services/file-operations';
 import {calculateActualConcurrency} from './config-manager';
 // 【优化】导入扫描配置常量
 import {
@@ -33,9 +33,9 @@ import {
     safelyTerminateWorker,  // 【新增】日志级别
     resultBatchSender,  // 【P3优化】批量发送管理器
     LogThrottler  // 【P3优化】日志抑制器
-} from './scanner-helpers';
+} from '../utils/scanner-helpers';
 // 【新增】导入文件类型工具函数
-import { getFileType } from './file-types';
+import {getFileType} from '../utils/file-types';
 
 export async function startScan(
     config: ScanConfig,
@@ -84,11 +84,11 @@ export async function startScan(
     let totalSensitiveItems = 0;    // 【新增】发现的敏感信息总条数
     let activeWorkerCount = 0;      // 【优化】跟踪活跃的 Worker 数量
     const countedTaskIds = new Set<number>(); // 【修复】防止重复计数
-    
+
     // 【P3优化】日志抑制计数器
     let errorLogCount = 0;          // 错误日志计数
     const ERROR_LOG_INTERVAL = 50;  // 每 50 个错误输出一次
-    
+
     // 【P3优化】敏感文件日志抑制器（数量+时间双重触发）
     const resultLogThrottler = new LogThrottler({
         countInterval: 100,         // 每 100 条输出一次
@@ -298,7 +298,7 @@ export async function startScan(
         const baseMemoryPerWorker = Math.min(systemBasedLimit, configBasedLimit);
 
         // 设置最低和最高限制
-        const minMemoryPerWorker = 200; // 【修复】最少 512MB（原200MB，防止 PDF/DOCX 解析超时）
+        const minMemoryPerWorker = 256; // 【修复】最少 256MB，防止 PDF/DOCX 解析超时
         const maxMemoryPerWorker = Math.floor(freeMemoryMB * 0.8 / workerCount); // 最多使用 80% 可用内存
 
         const finalMemoryPerWorker = Math.max(
@@ -319,10 +319,10 @@ export async function startScan(
      * 【P1修复】统一的 Consumer 计数更新函数
      * 【修复】移除条件判断，确保每次任务完成都会正确更新计数（与 a42a18ee 版本一致）
      */
-    function updateConsumerCount(consumer: any, taskId?: number): void {
+    function updateConsumerCount(taskId?: number): void {
         // 【修复】无条件减少活跃 Worker 计数
         activeWorkerCount--;
-        
+
         // 【修复】无论 Consumer 状态如何，只要 taskId 有效就增加处理计数
         if (taskId !== undefined) {
             incrementConsumerCount(taskId);
@@ -331,7 +331,7 @@ export async function startScan(
 
     // 创建 Consumer Worker
     function createConsumer(id: number, customOldGen?: number, customYoungGen?: number) {
-        const workerPath = path.join(__dirname, 'file-worker.js');
+        const workerPath = path.join(__dirname, '..', 'workers', 'file-worker.js');
 
         // 使用自定义内存限制或默认值
         const oldGenLimit = customOldGen || dynamicOldGenMB;
@@ -374,7 +374,7 @@ export async function startScan(
                 // 【重构】使用辅助函数标记 Consumer 为空闲
                 markConsumerIdle(consumer);
                 // 【P1修复】使用统一的计数更新函数
-                updateConsumerCount(consumer, taskId);
+                updateConsumerCount(taskId);
 
                 // 【智能调度】清理状态
                 cleanupConsumerState(consumer);
@@ -390,7 +390,7 @@ export async function startScan(
             // 【重构】使用辅助函数标记 Worker 为空闲
             markConsumerIdle(consumer);
             // 【P1修复】使用统一的计数更新函数
-            updateConsumerCount(consumer, taskId);
+            updateConsumerCount(taskId);
 
             // 【智能调度】清理状态
             cleanupConsumerState(consumer);
@@ -404,14 +404,14 @@ export async function startScan(
             // 处理结果
             if (result.error) {
                 errorLogCount++;
-                
+
                 // 【P3优化】抑制高频错误日志，每 50 个错误输出一次汇总
                 if (errorLogCount % ERROR_LOG_INTERVAL === 1) {
                     log.info(`处理文件失败: ${result.error}`);
                 } else if (errorLogCount % ERROR_LOG_INTERVAL === 0) {
                     log.info(`累计处理失败 ${errorLogCount} 个文件`);
                 }
-                
+
                 pending.reject(new Error(result.error));
             } else {
                 if (result.total && result.total > 0) {
@@ -457,7 +457,7 @@ export async function startScan(
             log.error(`[Consumer ${id}] Worker 错误: ${error.message}`);
 
             // 【P1修复】使用统一的计数更新函数，防止重复减少计数
-            updateConsumerCount(consumer, consumer.taskId);
+            updateConsumerCount(consumer.taskId);
         });
 
         worker.on('exit', (code: number, signal: string | null) => {
@@ -490,11 +490,11 @@ export async function startScan(
                 }
 
                 // 【P1修复】使用统一的计数更新函数，防止重复减少计数
-                updateConsumerCount(consumerRef, consumerRef.taskId);
+                updateConsumerCount(consumerRef.taskId);
 
                 // 【智能调度】清理状态
                 cleanupConsumerState(consumerRef);
-                
+
                 // 标记为空闲
                 markConsumerIdle(consumerRef);  // 这里会重置 counted = false
 
@@ -865,7 +865,7 @@ export async function startScan(
         if (pending) {
             pendingTasks.delete(consumer.taskId);
             // 【P1修复】使用统一的计数更新函数
-            updateConsumerCount(consumer, consumer.taskId);
+            updateConsumerCount(consumer.taskId);
             sendProgressUpdate(task.filePath);
             pending.reject(new Error(`文件处理超时`));
         }
@@ -985,7 +985,7 @@ export async function startScan(
                 if (pending) {
                     pendingTasks.delete(taskId);
                     // 【P1修复】使用统一的计数更新函数
-                    updateConsumerCount(consumer, taskId);
+                    updateConsumerCount(taskId);
 
                     // 【修复】发送进度更新，确保前端数字继续动
                     sendProgressUpdate(task.filePath);
@@ -1023,14 +1023,14 @@ export async function startScan(
                 });
             } catch (error: any) {
                 log.error(`[TaskQueue] 发送任务失败: ${error.message}`);
-                
+
                 // 回滚状态
                 consumer.busy = false;
                 consumer.taskId = undefined;
-                
+
                 // 【P1修复】使用统一的计数更新函数
-                updateConsumerCount(consumer, taskId);
-                
+                updateConsumerCount(taskId);
+
                 // 【修复】清理 pendingTasks 并 reject Promise
                 const pending = pendingTasks.get(taskId);
                 if (pending) {
@@ -1038,7 +1038,7 @@ export async function startScan(
                     pendingTasks.delete(taskId);
                     pending.reject(new Error(`发送任务失败: ${error.message}`));
                 }
-                
+
                 // 将任务放回队列头部（【关键修复】使用 enqueueTask）
                 enqueueTask(task);
             }
@@ -1046,7 +1046,7 @@ export async function startScan(
     }
 
     // 创建 Walker Worker
-    const walkerWorkerPath = path.join(__dirname, 'walker-worker.js');
+    const walkerWorkerPath = path.join(__dirname, '..', 'workers', 'walker-worker.js');
     let walkerWorker: Worker;
     try {
         // 【修复】给 Walker Worker 也设置内存限制，防止 OOM
@@ -1149,58 +1149,58 @@ export async function startScan(
                     dynamicOldGenMB = newLimits.oldGen;
                     dynamicYoungGenMB = newLimits.youngGen;
 
-                log.info(`【智能内存调整】平均文件大小: ${avgFileSizeMB.toFixed(2)}MB, 新内存限制: 老生代=${dynamicOldGenMB}MB, 新生代=${dynamicYoungGenMB}MB`);
+                    log.info(`【智能内存调整】平均文件大小: ${avgFileSizeMB.toFixed(2)}MB, 新内存限制: 老生代=${dynamicOldGenMB}MB, 新生代=${dynamicYoungGenMB}MB`);
 
-                // 【关键】重启所有空闲的 Consumer Workers 以应用新配置
-                // 【修复】延迟 100ms 确保所有 Worker 的状态已同步
-                setTimeout(() => {
-                    let restartedCount = 0;
+                    // 【关键】重启所有空闲的 Consumer Workers 以应用新配置
+                    // 【修复】延迟 100ms 确保所有 Worker 的状态已同步
+                    setTimeout(() => {
+                        let restartedCount = 0;
 
-                    // 【Map优化】遍历 Map 中的所有 Consumer
-                    for (const [consumerId, consumer] of consumers) {
-                        if (!consumer.busy) {
-                            // 终止旧的 Worker
-                            try {
-                                consumer.worker.terminate();
-                                consumer.worker.removeAllListeners();
-                            } catch (e) {
-                                // 忽略终止错误
+                        // 【Map优化】遍历 Map 中的所有 Consumer
+                        for (const [consumerId, consumer] of consumers) {
+                            if (!consumer.busy) {
+                                // 终止旧的 Worker
+                                try {
+                                    consumer.worker.terminate();
+                                    consumer.worker.removeAllListeners();
+                                } catch (e) {
+                                    // 忽略终止错误
+                                }
+
+                                // 【Map优化】删除旧 Consumer，创建新的 Worker（使用新内存限制）
+                                consumers.delete(consumerId);
+                                createConsumer(consumerId, dynamicOldGenMB, dynamicYoungGenMB);
+                                restartedCount++;
                             }
-
-                            // 【Map优化】删除旧 Consumer，创建新的 Worker（使用新内存限制）
-                            consumers.delete(consumerId);
-                            createConsumer(consumerId, dynamicOldGenMB, dynamicYoungGenMB);
-                            restartedCount++;
                         }
-                    }
 
-                    if (restartedCount > 0) {
-                        log.info(`【智能内存】已重启 ${restartedCount} 个空闲 Worker 以应用新内存配置`);
+                        if (restartedCount > 0) {
+                            log.info(`【智能内存】已重启 ${restartedCount} 个空闲 Worker 以应用新内存配置`);
 
-                        // 【新增】批量重启后强制 GC，释放内存
-                        if ((global as any).gc) {
-                            log.info(`【智能内存】执行强制垃圾回收...`);
-                            (global as any).gc();
+                            // 【新增】批量重启后强制 GC，释放内存
+                            if ((global as any).gc) {
+                                log.info(`【智能内存】执行强制垃圾回收...`);
+                                (global as any).gc();
+                            }
                         }
-                    }
-                }, 100);
+                    }, 100);
+                }
+
+                // 【事件驱动】检查是否应该结束
+                checkAndComplete();
             }
 
-            // 【事件驱动】检查是否应该结束
-            checkAndComplete();
-        }
+            if (message.type === 'walking-error') {
+                log.error(`Walker 错误: ${message.error}`);
 
-        if (message.type === 'walking-error') {
-            log.error(`Walker 错误: ${message.error}`);
+                // 【事件驱动】检查是否应该结束
+                checkAndComplete();
+            }
 
-            // 【事件驱动】检查是否应该结束
-            checkAndComplete();
-        }
-
-        // 【调试】接收 Walker Worker 的日志
-        if (message.type === 'walker-log') {
-            log.info(message.message);
-        }
+            // 【调试】接收 Walker Worker 的日志
+            if (message.type === 'walker-log') {
+                log.info(message.message);
+            }
         } catch (error: any) {
             // 【P3优化】Walker Worker 消息处理错误边界
             log.error(`[Walker] 处理消息失败: ${error.message}`);
@@ -1426,7 +1426,7 @@ export async function startScan(
                 log.info('[cleanup] 触发垃圾回收...');
                 (global as any).gc();
             }
-            
+
             // 【P1修复】销毁 Logger，释放日志数组和闭包引用
             if (log && log.destroy) {
                 log.destroy();
@@ -1441,7 +1441,7 @@ export async function startScan(
     // 启动 Walker Worker
     const totalPaths = config.selectedPaths.length;
     let currentPathIndex = 0;
-    
+
     // 【注意】前端已通过 getEffectiveScanPaths() 去重，后端无需再次清理
 
     for (const rootPath of config.selectedPaths) {
