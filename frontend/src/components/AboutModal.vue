@@ -36,7 +36,6 @@
           
           <div class="author-info">
             <h4>作者信息</h4>
-            <p><strong>开发单位：</strong>长沙农商银行</p>
             <p><strong>开发者：</strong>易峰</p>
             <p><strong>联系邮箱：</strong><a href="mailto:yifengjob@qq.com">yifengjob@qq.com</a></p>
           </div>
@@ -60,7 +59,7 @@
           </div>
           
           <div class="copyright">
-            <p>© 2026 长沙农商银行. All rights reserved.</p>
+            <p>© 2026 YiFeng. All rights reserved.</p>
           </div>
         </div>
       </div>
