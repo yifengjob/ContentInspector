@@ -49,7 +49,7 @@ export function setupPdfJsPolyfills(context: any = global): void {
     // 【关键修复】Path2D polyfill（防止 pdf.js 尝试加载 canvas 模块）
     if (typeof context.Path2D === 'undefined') {
       context.Path2D = class Path2D {
-        constructor(path?: any) {
+        constructor(_path?: any) {
           // 空实现，仅用于避免 pdf.js 报错
         }
         addPath() {}
