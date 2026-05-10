@@ -146,7 +146,7 @@ export async function startScan(
     }
 
     /**
-     * 【新架构】向队列中添加任务（O(1)）
+     * 【新架构】向队列中添加任务（O(1)）并触发事件通知
      */
     function enqueueTask(task: Task): void {
         ensureTypeQueue(task.fileType);
@@ -158,6 +158,15 @@ export async function startScan(
             queues.small.push(task);
         }
 
+        // 【真正的事件驱动】新任务入队后，查找是否有空闲的 Worker，有则立即分配
+        // 注意：这里不是遍历所有 Worker，而是找到第一个空闲的就分配
+        for (const consumer of consumers.values()) {
+            if (!consumer.busy) {
+                // 找到空闲 Worker，立即为其分配任务
+                assignTaskToIdleConsumer(consumer);
+                break; // 只分配一个任务，其他空闲 Worker 等待下一个 task-ready 事件
+            }
+        }
     }
 
     /**
@@ -210,6 +219,39 @@ export async function startScan(
     let nextTypeIndex = 0;
     const typeOrder: string[] = [];
 
+    // 【修复】Worker 创建队列 - 串行化创建避免 EAGAIN 错误
+    const workerCreateQueue: Array<{consumerId: number, oldGen?: number, youngGen?: number}> = [];
+    let isCreatingWorker = false;
+    
+    /**
+     * 【修复】串行化创建 Worker，避免并发创建导致 EAGAIN
+     */
+    async function processWorkerCreateQueue(): Promise<void> {
+        if (isCreatingWorker || workerCreateQueue.length === 0) {
+            return;
+        }
+        
+        isCreatingWorker = true;
+        
+        while (workerCreateQueue.length > 0) {
+            const {consumerId, oldGen, youngGen} = workerCreateQueue.shift()!;
+            
+            try {
+                createConsumer(consumerId, oldGen, youngGen);
+                // 【关键】每个 Worker 创建后延迟 50ms，避免资源竞争
+                await new Promise(resolve => setTimeout(resolve, 50));
+            } catch (error: any) {
+                log.error(`[Worker创建] 创建 Worker ${consumerId} 失败: ${error.message}，将重试...`);
+                // 失败后放回队列头部，稍后重试
+                workerCreateQueue.unshift({consumerId, oldGen, youngGen});
+                // 等待更长时间后重试
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        }
+        
+        isCreatingWorker = false;
+    }
+    
     // 【事件驱动】跟踪最后活动时间（必须在前面声明）
     let lastActivityTime = Date.now();
 
@@ -347,7 +389,14 @@ export async function startScan(
             });
         } catch (error: any) {
             log.error(`无法创建 Worker ${id} - ${error.message}`);
-            return; // 跳过这个 Worker
+            
+            // 【修复】如果是因为资源不足（EAGAIN），将创建请求放回队列重试
+            if (error.code === 'EAGAIN') {
+                log.warn(`[Worker创建] 系统资源不足，Worker ${id} 将在稍后重试创建`);
+                // 不立即返回，让调用者处理重试逻辑
+            }
+            
+            throw error; // 抛出错误，让队列处理重试
         }
 
         const consumer = {
@@ -361,6 +410,8 @@ export async function startScan(
 
         // 【Map优化】使用 Map.set() 存储，O(1) 复杂度
         consumers.set(id, consumer);
+        
+        log.info(`[Worker创建] Worker ${id} 创建成功`);
 
         worker.on('message', (result) => {
             if (result.type === 'ready') {
@@ -379,7 +430,8 @@ export async function startScan(
                 // 【智能调度】清理状态
                 cleanupConsumerState(consumer);
 
-                tryDispatch();
+                // 【真正的事件驱动】Worker 变为空闲，但不主动调度
+                // 等待下一个 task-ready 事件或新任务入队时再分配
                 return;
             }
 
@@ -438,12 +490,9 @@ export async function startScan(
                 pending.resolve(result);
             }
 
-            // 调度下一个任务
-            try {
-                tryDispatch();
-            } catch (error: any) {
-                log.error(`[Consumer ${id}] 调度任务失败: ${error.message}`);
-            }
+            // 【真正的事件驱动】Worker 完成任务后变为空闲，立即为其分配新任务（如果有）
+            // 这是被动响应，不是主动遍历
+            assignTaskToIdleConsumer(consumer);
 
             // 【事件驱动】检查是否应该结束
             try {
@@ -519,8 +568,13 @@ export async function startScan(
                         // 【Map优化】使用 Map.delete() 删除，O(1) 复杂度
                         consumers.delete(id);
 
-                        // 【Map优化】复用相同的 ID 创建新 Worker
-                        createConsumer(id);
+                        // 【修复】使用队列串行化创建新 Worker
+                        workerCreateQueue.push({consumerId: id});
+                        setImmediate(() => {
+                            processWorkerCreateQueue().catch(error => {
+                                log.error(`[Consumer ${id}] Worker 重启失败: ${error.message}`);
+                            });
+                        });
 
                         // 【新增】Worker 重启后强制 GC，释放内存
                         if ((global as any).gc) {
@@ -528,7 +582,7 @@ export async function startScan(
                             (global as any).gc();
                         }
                         // 【关键】重启后立即尝试调度任务，防止停滞
-                        setTimeout(() => tryDispatch(), 100);
+                        setTimeout(() => tryDispatch(), 150);
                     }
                 }, WORKER_RESTART_DELAY);
             } else {
@@ -537,10 +591,18 @@ export async function startScan(
         });
     }
 
-    // 创建所有 Consumer Workers
+    // 【修复】创建所有 Consumer Workers - 使用队列串行化创建
+    log.info(`正在初始化 ${poolSize} 个 Consumer Workers...`);
     for (let i = 0; i < poolSize; i++) {
-        createConsumer(i);
+        workerCreateQueue.push({consumerId: i});
     }
+    
+    // 异步处理初始 Worker 创建
+    setImmediate(() => {
+        processWorkerCreateQueue().catch(error => {
+            log.error(`[Worker初始化] 创建 Worker 失败: ${error.message}`);
+        });
+    });
 
     // 【重构】使用智能超时计算函数
     const calculateTimeout = (fileSize: number) => calcTimeout(fileSize);
@@ -574,7 +636,6 @@ export async function startScan(
         for (const [fileType, lastTime] of lastTypeScheduleTime.entries()) {
             if (now - lastTime > TYPE_MUTEX_TIMEOUT_MS) {
                 // 超时，允许该类型的任务
-                log.info(`[智能调度] 类型 '${fileType}' 超时 ${(now - lastTime) / 1000}s，解除互斥`);
 
                 // 【新架构】直接从队列中获取（优先小文件）
                 const queues = queueByTypeAndSize.get(fileType);
@@ -633,7 +694,6 @@ export async function startScan(
                     if (queues && queues.large.length > 0) {
                         // 找到！更新轮询索引
                         nextTypeIndex = (idx + 1) % typeOrder.length;
-                        log.debug(`[智能调度] 策略1: 优先处理大文件 ${fileType}`);
                         return dequeueTask(fileType, true);  // ✅ 要求1：最多 MAX_LARGE_FILES_CONCURRENT 个大文件
                     }
                 }
@@ -654,7 +714,6 @@ export async function startScan(
             if (queues.large.length > 0 && largeFilesProcessing < MAX_LARGE_FILES_CONCURRENT) {
                 if (!isTypeBlocked(fileType, true)) {  // ✅ 大文件严格互斥
                     nextTypeIndex = (idx + 1) % typeOrder.length;
-                    log.debug(`[智能调度] 策略2: 选择大文件 ${fileType}`);
                     return dequeueTask(fileType, true);  // ✅ 要求1：最多 MAX_LARGE_FILES_CONCURRENT 个大文件
                 }
             }
@@ -662,7 +721,6 @@ export async function startScan(
             // 其次选择小文件（不检查类型阻塞，允许同类型并行）✅
             if (queues.small.length > 0) {
                 nextTypeIndex = (idx + 1) % typeOrder.length;
-                log.debug(`[智能调度] 策略2: 选择小文件 ${fileType}（允许同类型并行）`);
                 return dequeueTask(fileType, false);
             }
         }
@@ -672,7 +730,6 @@ export async function startScan(
         // 条件：某个类型的最后调度时间超过 TYPE_MUTEX_TIMEOUT_MS
         const timeoutTask = checkTypeTimeoutAndSelect();
         if (timeoutTask) {
-            log.debug(`[智能调度] 策略3: 类型超时，允许同类型 ${path.basename(timeoutTask.filePath)}`);
             return timeoutTask;
         }
 
@@ -686,7 +743,6 @@ export async function startScan(
             for (const fileType of typeOrder) {
                 const queues = queueByTypeAndSize.get(fileType);
                 if (queues && queues.large.length > 0) {
-                    log.debug(`[智能调度] 策略4: 所有类型阻塞，选择大文件 ${fileType}（违反类型互斥）`);
                     return dequeueTask(fileType, true);  // ✅ 要求3：允许多个 Worker 处理同类型
                 }
             }
@@ -696,70 +752,28 @@ export async function startScan(
         for (const fileType of typeOrder) {
             const queues = queueByTypeAndSize.get(fileType);
             if (queues && queues.small.length > 0) {
-                log.debug(`[智能调度] 策略4: 所有类型阻塞，选择小文件 ${fileType}（违反类型互斥）`);
                 return dequeueTask(fileType, false);  // ✅ 要求3：允许多个 Worker 处理同类型
             }
         }
 
         // 唯一能让 Worker 闲置的情况：全是大文件且已达上限
-        log.debug(`[智能调度] 策略4: 全是大文件且已达上限，Worker 等待中...`);
         return null;  // ❌ 无法分配任务，只能等待
     }
 
     /**
-     * 智能调度主函数
+     * 【真正的事件驱动】为指定 Worker 分配任务
+     * 不再遍历查找，而是直接为请求任务的 Worker 分配
+     * @param requestingConsumer 请求任务的 Consumer
      */
-    function smartDispatch(): void {
-        // 【安全检查】如果禁用智能调度，使用原始逻辑
-        if (!ENABLE_SMART_SCHEDULING) {
-            originalDispatch();
-            return;
+    function assignTaskToIdleConsumer(requestingConsumer: any): void {
+        // 【关键】只为这个特定的 Worker 选择任务，不遍历其他 Worker
+        const selectedTask = selectOptimalTask();
+        
+        if (selectedTask) {
+            // 分配任务
+            assignTaskToConsumer(requestingConsumer, selectedTask);
         }
-
-        let dispatched = false;
-
-        // 【修复】使用 while 循环，每次只分配一个任务，然后重新检查
-        // 这样可以确保每次选择任务时都能看到最新的处理状态
-        let hasIdleWorker = true;
-        let noTaskAvailable = false;  // 【新增】标记是否没有可用任务
-        // 【新架构】使用新的队列长度检查
-        while (hasIdleWorker && getQueueLength() > 0 && !noTaskAvailable) {
-            hasIdleWorker = false;
-
-            // 查找第一个空闲的 Worker
-            for (const consumer of consumers.values()) {
-                if (consumer.busy) {
-                    continue;
-                }
-
-                hasIdleWorker = true;
-
-                // 尝试为这个 Worker 找到合适的任务
-                const selectedTask = selectOptimalTask();
-
-                if (selectedTask) {
-                    // 【新架构】任务已在 dequeueTask 中移除，无需再次操作
-
-                    // 分配任务（会立即更新 processingTypeCount）
-                    assignTaskToConsumer(consumer, selectedTask);
-                    dispatched = true;
-
-                    // 【关键修复】分配后立即跳出，重新检查状态
-                    // 这样下一个 Worker 能看到最新的 processingTypeCount
-                    break;
-                } else {
-                    // 【关键修复】如果没有合适的任务，标记并跳出所有循环
-                    // 这种情况发生在：全是大文件且已达上限，或者其他类型阻塞
-                    noTaskAvailable = true;  // 【新增】标记没有可用任务
-                    break;
-                }
-            }
-        }
-
-        // 【调试日志】
-        if (dispatched && process.env.NODE_ENV === 'development') {
-            log.debug(`[智能调度] 成功调度 ${getQueueLength()} 个任务待处理`);
-        }
+        // 如果没有任务可分配，Worker 保持空闲状态，等待下一个 task-ready 事件
     }
 
     /**
@@ -835,24 +849,28 @@ export async function startScan(
         // 安全终止 Worker
         safelyTerminateWorker(consumer.worker, consumer, log);
 
-        // 【修复】延迟 100ms 确保旧 Worker 完全终止后再创建新 Worker
+        const consumerId = consumer.id;
+        
+        // 【修复】将 Worker 创建请求加入队列，串行化处理
+        workerCreateQueue.push({consumerId});
+        
+        // 【修复】异步处理队列，避免阻塞
+        setImmediate(() => {
+            processWorkerCreateQueue().catch(error => {
+                log.error(`[Worker重启] 处理创建队列失败: ${error.message}`);
+            });
+        });
+
+        // 强制 GC
+        if ((global as any).gc) {
+            log.info(`[Worker重启] 执行强制垃圾回收...${taskId !== undefined ? ` (任务 ${taskId})` : ''}`);
+            (global as any).gc();
+        }
+
+        // 延迟调度新任务
         setTimeout(() => {
-            // 删除并重建 Consumer
-            const consumerId = consumer.id;
-            consumers.delete(consumerId);
-            createConsumer(consumerId);
-
-            // 强制 GC
-            if ((global as any).gc) {
-                log.info(`[Worker重启] 执行强制垃圾回收...${taskId !== undefined ? ` (任务 ${taskId})` : ''}`);
-                (global as any).gc();
-            }
-
-            // 延迟调度新任务
-            setTimeout(() => {
-                tryDispatch();
-            }, 50);
-        }, 100);
+            tryDispatch();
+        }, 150); // 【修复】增加延迟，确保 Worker 已创建
     }
 
     /**
@@ -943,20 +961,15 @@ export async function startScan(
         }
     }
 
-    // 【关键修复】轮询索引，实现 Round-Robin 调度
+    // 【关键修复】轮询索引，实现 Round-Robin 调度（仅用于原始调度模式）
     let nextConsumerIndex = 0;
 
-    // 尝试调度任务
+    // 【废弃】tryDispatch 已不再使用，保留以防 ENABLE_SMART_SCHEDULING=false
     function tryDispatch() {
-        // 【智能调度】使用智能调度或原始调度
-        // 【关键修复】使用 setImmediate 异步执行，避免阻塞主线程
-        setImmediate(() => {
-            if (ENABLE_SMART_SCHEDULING) {
-                smartDispatch();
-            } else {
-                originalDispatch();
-            }
-        });
+        if (!ENABLE_SMART_SCHEDULING) {
+            originalDispatch();
+        }
+        // 如果启用智能调度，什么都不做，因为现在是真正的事件驱动
     }
 
     // 分发下一个任务
@@ -1094,7 +1107,7 @@ export async function startScan(
                 const fileType = getFileType(message.filePath);
                 const isLargeFile = message.stat.size > LARGE_FILE_THRESHOLD_MB * BYTES_TO_MB;
 
-                // 【新架构】使用新的入队函数
+                // 【新架构】使用新的入队函数（会自动触发task-ready事件）
                 enqueueTask({
                     filePath: message.filePath,
                     fileSize: message.stat.size,
@@ -1104,8 +1117,7 @@ export async function startScan(
                     isLargeFile
                 });
 
-                // 尝试调度
-                tryDispatch();
+                // 【事件驱动】tryDispatch会在enqueueTask中通过事件自动触发，无需手动调用
             }
 
             if (message.type === 'walking-complete') {

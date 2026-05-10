@@ -92,8 +92,8 @@ process.on('uncaughtException', (error) => {
   } as WorkerResult);
 });
 
-// 监听主线程传来的任务
-parentPort?.on('message', async (task: WorkerTask) => {
+// 【事件驱动】Worker任务处理器 - 使用Promise链式处理
+async function processTask(task: WorkerTask): Promise<void> {
   const { taskId, filePath, enabledSensitiveTypes, previewMode = false } = task;
   
   // 【优化】设置超时保护（使用配置常量）
@@ -262,6 +262,20 @@ parentPort?.on('message', async (task: WorkerTask) => {
       error: error.message
     } as WorkerResult);
   }
+}
+
+// 【事件驱动】监听主线程传来的任务，立即处理
+parentPort?.on('message', (task: WorkerTask) => {
+  // 【事件驱动】异步处理任务，不阻塞消息接收
+  processTask(task).catch(error => {
+    // 捕获未处理的错误
+    workerLogger.error(`[Worker TID:${threadId}] 任务处理异常:`, error.message);
+    parentPort?.postMessage({
+      taskId: task.taskId,
+      filePath: task.filePath,
+      error: `任务处理异常: ${error.message}`
+    } as WorkerResult);
+  });
 });
 
 // 通知主线程 Worker 已就绪
