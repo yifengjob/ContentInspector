@@ -57,6 +57,23 @@ async function initWalkdir() {
 async function startWalking(config: WalkerConfig) {
   let timeoutId: NodeJS.Timeout | undefined;
   
+  // 【批量优化】批次缓冲区和批次大小
+  const fileBatch: Array<{filePath: string, stat: any}> = [];
+  const BATCH_SIZE = 100;  // 每批 100 个文件
+  
+  /**
+   * 发送批次文件（如果缓冲区已满）
+   */
+  function flushBatch() {
+    if (fileBatch.length > 0) {
+      parentPort?.postMessage({
+        type: 'files-batch',
+        files: [...fileBatch]  // 复制数组，避免引用问题
+      });
+      fileBatch.length = 0;  // 清空缓冲区
+    }
+  }
+  
   try {
     await initWalkdir();
     
@@ -77,9 +94,7 @@ async function startWalking(config: WalkerConfig) {
     
     // 如果是文件，直接处理该文件
     if (stat.isFile()) {
-      workerLogger.info(`[Walker] 检测到文件: ${rootPath}, 大小: ${stat.size} bytes`);
       const ext = path.extname(rootPath).toLowerCase().replace('.', '');
-      workerLogger.info(`[Walker] 文件扩展名: '${ext}'`);
       
       // 检查扩展名
       let shouldProcess: boolean;
@@ -88,10 +103,8 @@ async function startWalking(config: WalkerConfig) {
       
       if (selectedExtensions.includes('*')) {
         shouldProcess = SUPPORTED_EXTENSIONS.includes(ext);
-        workerLogger.info(`[Walker] 检查扩展名: ${ext} in SUPPORTED_EXTENSIONS=${SUPPORTED_EXTENSIONS.includes(ext)}`);
       } else {
         shouldProcess = selectedExtensions.includes(ext);
-        workerLogger.info(`[Walker] 检查扩展名: ${ext} in selectedExtensions=${selectedExtensions.includes(ext)}`);
       }
       
       // 扩展名不匹配视为过滤
@@ -104,8 +117,6 @@ async function startWalking(config: WalkerConfig) {
         isFiltered = true;
       }
 
-      workerLogger.info(`[Walker] shouldProcess=${shouldProcess}, size=${stat.size}, isFiltered=${isFiltered}, isSkipped=${isSkipped}`);
-      
       if (shouldProcess && stat.size > 0) {
         // 检查文件大小
         const maxSize = rootPath.toLowerCase().endsWith('.pdf')
@@ -113,14 +124,16 @@ async function startWalking(config: WalkerConfig) {
           : maxFileSizeMb * BYTES_TO_MB;
         
         if (stat.size <= maxSize) {
-          parentPort?.postMessage({
-            type: 'file-found',
+          // 【批量优化】添加到批次缓冲区
+          fileBatch.push({
             filePath: rootPath,
             stat: {
               size: stat.size,
               mtime: stat.mtime.toISOString()
             }
           });
+          // 立即发送（只有一个文件）
+          flushBatch();
         } else {
           // 文件过大视为跳过
           isSkipped = true;
@@ -162,14 +175,12 @@ async function startWalking(config: WalkerConfig) {
       const seenFiles = new Set<string>();
       
       // 【调试】输出 walker 配置
-      workerLogger.info(`[Walker] 创建 walker: rootPath=${rootPath}, follow_symlinks=false`);
       
       // 【新增】超时保护 - 如果 30 秒内没有完成，强制 resolve（调试用）
       const timeoutId = setTimeout(() => {
-        parentPort?.postMessage({
-          type: 'walker-log',
-          message: `[Walker] 遍历超时 (${rootPath})，强制结束`
-        });
+        // 【批量优化】发送剩余批次
+        flushBatch();
+        
         parentPort?.postMessage({
           type: 'walking-complete',
           fileCount,
@@ -187,10 +198,6 @@ async function startWalking(config: WalkerConfig) {
 
         // 【调试】输出过滤日志
         if (shouldIgnoreDirectory(dirName, directory, config)) {
-          parentPort?.postMessage({
-            type: 'walker-log',
-            message: `[Walker Filter] 跳过忽略目录: ${directory}`
-          });
           return [];
         }
 
@@ -198,10 +205,6 @@ async function startWalking(config: WalkerConfig) {
         const normalizedDir = path.normalize(directory).toLowerCase();
         for (const sysDir of ignoredDirsNormalized) {
           if (normalizedDir.startsWith(sysDir + path.sep) || normalizedDir === sysDir) {
-            parentPort?.postMessage({
-              type: 'walker-log',
-              message: `[Walker Filter] 跳过系统目录: ${directory} (匹配: ${sysDir})`
-            });
             return [];
           }
         }
@@ -214,10 +217,6 @@ async function startWalking(config: WalkerConfig) {
       // 【关键】跳过符号链接文件（包括文件和目录）
       if (stat.isSymbolicLink && stat.isSymbolicLink()) {
         skippedCount++;
-        parentPort?.postMessage({
-          type: 'walker-log',
-          message: `[Walker] 跳过符号链接: ${filePath}`
-        });
         return;
       }
       
@@ -281,48 +280,39 @@ async function startWalking(config: WalkerConfig) {
       }
       seenFiles.add(realPath);
       
-      // 发送文件信息到主线程
+      // 【批量优化】累积到批次缓冲区
       fileCount++;
-      
-      parentPort?.postMessage({
-        type: 'file-found',
+      fileBatch.push({
         filePath,
         stat: {
           size: stat.size,
           mtime: stat.mtime.toISOString()
         }
       });
+      
+      // 达到批次大小，发送一批
+      if (fileBatch.length >= BATCH_SIZE) {
+        flushBatch();
+      }
     });
 
     walker.on('end', () => {
       clearTimeout(timeoutId); // 【新增】清除超时定时器
-      parentPort?.postMessage({
-        type: 'walker-log',
-        message: `[Walker] walker 'end' 事件触发: ${rootPath}, fileCount=${fileCount}, filteredCount=${filteredCount}, skippedCount=${skippedCount}`
-      });
+      
+      // 【批量优化】发送剩余不足批次的文件
+      flushBatch();
+      
       parentPort?.postMessage({
         type: 'walking-complete',
         fileCount,
         filteredCount,  // 【新增】传递过滤计数
         skippedCount
       });
-      parentPort?.postMessage({
-        type: 'walker-log',
-        message: `[Walker] 即将 resolve Promise: ${rootPath}`
-      });
       resolve(); // 【修复】Promise resolve
-      parentPort?.postMessage({
-        type: 'walker-log',
-        message: `[Walker] Promise 已 resolve: ${rootPath}`
-      });
     });
 
     walker.on('error', (err: any) => {
       clearTimeout(timeoutId); // 【新增】清除超时定时器
-      parentPort?.postMessage({
-        type: 'walker-log',
-        message: `[Walker Error] 遍历错误 (${rootPath}): ${err.message}`
-      });
       parentPort?.postMessage({
         type: 'walking-error',
         error: err.message
@@ -355,40 +345,22 @@ async function processNextTask() {
   while (taskQueue.length > 0 || isWalking) {
     if (taskQueue.length === 0) {
       // 队列为空，等待新任务
-      workerLogger.info(`[Walker] 队列为空，等待新任务`);
-      parentPort?.postMessage({
-        type: 'walker-log',
-        message: `[Walker] 队列为空，等待新任务`
-      });
       return;
     }
     
     const config = taskQueue.shift();
-    workerLogger.info(`[Walker] 开始遍历: ${config.rootPath}`);
-    parentPort?.postMessage({
-      type: 'walker-log',
-      message: `[Walker] 开始遍历: ${config.rootPath}`
-    });
     
     try {
       await startWalking(config);
       
       // 遍历完成
       isWalking = false;
-      const queueLength = taskQueue.length;
-      workerLogger.info(`[Walker] .then() 回调被调用: ${config.rootPath}`);
-      workerLogger.info(`[Walker] 遍历完成: ${config.rootPath}, 队列长度: ${queueLength}`);
-      parentPort?.postMessage({
-        type: 'walker-log',
-        message: `[Walker] 遍历完成: ${config.rootPath}, 队列长度: ${queueLength}`
-      });
     } catch (error: any) {
       parentPort?.postMessage({
         type: 'walking-error',
         error: error.message || String(error)
       });
       isWalking = false;
-      workerLogger.info(`[Walker] 从队列中取出下一个任务（错误恢复）: ${taskQueue.length > 0 ? taskQueue[0].rootPath : 'none'}`);
     }
   }
 }
@@ -397,7 +369,6 @@ parentPort?.on('message', (message: any) => {
   if (message.type === 'start-walking') {
     // 【修复】如果正在遍历，将任务加入队列
     if (isWalking) {
-      workerLogger.info(`[Walker] 正在遍历中，将任务加入队列: ${message.config.rootPath}`);
       taskQueue.push(message.config);
       return;
     }
@@ -408,7 +379,6 @@ parentPort?.on('message', (message: any) => {
     void processNextTask(); // 启动迭代处理（忽略返回值）
   } else if (message.type === 'cancel-all') {
     // 【内存安全】清空所有待处理的任务
-    workerLogger.info(`[Walker] 收到取消信号，清空队列 (${taskQueue.length} 个任务)`);
     taskQueue.length = 0;
     isWalking = false;
   }

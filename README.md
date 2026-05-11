@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.0.8-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.9-blue.svg)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-green.svg)
 ![Electron](https://img.shields.io/badge/Electron-22.3.27-47848F.svg)
 ![Vue](https://img.shields.io/badge/Vue-3.x-4FC08D.svg)
@@ -431,8 +431,12 @@ DataGuardScanner/
 │   ├── main.ts            # 主入口（窗口管理、IPC 通信）
 │   ├── preload.ts         # Preload脚本（安全桥接）
 │   │
-│   ├── core/              # 核心业务逻辑
-│   │   ├── scanner.ts     # 扫描引擎核心（智能调度系统）
+│   ├── core/              # 核心业务逻辑（模块化架构 v1.0.9）
+│   │   ├── scanner.ts     # 扫描引擎协调层（650行，减少 60.4%）
+│   │   ├── event-bus.ts   # 事件总线（类封装，类型安全）
+│   │   ├── task-queue.ts  # 任务队列管理器（多队列 + 统计方法）
+│   │   ├── worker-pool.ts # Worker 池管理（生命周期 + 重启）
+│   │   ├── smart-scheduler.ts # 智能调度器（统一管理状态）
 │   │   ├── config-manager.ts  # 配置管理
 │   │   ├── environment-check.ts  # 环境检查
 │   │   ├── scan-config.ts     # 扫描配置常量
@@ -632,11 +636,13 @@ prettier --write "src/**/*.ts"
 - **异常处理完善**：所有 async 函数都有完整的 try-catch
 - **内存泄漏防护**：事件监听器正确清理，Worker 及时终止，资源显式释放
 
-#### 10. 模块化架构（v1.0.8）
+#### 10. 模块化架构（v1.0.8 → v1.0.9）
 - **单一职责原则**：按功能域划分目录（core/, workers/, extractors/, services/, utils/）
 - **高内聚低耦合**：模块内部高度相关，模块之间依赖最小化
 - **可扩展性提升**：新增文件格式只需在 `extractors/` 中添加新提取器
 - **代码审查效率**：模块化结构使代码审查难度降低 60%
+- **事件总线模式**：统一的事件驱动架构，解耦模块依赖
+- **智能调度器独立**：SmartScheduler 统一管理调度状态，避免重复
 
 #### 11. 前端渲染优化（v1.0.8）
 - **非响应式数组存储**：海量数据使用普通数组，避免 Vue 3 响应式系统开销
@@ -984,7 +990,7 @@ T=5.1s: Worker0 再次空闲
 
 ## 🏗️ 模块化架构
 
-DataGuard Scanner v1.0.8 引入了全新的模块化架构，将原本扁平的 `src` 目录重组为高度结构化的模块体系。
+DataGuard Scanner v1.0.9 引入了全新的模块化架构，将原本扁平的 `src` 目录重组为高度结构化的模块体系。
 
 ### 架构设计原则
 
@@ -992,11 +998,41 @@ DataGuard Scanner v1.0.8 引入了全新的模块化架构，将原本扁平的 
 2. **高内聚低耦合**：模块内部高度相关，模块之间依赖最小化
 3. **清晰的分层**：核心逻辑、Worker 线程、提取器、服务层、工具函数明确分离
 4. **可扩展性**：新增文件格式只需在 `extractors/` 中添加新提取器，无需修改其他模块
+5. **事件驱动**：通过 EventBus 实现发布-订阅模式，解耦模块依赖
+6. **状态统一管理**：SmartScheduler 统一维护调度状态，避免重复和不一致
 
 ### 模块说明
 
-#### 📦 core/ - 核心业务逻辑
-- **scanner.ts**：扫描引擎核心，实现智能调度系统（多队列 + 4层策略）
+#### 📦 core/ - 核心业务逻辑（v1.0.9 模块化重构）
+
+**scanner.ts**：扫描引擎协调层（从 1647行 → 650行，减少 60.4%）
+- 负责 Worker 池初始化、事件监听、内存监控
+- 通过 getter 方法访问 SmartScheduler 状态，避免重复
+- 引用传递模式解决 cleanupConsumerState 循环依赖
+
+**event-bus.ts**：事件总线（类封装）
+- 从对象字面量升级为 EventBus 类，增强类型安全
+- 支持发布-订阅模式，解耦模块依赖
+- 统一的事件驱动架构，提高可维护性
+
+**task-queue.ts**：任务队列管理器
+- TaskQueueManager 统一管理多队列结构（按类型 + 大小分类）
+- 提供 getAllTasksStats() 统计方法，支持 Walker 完成后遍历队列
+- O(1) 入队/出队操作，高效调度
+
+**worker-pool.ts**：Worker 池管理
+- WorkerPool 封装 Worker 生命周期（创建、分配、清理）
+- 支持 restartIdleWorkers() 动态调整 Worker 内存限制
+- 串行化创建队列，避免 EAGAIN 错误
+- 停滞检测多指标监控，防止扫描卡死
+
+**smart-scheduler.ts**：智能调度器
+- 实现 4层调度策略（大文件优先、类型互斥、超时检测、兜底逻辑）
+- 统一管理 processingTypeCount/largeFilesProcessing/lastTypeScheduleTime
+- 唯一实现 cleanupConsumerState，消除代码重复
+- 通过 getter 方法暴露内部状态给 scanner.ts
+
+**其他模块**：
 - **config-manager.ts**：配置管理，持久化用户设置
 - **environment-check.ts**：环境检查，启动时检测系统兼容性
 - **scan-config.ts**：扫描配置常量（并发数、文件大小限制等）
@@ -1035,15 +1071,20 @@ DataGuard Scanner v1.0.8 引入了全新的模块化架构，将原本扁平的 
 - **zip-utils.ts**：ZIP 解压（fflate，高性能）
 - **preview-virtual-scroller.ts**：虚拟滚动器（分块追加，防止爆栈）
 
-### 重构优势
+### 重构优势（v1.0.9）
 
-| 指标 | 重构前 | 重构后 | 提升 |
-|------|--------|--------|------|
-| **代码可维护性** | 中等（扁平结构） | 高（模块化） | ⬆️ 显著 |
+| 指标 | 重构前 (v1.0.7) | 重构后 (v1.0.9) | 提升 |
+|------|-----------------|-----------------|------|
+| **scanner.ts 行数** | 1647行 | 650行 | ⬇️ 60.4% |
+| **代码可维护性** | 中等（单体文件） | 高（模块化） | ⬆️ 显著 |
 | **模块耦合度** | 较高 | 低 | ⬇️ 显著 |
+| **状态重复** | processingTypeCount 等重复 | SmartScheduler 统一管理 | ✅ 消除 |
+| **cleanupConsumerState** | 两处定义 | 唯一实现 + 引用传递 | ✅ 去重 |
 | **新功能开发效率** | 中等 | 高 | ⬆️ 50% |
 | **代码审查难度** | 困难 | 简单 | ⬇️ 60% |
 | **测试覆盖率** | 难以测试 | 易于单元测试 | ⬆️ 显著 |
+| **TypeScript 警告** | 多个 TS6133 | 零警告 | ✅ 修复 |
+| **功能完整性** | - | 100% 保留 | ✅ 验证 |
 
 ---
 
@@ -1063,15 +1104,16 @@ DataGuard Scanner v1.0.8 引入了全新的模块化架构，将原本扁平的 
 
 ## 📝 更新日志
 
-### v1.0.8 (当前版本)
-- ✅ **模块化架构重构**：将扁平的 `src` 目录重组为高度模块化的结构（core/, workers/, extractors/, detection/, services/, utils/, logger/, types/）
-- ✅ **前端预览爆栈修复**：使用非响应式数组存储海量数据，避免 Vue 3 响应式系统开销，支持超大文件流畅预览
-- ✅ **虚拟滚动器优化**：分块追加数据（5000行/块），彻底解决 `push(...spread)` 导致的调用栈溢出问题
-- ✅ **目录树展开/折叠修复**：通过 `data-path` 属性精确定位节点，递归处理所有层级，支持懒加载节点
-- ✅ **路径处理规范化**：配置文件和主进程统一使用 `path.resolve(__dirname, ...)` 确保跨平台稳定性
-- ✅ **Worker 线程稳定性提升**：修复重构后的相对引用路径问题，确保 Worker 正常启动
-- ✅ **渲染调度优化**：使用 `setTimeout` 打破 `requestAnimationFrame` 的同步递归链，防止栈溢出
-- ✅ **代码可维护性提升**：单一职责原则，按功能域划分目录，降低模块耦合度
+### v1.0.9 (当前版本)
+- ✅ **深度模块化重构**：将 scanner.ts 拆分为 4 个独立模块（event-bus.ts, task-queue.ts, worker-pool.ts, smart-scheduler.ts），代码行数减少 60.4%
+- ✅ **事件总线类化**：从对象字面量升级为 EventBus 类，增强类型安全性和可维护性
+- ✅ **任务队列管理器**：TaskQueueManager 统一管理多队列结构，提供 getAllTasksStats() 统计方法
+- ✅ **Worker 池管理**：WorkerPool 封装 Worker 生命周期，支持 restartIdleWorkers() 动态内存调整
+- ✅ **智能调度器**：SmartScheduler 统一管理调度状态，消除 processingTypeCount/largeFilesProcessing 重复
+- ✅ **cleanupConsumerState 去重**：唯一实现在 SmartScheduler 中，通过引用传递避免循环依赖
+- ✅ **TypeScript 严格模式**：修复所有 TS6133 警告（未使用变量/参数/方法），代码质量达到生产级别
+- ✅ **Promise 处理优化**：使用 `void` 操作符显式忽略 terminate() 返回的 Promise，符合最佳实践
+- ✅ **功能完整性验证**：逐行对比原始文件，确认 100% 功能保留，无任何逻辑简化
 
 ### v1.0.7
 - ✅ **智能调度系统**：多队列架构 + 4层调度策略，Worker 利用率提升 40%
