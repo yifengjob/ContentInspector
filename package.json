@@ -1,6 +1,6 @@
 {
   "name": "DataGuardScanner",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "个人敏感信息扫描工具",
   "main": "dist/main.js",
   "scripts": {
