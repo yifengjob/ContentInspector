@@ -28,18 +28,33 @@ export interface ZipEntry {
  * @returns ZIP 条目数组
  */
 export async function unzipFile(filePath: string): Promise<ZipEntry[]> {
-  // 【新增】使用带超时的文件读取，防止 Windows 锁屏时阻塞
+  // 【关键修复】使用带超时的文件读取，防止 Windows 锁屏时阻塞
   const buffer = await readFileWithTimeout(filePath, FILE_READ_TIMEOUT_STANDARD_MS);
+  
+  // 【关键修复】限制最大解压大小，防止恶意或损坏的文件导致 OOM
+  const MAX_UNZIP_SIZE = 100 * 1024 * 1024; // 100MB
+  if (buffer.length > MAX_UNZIP_SIZE) {
+    throw new Error(`文件过大，超过最大解压限制 (${MAX_UNZIP_SIZE / 1024 / 1024}MB)`);
+  }
+  
   const u8 = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   
-  // 同步解压 ZIP 文件（fflate 的优势：速度快，零拷贝）
-  const unzipped = unzipSync(u8);
-  
-  // 转换为 ZipEntry 数组
-  return Object.entries(unzipped).map(([name, data]) => ({
-    name,
-    data
-  }));
+  try {
+    // 同步解压 ZIP 文件（fflate 的优势：速度快，零拷贝）
+    const unzipped = unzipSync(u8);
+    
+    // 转换为 ZipEntry 数组
+    return Object.entries(unzipped).map(([name, data]) => ({
+      name,
+      data
+    }));
+  } catch (error: any) {
+    // 【关键修复】捕获解压错误，防止卡死
+    if (error.message.includes('invalid') || error.message.includes('corrupt')) {
+      throw new Error(`ZIP 文件损坏或格式错误: ${error.message}`);
+    }
+    throw error;
+  }
 }
 
 /**
