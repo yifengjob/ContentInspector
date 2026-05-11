@@ -10,7 +10,7 @@ import {
     MAX_LOG_ENTRIES,
     WORKER_BASE_TIMEOUT,
     WORKER_TIMEOUT_PER_MB,
-    WORKER_MAX_TIMEOUT, SCAN_LOG_FILE_LEVEL, SCAN_LOG_FRONTEND_LEVEL, SCAN_LOG_MEMORY_LEVEL
+    WORKER_MAX_TIMEOUT, LOG_FILE_LEVEL, LOG_FRONTEND_LEVEL, LOG_MEMORY_LEVEL
 } from '../core/scan-config';
 import {LogLevel} from "../types";
 // 【新增】导入公共工具函数
@@ -33,9 +33,9 @@ interface LogConfig {
  * - 内存：记录 INFO 及以上（保留必要历史）
  */
 const DEFAULT_LOG_CONFIG: LogConfig = {
-    fileLevel: SCAN_LOG_FILE_LEVEL,
-    frontendLevel: SCAN_LOG_FRONTEND_LEVEL,
-    memoryLevel: SCAN_LOG_MEMORY_LEVEL,
+    fileLevel: LOG_FILE_LEVEL,
+    frontendLevel: LOG_FRONTEND_LEVEL,
+    memoryLevel: LOG_MEMORY_LEVEL,
 };
 
 /**

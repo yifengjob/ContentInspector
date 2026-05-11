@@ -287,12 +287,22 @@ export const MAX_LARGE_FILES_CONCURRENT = 2;
 /** 类型互斥超时时间（毫秒）- 如果超过此时间找不到不同类型，允许同类型 */
 export const TYPE_MUTEX_TIMEOUT_MS = 5000;
 
-// ==================== 扫描日志级别配置 ====================
-/** 扫描日志文件级别 */
-export const SCAN_LOG_FILE_LEVEL: LogLevel = LogLevel.INFO;
+// ==================== 日志级别配置 ====================
+/** 输出到文件的日志级别 */
+export const LOG_FILE_LEVEL: LogLevel = LogLevel.INFO;
 
-/** 扫描日志前端级别 */
-export const SCAN_LOG_FRONTEND_LEVEL: LogLevel = LogLevel.WARN;
+/** 输出到前端的日志级别 */
+export const LOG_FRONTEND_LEVEL: LogLevel = LogLevel.WARN;
 
-/** 扫描日志内存级别 */
-export const SCAN_LOG_MEMORY_LEVEL: LogLevel = LogLevel.WARN;
+/** 输出到内存的日志级别 */
+export const LOG_MEMORY_LEVEL: LogLevel = LogLevel.WARN;
+
+// ==================== 日志输出开关配置 ====================
+/** 是否启用文件日志输出 */
+export const LOG_ENABLE_FILE: boolean = true;
+
+/** 是否启用前端日志输出（IPC 通信） */
+export const LOG_ENABLE_FRONTEND: boolean = false;
+
+/** 是否启用内存日志输出（ScanState） */
+export const LOG_ENABLE_MEMORY: boolean = true;

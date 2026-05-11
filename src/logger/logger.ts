@@ -12,6 +12,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {LogLevel} from '../types';
+import {
+    LOG_FILE_LEVEL,
+    LOG_FRONTEND_LEVEL,
+    LOG_MEMORY_LEVEL,
+    LOG_ENABLE_FILE,
+    LOG_ENABLE_FRONTEND,
+    LOG_ENABLE_MEMORY
+} from '../core/scan-config';
 
 // 【配置】日志保留天数
 const LOG_RETENTION_DAYS = 30;
@@ -42,7 +50,27 @@ interface LogConfig {
     enableFile?: boolean;         // 是否写入文件
     enableFrontend?: boolean;     // 是否发送到前端
     enableMemory?: boolean;       // 是否保存到内存
+    
+    // 【新增】日志级别配置
+    fileLevel?: LogLevel;         // 写入文件的最低级别
+    frontendLevel?: LogLevel;     // 发送到前端的最低级别
+    memoryLevel?: LogLevel;       // 保存到内存的最低级别
 }
+
+/**
+ * 默认日志配置
+ * - 文件：记录 INFO 及以上
+ * - 前端：记录 WARN 及以上
+ * - 内存：记录 WARN 及以上
+ */
+const DEFAULT_LOG_CONFIG = {
+    enableFile: LOG_ENABLE_FILE,
+    enableFrontend: LOG_ENABLE_FRONTEND,
+    enableMemory: LOG_ENABLE_MEMORY,
+    fileLevel: LOG_FILE_LEVEL,
+    frontendLevel: LOG_FRONTEND_LEVEL,
+    memoryLevel: LOG_MEMORY_LEVEL,
+};
 
 // 【新增】全局日志流引用（用于应用退出时 flush）
 let globalLogStream: fs.WriteStream | null = null;
@@ -95,84 +123,40 @@ export function setupFileLogger(logDir: string): void {
     const originalDebug = console.debug;
     const originalWarn = console.warn;
 
-    // 重定向 console.log（带日志抑制）
-    console.log = function (...args) {
-        const message = args.join(' ');
-        
-        // 【改进】统一日志抑制逻辑
-        if (shouldSuppressLog(message)) {
-            return; // 静默丢弃
-        }
-        
-        const timestamp = getBeijingTimestamp();
-        const logMessage = `[${timestamp}] [INFO] ${formatLogMessage(args)}\n`;
-        logStream.write(logMessage, (err) => {
-            if (err) {
-                // 【改进】使用 process.stderr 避免递归日志
-                process.stderr.write(`[日志写入失败] ${err.message}\n`);
+    /**
+     * 【辅助方法】重定向 console 方法（带日志抑制）
+     * @param originalFn - 原始 console 方法
+     * @param levelPrefix - 日志级别前缀（INFO/DEBUG/WARN/ERROR）
+     */
+    const redirectConsoleMethod = (
+        originalFn: (...args: any[]) => void,
+        levelPrefix: string
+    ) => {
+        return function (...args: any[]) {
+            const message = args.join(' ');
+            
+            // 【改进】统一日志抑制逻辑
+            if (shouldSuppressLog(message)) {
+                return; // 静默丢弃
             }
-        });
-        originalLog.apply(console, args);
-    };
-    // 重定向 console.debug（带日志抑制）
-    console.debug = function (...args) {
-        const message = args.join(' ');
-        
-        // 【改进】统一日志抑制逻辑
-        if (shouldSuppressLog(message)) {
-            return; // 静默丢弃
-        }
-        
-        const timestamp = getBeijingTimestamp();
-        const debugMessage = `[${timestamp}] [DEBUG] ${formatLogMessage(args)}\n`;
-        logStream.write(debugMessage, (err) => {
-            if (err) {
-                // 【改进】使用 process.stderr 避免递归日志
-                process.stderr.write(`[日志写入失败] ${err.message}\n`);
-            }
-        });
-        originalDebug.apply(console, args);
+            
+            const timestamp = getBeijingTimestamp();
+            const logMessage = `[${timestamp}] [${levelPrefix}] ${formatLogMessage(args)}\n`;
+            logStream.write(logMessage, (err) => {
+                if (err) {
+                    // 【改进】使用 process.stderr 避免递归日志
+                    process.stderr.write(`[日志写入失败] ${err.message}\n`);
+                }
+            });
+            originalFn.apply(console, args);
+        };
     };
 
-    // 重定向 console.error（带日志抑制）
-    console.error = function (...args) {
-        const message = args.join(' ');
-        
-        // 【改进】统一日志抑制逻辑
-        if (shouldSuppressLog(message)) {
-            return; // 静默丢弃
-        }
-        
-        const timestamp = getBeijingTimestamp();
-        const errorMessage = `[${timestamp}] [ERROR] ${formatLogMessage(args)}\n`;
-        logStream.write(errorMessage, (err) => {
-            if (err) {
-                // 【改进】使用 process.stderr 避免递归日志
-                process.stderr.write(`[日志写入失败] ${err.message}\n`);
-            }
-        });
-        originalError.apply(console, args);
-    };
-
-    // 重定向 console.warn（带日志抑制）
-    console.warn = function (...args) {
-        const message = args.join(' ');
-
-        // 检查是否需要抑制
-        if (shouldSuppressLog(message)) {
-            return; // 静默丢弃
-        }
-
-        const timestamp = getBeijingTimestamp();
-        const warnMessage = `[${timestamp}] [WARN] ${formatLogMessage(args)}\n`;
-        logStream.write(warnMessage, (err) => {
-            if (err) {
-                // 【改进】使用 process.stderr 避免递归日志
-                process.stderr.write(`[日志写入失败] ${err.message}\n`);
-            }
-        });
-        originalWarn.apply(console, args);
-    };
+    // 重定向 console 方法
+    console.log = redirectConsoleMethod(originalLog, 'INFO');
+    console.debug = redirectConsoleMethod(originalDebug, 'DEBUG');
+    console.error = redirectConsoleMethod(originalError, 'ERROR');
+    console.warn = redirectConsoleMethod(originalWarn, 'WARN');
 }
 
 /**
@@ -196,18 +180,33 @@ export function setupFileLogger(logDir: string): void {
  */
 export function createLogger(config: string | LogConfig): Logger {
     const context = typeof config === 'string' ? config : config.context;
-    const enableFile = typeof config === 'object' ? (config.enableFile ?? true) : true;
-    const enableFrontend = typeof config === 'object' ? (config.enableFrontend ?? false) : false;
-    const enableMemory = typeof config === 'object' ? (config.enableMemory ?? false) : false;
+    const enableFile = typeof config === 'object' ? (config.enableFile ?? DEFAULT_LOG_CONFIG.enableFile) : DEFAULT_LOG_CONFIG.enableFile;
+    const enableFrontend = typeof config === 'object' ? (config.enableFrontend ?? DEFAULT_LOG_CONFIG.enableFrontend) : DEFAULT_LOG_CONFIG.enableFrontend;
+    const enableMemory = typeof config === 'object' ? (config.enableMemory ?? DEFAULT_LOG_CONFIG.enableMemory) : DEFAULT_LOG_CONFIG.enableMemory;
+    
+    // 【新增】获取日志级别配置
+    const fileLevel = typeof config === 'object' ? (config.fileLevel ?? DEFAULT_LOG_CONFIG.fileLevel) : DEFAULT_LOG_CONFIG.fileLevel;
+    const frontendLevel = typeof config === 'object' ? (config.frontendLevel ?? DEFAULT_LOG_CONFIG.frontendLevel) : DEFAULT_LOG_CONFIG.frontendLevel;
+    const memoryLevel = typeof config === 'object' ? (config.memoryLevel ?? DEFAULT_LOG_CONFIG.memoryLevel) : DEFAULT_LOG_CONFIG.memoryLevel;
 
     // 内存缓冲区（仅在需要时初始化）
     let logs: string[] | null = enableMemory ? [] : null;
     let lastUpdateTime = 0;
 
-    // 【新增】统一的日志输出函数
+    // 【新增】统一的日志输出函数（带级别过滤）
     const logWithLevel = (formattedMsg: string, level: LogLevel) => {
+        // 【关键】根据级别判断是否需要处理
+        const shouldWriteToFile = enableFile && level >= fileLevel;
+        const shouldSendToFrontend = enableFrontend && level >= frontendLevel;
+        const shouldSaveToMemory = enableMemory && level >= memoryLevel;
+        
+        // 如果都不需要，直接返回
+        if (!shouldWriteToFile && !shouldSendToFrontend && !shouldSaveToMemory) {
+            return;
+        }
+        
         // 写入文件（根据级别使用不同的 console 函数）
-        if (enableFile) {
+        if (shouldWriteToFile) {
             setImmediate(() => {
                 switch (level) {
                     case LogLevel.ERROR:
@@ -226,7 +225,7 @@ export function createLogger(config: string | LogConfig): Logger {
         }
 
         // 发送到前端（通过 IPC）
-        if (enableFrontend) {
+        if (shouldSendToFrontend) {
             setImmediate(() => {
                 // TODO: 需要通过全局变量或依赖注入获取 mainWindow
                 // if (mainWindow && !mainWindow.isDestroyed()) {
@@ -236,7 +235,7 @@ export function createLogger(config: string | LogConfig): Logger {
         }
 
         // 保存到内存
-        if (enableMemory && logs) {
+        if (shouldSaveToMemory && logs) {
             logs.push(formattedMsg);
 
             // 限制内存中的日志数量
