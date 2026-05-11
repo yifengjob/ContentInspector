@@ -30,13 +30,6 @@ export interface ZipEntry {
 export async function unzipFile(filePath: string): Promise<ZipEntry[]> {
   // 【关键修复】使用带超时的文件读取，防止 Windows 锁屏时阻塞
   const buffer = await readFileWithTimeout(filePath, FILE_READ_TIMEOUT_STANDARD_MS);
-  
-  // 【关键修复】限制最大解压大小，防止恶意或损坏的文件导致 OOM
-  const MAX_UNZIP_SIZE = 100 * 1024 * 1024; // 100MB
-  if (buffer.length > MAX_UNZIP_SIZE) {
-    throw new Error(`文件过大，超过最大解压限制 (${MAX_UNZIP_SIZE / 1024 / 1024}MB)`);
-  }
-  
   const u8 = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   
   try {
