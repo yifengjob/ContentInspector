@@ -91,6 +91,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('scan-log', listener);
   },
   
+  // 【新增】批量日志监听（带节流）
+  onScanLogBatch: (callback: (messages: string[]) => void) => {
+    const listener = (_event: any, batchText: string) => {
+      // 将批量文本拆分为数组
+      const messages = batchText.split('\n').filter(msg => msg.length > 0);
+      if (messages.length > 0) {
+        callback(messages);
+      }
+    };
+    ipcRenderer.on('scan-log-batch', listener);
+    return () => ipcRenderer.removeListener('scan-log-batch', listener);
+  },
+  
   // 【方案 D3】预览数据块事件
   onPreviewChunk: (callback: (chunk: any) => void) => {
     const listener = (_event: any, chunk: any) => callback(chunk);

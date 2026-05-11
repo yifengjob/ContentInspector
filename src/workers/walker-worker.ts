@@ -57,7 +57,7 @@ async function initWalkdir() {
 async function startWalking(config: WalkerConfig) {
   let timeoutId: NodeJS.Timeout | undefined;
   
-  // 【批量优化】批次缓冲区和批次大小
+    // 【批量优化】批次缓冲区和批次大小
   const fileBatch: Array<{filePath: string, stat: any}> = [];
   const BATCH_SIZE = 100;  // 每批 100 个文件
   

@@ -177,33 +177,64 @@ export const useAppStore = defineStore('app', () => {
     }
   }
   
-  function addLog(log: string) {
-    pendingLogs.push(log)
+  // 【重构】提取日志批处理公共逻辑
+  function flushPendingLogs() {
+    if (pendingLogs.length === 0) return
     
-    // 如果还没有定时器，设置一个批处理定时器
+    logs.value.push(...pendingLogs)
+    
+    // 限制前端日志长度，防止内存泄漏
+    if (logs.value.length > MAX_FRONTEND_LOGS) {
+      const removeCount = logs.value.length - MAX_FRONTEND_LOGS + 100
+      logs.value.splice(0, removeCount)
+    }
+    
+    pendingLogs.length = 0
+    
+    // 递增版本号，触发 watch
+    logVersion.value++
+  }
+  
+  // 【重构】启动日志批处理定时器
+  function startLogBatchTimer() {
     if (logBatchTimer === null) {
       logBatchTimer = window.setTimeout(() => {
-        if (pendingLogs.length > 0) {
-          logs.value.push(...pendingLogs)
-          
-          // 限制前端日志长度，防止内存泄漏
-          if (logs.value.length > MAX_FRONTEND_LOGS) {
-            const removeCount = logs.value.length - MAX_FRONTEND_LOGS + 100
-            logs.value.splice(0, removeCount)
-          }
-          
-          pendingLogs.length = 0
-          
-          // 递增版本号，触发 watch
-          logVersion.value++
-        }
+        flushPendingLogs()
         logBatchTimer = null
       }, UI_LOG_BATCH_INTERVAL)
     }
   }
   
+  function addLog(log: string) {
+    pendingLogs.push(log)
+    startLogBatchTimer()
+  }
+  
+  // 【新增】批量添加日志（优化 IPC 批量接收场景）
+  function addLogs(logsBatch: string[]) {
+    if (logsBatch.length === 0) return
+    
+    // 直接批量添加到 pendingLogs
+    pendingLogs.push(...logsBatch)
+    startLogBatchTimer()
+  }
+  
   function clearScanResults() {
-    // 【修复】使用 splice 清空数组，保持响应式
+    // 【P0修复】先清空待处理日志和定时器，避免竞态条件
+    pendingLogs.length = 0
+    if (logBatchTimer) {
+      clearTimeout(logBatchTimer)
+      logBatchTimer = null
+    }
+    
+    // 【P0修复】同样清空待处理结果
+    pendingResults.length = 0
+    if (batchTimer) {
+      clearTimeout(batchTimer)
+      batchTimer = null
+    }
+    
+    // 然后清空已显示的数据
     scanResults.value.splice(0, scanResults.value.length)
     scannedCount.value = 0
     totalCount.value = 0      // ← 重置总数
@@ -325,7 +356,8 @@ export const useAppStore = defineStore('app', () => {
     stopElapsedTimeTimer,   // 【UI优化】导出停止定时器函数
     addScanResult,
     addScanResults,  // 【P3优化】导出批量添加方法
-    addLog,  // 【新增】批量添加日志
+    addLog,          // 单条添加日志
+    addLogs,         // 【新增】批量添加日志
     clearScanResults,
     removeResult,
     togglePath,

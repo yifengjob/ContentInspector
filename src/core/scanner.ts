@@ -1,6 +1,6 @@
 /**
  * 扫描器主入口 - 协调层
- * 
+ *
  * 职责：
  * - 协调各个模块完成扫描任务
  * - 处理 Walker Worker 消息
@@ -25,10 +25,12 @@ import {
     MAX_IDLE_TIME,
     PROGRESS_THROTTLE_INTERVAL,
     BYTES_TO_MB,
-    LARGE_FILE_THRESHOLD_MB
+    LARGE_FILE_THRESHOLD_MB,
+    ERROR_LOG_INTERVAL,
+    RESULT_LOG_COUNT_INTERVAL,
+    RESULT_LOG_TIME_INTERVAL
 } from './scan-config';
 import {
-    createScannerLogger,
     createProgressUpdater,
     sendToMainWindow,
     calculateTimeout as calcTimeout,
@@ -40,6 +42,7 @@ import {EventBus} from './event-bus';
 import {TaskQueueManager, Task} from './task-queue';
 import {WorkerPool, Consumer} from './worker-pool';
 import {SmartScheduler} from './smart-scheduler';
+import {getScannerLogger} from "../logger/logger";
 
 export async function startScan(
     config: ScanConfig,
@@ -54,12 +57,12 @@ export async function startScan(
     scanState.cancelFlag = false;
     scanState.logs = [];
 
+    // 1. 创建日志记录器
+    const log = getScannerLogger();
+
     // 清除旧的允许路径，添加新的扫描路径
     clearAllowedPaths();
     config.selectedPaths.forEach(p => addAllowedPath(p));
-
-    // 创建日志器
-    const log = createScannerLogger(scanState, mainWindow);
 
     log.info('开始扫描...');
     log.info(`扫描路径数: ${config.selectedPaths.length}`);
@@ -81,13 +84,13 @@ export async function startScan(
 
     // ==================== 【初始化模块】====================
 
-    // 1. 创建事件总线
-    const eventBus = new EventBus(scanState, mainWindow);
+    // 2. 获取 EventBus 单例实例
+    const eventBus = EventBus.getInstance();
 
-    // 2. 创建任务队列管理器
+    // 3. 创建任务队列管理器
     const queueManager = new TaskQueueManager(eventBus);
 
-    // 3. 统计信息
+    // 4. 统计信息
     let walkerTotalCount = 0;
     let walkerFilteredCount = 0;
     let walkerSkippedCount = 0;
@@ -96,18 +99,17 @@ export async function startScan(
     let totalSensitiveItems = 0;
     const countedTaskIds = new Set<number>();
 
-    // 4. 日志抑制
+    // 5. 日志抑制
     let errorLogCount = 0;
-    const ERROR_LOG_INTERVAL = 50;
     const resultLogThrottler = new LogThrottler({
-        countInterval: 100,
-        timeIntervalMs: 2000
+        countInterval: RESULT_LOG_COUNT_INTERVAL,
+        timeIntervalMs: RESULT_LOG_TIME_INTERVAL
     });
 
-    // 5. 智能调度状态（由 SmartScheduler 统一管理）
+    // 6. 智能调度状态（由 SmartScheduler 统一管理）
     let largeFilesProcessing = 0; // 【优化】仅保留 activeWorkerCount 需要的本地计数
 
-    // 6. 内存配置 - 【关键】macOS 需要使用 vm_stat 获取准确可用内存
+    // 7. 内存配置 - 【关键】macOS 需要使用 vm_stat 获取准确可用内存
     const freeMemoryMB = (process.platform === 'darwin'
         ? (() => {
             try {
@@ -186,7 +188,7 @@ export async function startScan(
     // 初始日志
     log.info(`【内存优化】可用内存: ${freeMemoryMB.toFixed(0)}MB, 初始每 Worker 限制: ${dynamicOldGenMB + dynamicYoungGenMB}MB`);
 
-    // 7. 辅助函数
+    // 8. 辅助函数
     const sendProgressUpdate = createProgressUpdater(
         mainWindow,
         () => consumerProcessedCount,
@@ -229,7 +231,7 @@ export async function startScan(
         cleanupConsumerStateRef.fn(consumer);
     };
 
-    // 8. 回调函数（供 WorkerPool 和 SmartScheduler 使用）
+    // 9. 回调函数（供 WorkerPool 和 SmartScheduler 使用）
     let activeWorkerCount = 0;
 
     function onErrorLog(error: string): void {
@@ -253,7 +255,7 @@ export async function startScan(
         resultBatchSender.send(mainWindow, 'scan-result', resultItem);
     }
 
-    // 9. 创建 Worker 池
+    // 10. 创建 Worker 池
     const workerPool = new WorkerPool(
         poolSize,
         eventBus,
@@ -281,13 +283,13 @@ export async function startScan(
         (consumer: Consumer, task: Task) => {
             // 【优化】使用 scheduler 内部的状态管理，避免重复
             workerPool.assignTaskToConsumer(
-                consumer, 
-                task, 
-                scheduler.getProcessingTypeCount(), 
-                {value: scheduler.getLargeFilesProcessing()}, 
+                consumer,
+                task,
+                scheduler.getProcessingTypeCount(),
+                {value: scheduler.getLargeFilesProcessing()},
                 scheduler.getLastTypeScheduleTime()
             );
-            
+
             // 更新本地计数（仅用于停滞检测）
             if (task.isLargeFile) {
                 largeFilesProcessing = scheduler.getLargeFilesProcessing();
@@ -319,19 +321,19 @@ export async function startScan(
         try {
             if (message.type === 'files-batch') {
                 const files = message.files;
-                
+
                 if (!files || files.length === 0) {
                     return;
                 }
-                
+
                 for (const file of files) {
-                    walkerTotalCount++;
-                    
+                    walkerTotalCount++;  // 【恢复】累加实际找到的文件
+
                     if (walkerTotalCount % 100 === 0 || Date.now() - lastProgressUpdateTime > 1000) {
                         sendProgressUpdate(file.filePath);
                         lastProgressUpdateTime = Date.now();
                     }
-                    
+
                     const fileType = getFileType(file.filePath);
                     const isLargeFile = file.stat.size > LARGE_FILE_THRESHOLD_MB * BYTES_TO_MB;
                     queueManager.enqueueTask({
@@ -343,19 +345,24 @@ export async function startScan(
                         isLargeFile
                     });
                 }
-                
+
                 lastActivityTime = Date.now();
                 lastTaskEnqueueTime = Date.now();
-                
+
                 eventBus.emit('walker.batch-ready');
             }
 
             if (message.type === 'walking-complete') {
                 log.info(`Walker 完成: 找到 ${message.fileCount} 个文件, 过滤 ${message.filteredCount || 0} 个, 跳过 ${message.skippedCount} 个`);
 
+                // 【Bug2修复】walkerTotalCount 应该包含所有文件（找到+过滤+跳过）
+                // 遍历过程中只累加了 fileCount，需要补充 filteredCount 和 skippedCount
                 walkerTotalCount += (message.filteredCount || 0) + message.skippedCount;
                 walkerFilteredCount += message.filteredCount || 0;
                 walkerSkippedCount += message.skippedCount;
+
+                // 【关键修复】Walker 完成后立即发送进度更新，确保前端 totalCount 包含所有文件
+                sendProgressUpdate();
 
                 walkerCompletedCount++;
 
@@ -370,10 +377,10 @@ export async function startScan(
                 if (queueManager.getQueueLength() > 0) {
                     // 【关键修复】从 queueManager 获取所有任务来计算平均大小
                     const stats = queueManager.getAllTasksStats();
-                    const avgFileSizeMB = stats.totalCount > 0 
-                        ? (stats.totalSize / stats.totalCount) / BYTES_TO_MB 
+                    const avgFileSizeMB = stats.totalCount > 0
+                        ? (stats.totalSize / stats.totalCount) / BYTES_TO_MB
                         : 0;
-                    
+
                     if (stats.totalCount > 0) {
                         // 计算新的内存限制
                         const newLimits = calculateSmartMemoryLimits(avgFileSizeMB, poolSize);
@@ -521,7 +528,7 @@ export async function startScan(
                     && (consumerProcessedCount + walkerFilteredCount + walkerSkippedCount) >= walkerTotalCount)
             ) {
                 log.error(`警告: ${idleTime / 1000}秒内无任何进展，强制结束`);
-                
+
                 for (const pending of workerPool.getPendingTasks().values()) {
                     clearTimeout(pending.timeoutId);
                     pending.reject(new Error('扫描超时强制结束'));
@@ -585,10 +592,7 @@ export async function startScan(
                 (global as any).gc();
             }
 
-            if (log && log.destroy) {
-                log.destroy();
-            }
-            
+            // 【移除】destroy 方法已不再需要
             eventBus.clearAll();
         } catch (error) {
             log('[cleanup] 清理过程中出错: ' + error);

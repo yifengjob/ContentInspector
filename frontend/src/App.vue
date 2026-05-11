@@ -192,7 +192,8 @@ import {
   loadConfig,
   onScanError,
   onScanFinished,
-  onScanLog,
+  onScanLog,       // 【P1优化】用于 ERROR 级别立即显示
+  onScanLogBatch,  // 用于普通日志批量显示
   onScanProgress,
   onScanResult,
   showMessage,
@@ -329,9 +330,14 @@ onMounted(async () => {
     })
   })
 
-  // 监听日志事件
+  // 【P1优化】监听 ERROR 级别日志（立即显示）
   await onScanLog((log) => {
-    appStore.addLog(log)
+    appStore.addLog(log)  // 单条添加，但 ERROR 日志很少，性能影响可忽略
+  })
+  
+  // 监听普通日志（批量显示）
+  await onScanLogBatch((logs) => {
+    appStore.addLogs(logs)  // ← 批量添加，只触发一次响应式更新
   })
 })
 

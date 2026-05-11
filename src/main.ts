@@ -16,10 +16,10 @@ app.commandLine.appendSwitch('js-flags', '--expose-gc');
 
 // 【修复】初始化 PDF.js 所需的 polyfill（包括 Promise.withResolvers、DOMMatrix、浏览器环境模拟）
 import {setupAllPdfPolyfills} from './utils/pdf-polyfills';
-
 setupAllPdfPolyfills();
 
 import {ScanState} from './core/scan-state';
+import {LogManager} from './core/log-manager';  // 【新增】导入日志管理器
 import {getDirectoryTree} from './services/directory-tree';
 import {cancelScan, startScan} from './core/scanner';
 import {deleteFile, openFile, openFileLocation} from './services/file-operations';
@@ -78,10 +78,14 @@ app.on('before-quit', async () => {
         // 使用 process.stderr 避免循环依赖
         process.stderr.write(`[应用退出] 日志 flush 失败: ${error}\n`);
     }
+    
+    // 【新增】清理 LogManager
+    logManager?.destroy();
 });
 
 let mainWindow: BrowserWindow | null = null;
 const scanState = new ScanState();
+let logManager: LogManager | null = null;  // 【新增】日志管理器实例
 
 // 【新增】电源阻止器 ID（用于防止锁屏时扫描中断）
 let powerSaveBlockerId: number | null = null;
@@ -160,6 +164,9 @@ function createWindow() {
         title: 'DataGuard Scanner - 敏感数据扫描工具',
         icon: icon
     });
+
+    // 【新增】初始化日志管理器（只需一行代码）
+    logManager = new LogManager(mainWindow);
 
     // 【新增】隐藏原生菜单栏（Windows/Linux）
     Menu.setApplicationMenu(null);

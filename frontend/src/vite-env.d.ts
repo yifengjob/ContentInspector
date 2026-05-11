@@ -13,6 +13,7 @@ interface ElectronAPI {
   onScanProgress: (callback: (data: any) => void) => Promise<() => void>
   onScanResult: (callback: (data: any) => void) => Promise<() => void>
   onScanLog: (callback: (data: any) => void) => Promise<() => void>
+  onScanLogBatch: (callback: (logs: string[]) => void) => Promise<() => void>  // 【新增】批量日志监听
   onScanFinished: (callback: () => void) => Promise<() => void>
   onScanError: (callback: (error: string) => void) => Promise<() => void>
   

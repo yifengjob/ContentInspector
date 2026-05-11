@@ -15,20 +15,17 @@ import {LogLevel} from '../types';
 import {
     LOG_FILE_LEVEL,
     LOG_FRONTEND_LEVEL,
-    LOG_MEMORY_LEVEL,
     LOG_ENABLE_FILE,
-    LOG_ENABLE_FRONTEND,
-    LOG_ENABLE_MEMORY
+    LOG_ENABLE_FRONTEND
 } from '../core/scan-config';
+import {getGlobalEventBus} from '../core/event-bus';
 
 // 【配置】日志保留天数
 const LOG_RETENTION_DAYS = 30;
 
-// 【配置】内存中最大日志条数
-const MAX_LOG_ENTRIES = 1000;
-
-// 【配置】日志更新频率限制（毫秒）
-const LOG_UPDATE_INTERVAL = 1000;
+// 【新增】检测是否在 Worker 线程
+const isWorkerThread = typeof process !== 'undefined' &&
+    typeof process.send === 'function';
 
 /**
  * 日志记录器接口（提供便捷的日志方法，支持可变参数和占位符）
@@ -39,7 +36,6 @@ export interface Logger {
     info(...args: any[]): void;          // log.info()
     warn(...args: any[]): void;          // log.warn()
     error(...args: any[]): void;         // log.error()
-    destroy?: () => void;                // 【新增】销毁方法，清理资源
 }
 
 /**
@@ -49,27 +45,27 @@ interface LogConfig {
     context: string;              // 日志上下文（模块名）
     enableFile?: boolean;         // 是否写入文件
     enableFrontend?: boolean;     // 是否发送到前端
-    enableMemory?: boolean;       // 是否保存到内存
-    
+    // 【移除】enableMemory 已不再使用
+
     // 【新增】日志级别配置
     fileLevel?: LogLevel;         // 写入文件的最低级别
     frontendLevel?: LogLevel;     // 发送到前端的最低级别
-    memoryLevel?: LogLevel;       // 保存到内存的最低级别
+    // 【移除】memoryLevel 已不再使用
 }
 
 /**
  * 默认日志配置
  * - 文件：记录 INFO 及以上
  * - 前端：记录 WARN 及以上
- * - 内存：记录 WARN 及以上
+ * - 【移除】内存日志已不再使用
  */
 const DEFAULT_LOG_CONFIG = {
     enableFile: LOG_ENABLE_FILE,
     enableFrontend: LOG_ENABLE_FRONTEND,
-    enableMemory: LOG_ENABLE_MEMORY,
+    // 【移除】enableMemory 已不再使用
     fileLevel: LOG_FILE_LEVEL,
     frontendLevel: LOG_FRONTEND_LEVEL,
-    memoryLevel: LOG_MEMORY_LEVEL,
+    // 【移除】memoryLevel 已不再使用
 };
 
 // 【新增】全局日志流引用（用于应用退出时 flush）
@@ -111,7 +107,7 @@ export function setupFileLogger(logDir: string): void {
 
     const logFile = path.join(logDir, `app-${timeStr}.log`);
     const logStream = fs.createWriteStream(logFile, {flags: 'a'});
-    
+
     // 【新增】保存全局引用，用于应用退出时 flush
     globalLogStream = logStream;
 
@@ -134,12 +130,12 @@ export function setupFileLogger(logDir: string): void {
     ) => {
         return function (...args: any[]) {
             const message = args.join(' ');
-            
+
             // 【改进】统一日志抑制逻辑
             if (shouldSuppressLog(message)) {
                 return; // 静默丢弃
             }
-            
+
             const timestamp = getBeijingTimestamp();
             const logMessage = `[${timestamp}] [${levelPrefix}] ${formatLogMessage(args)}\n`;
             logStream.write(logMessage, (err) => {
@@ -182,29 +178,23 @@ export function createLogger(config: string | LogConfig): Logger {
     const context = typeof config === 'string' ? config : config.context;
     const enableFile = typeof config === 'object' ? (config.enableFile ?? DEFAULT_LOG_CONFIG.enableFile) : DEFAULT_LOG_CONFIG.enableFile;
     const enableFrontend = typeof config === 'object' ? (config.enableFrontend ?? DEFAULT_LOG_CONFIG.enableFrontend) : DEFAULT_LOG_CONFIG.enableFrontend;
-    const enableMemory = typeof config === 'object' ? (config.enableMemory ?? DEFAULT_LOG_CONFIG.enableMemory) : DEFAULT_LOG_CONFIG.enableMemory;
-    
+    // 【移除】enableMemory 已不再使用
+
     // 【新增】获取日志级别配置
     const fileLevel = typeof config === 'object' ? (config.fileLevel ?? DEFAULT_LOG_CONFIG.fileLevel) : DEFAULT_LOG_CONFIG.fileLevel;
     const frontendLevel = typeof config === 'object' ? (config.frontendLevel ?? DEFAULT_LOG_CONFIG.frontendLevel) : DEFAULT_LOG_CONFIG.frontendLevel;
-    const memoryLevel = typeof config === 'object' ? (config.memoryLevel ?? DEFAULT_LOG_CONFIG.memoryLevel) : DEFAULT_LOG_CONFIG.memoryLevel;
 
-    // 内存缓冲区（仅在需要时初始化）
-    let logs: string[] | null = enableMemory ? [] : null;
-    let lastUpdateTime = 0;
-
-    // 【新增】统一的日志输出函数（带级别过滤）
+    // 【新增】统一的日志输出函数（带级别过滤和自动桥接）
     const logWithLevel = (formattedMsg: string, level: LogLevel) => {
         // 【关键】根据级别判断是否需要处理
         const shouldWriteToFile = enableFile && level >= fileLevel;
         const shouldSendToFrontend = enableFrontend && level >= frontendLevel;
-        const shouldSaveToMemory = enableMemory && level >= memoryLevel;
-        
+
         // 如果都不需要，直接返回
-        if (!shouldWriteToFile && !shouldSendToFrontend && !shouldSaveToMemory) {
+        if (!shouldWriteToFile && !shouldSendToFrontend) {
             return;
         }
-        
+
         // 写入文件（根据级别使用不同的 console 函数）
         if (shouldWriteToFile) {
             setImmediate(() => {
@@ -224,31 +214,17 @@ export function createLogger(config: string | LogConfig): Logger {
             });
         }
 
-        // 发送到前端（通过 IPC）
+        // 发送到前端（通过自动桥接）
         if (shouldSendToFrontend) {
             setImmediate(() => {
-                // TODO: 需要通过全局变量或依赖注入获取 mainWindow
-                // if (mainWindow && !mainWindow.isDestroyed()) {
-                //   mainWindow.webContents.send('scan-log', formattedMsg);
-                // }
+                if (isWorkerThread) {
+                    // Worker 线程：通过 parentPort 发送消息到主进程
+                    bridgeWorkerLogToMain(level, formattedMsg, context);
+                } else {
+                    // 主进程：通过 EventBus 发布事件
+                    emitLogToEventBus(level, formattedMsg, context);
+                }
             });
-        }
-
-        // 保存到内存
-        if (shouldSaveToMemory && logs) {
-            logs.push(formattedMsg);
-
-            // 限制内存中的日志数量
-            if (logs.length > MAX_LOG_ENTRIES) {
-                logs.shift();
-            }
-
-            // 限制更新频率
-            const now = Date.now();
-            if (now - lastUpdateTime >= LOG_UPDATE_INTERVAL) {
-                // TODO: 更新到全局状态
-                lastUpdateTime = now;
-            }
         }
     };
 
@@ -286,6 +262,60 @@ export function createLogger(config: string | LogConfig): Logger {
     };
 
     return logger;
+}
+
+/**
+ * 【辅助函数】Worker 线程日志桥接到主进程
+ *
+ * @param level - 日志级别
+ * @param message - 日志消息
+ * @param context - 日志上下文
+ */
+function bridgeWorkerLogToMain(level: LogLevel, message: string, context: string): void {
+    try {
+        const {parentPort} = require('worker_threads');
+        if (parentPort) {
+            parentPort.postMessage({
+                type: 'log',
+                level: LogLevel[level],
+                message,
+                context,
+                timestamp: getBeijingTimestamp()
+            });
+        }
+    } catch (error) {
+        // 静默失败，避免影响主流程
+        process.stderr.write(`[Worker 日志桥接失败] ${error}\n`);
+    }
+}
+
+/**
+ * 【辅助函数】主进程发布日志到 EventBus
+ *
+ * @param level - 日志级别
+ * @param message - 日志消息
+ * @param context - 日志上下文
+ */
+function emitLogToEventBus(level: LogLevel, message: string, context: string): void {
+    try {
+        const eventBus = getGlobalEventBus();
+        if (eventBus) {
+            eventBus.emit('log:message', {
+                level: LogLevel[level],
+                message,
+                context,
+                timestamp: getBeijingTimestamp()
+            });
+        } else {
+            // 【调试】EventBus 未初始化时的警告（仅开发环境）
+            if (process.env.NODE_ENV === 'development') {
+                process.stderr.write(`[警告] EventBus 未初始化，日志无法发送到前端: [${LogLevel[level]}] ${message}\n`);
+            }
+        }
+    } catch (error) {
+        // 静默失败，避免影响主流程
+        process.stderr.write(`[日志事件发布失败] ${error}\n`);
+    }
 }
 
 /**
@@ -422,7 +452,7 @@ export function flushLogStream(): Promise<void> {
             resolve();
             return;
         }
-        
+
         // 等待所有写入操作完成
         globalLogStream.end(() => {
             resolve();
@@ -431,8 +461,22 @@ export function flushLogStream(): Promise<void> {
 }
 
 // 【导出】预创建的常用日志实例
+// 【注意】这些实例在模块加载时创建，此时 EventBus 可能还未初始化
+// 如果需要使用 EventBus 功能，请确保在 LogManager 初始化后使用
 export const logger = createLogger('General');
 export const fileLogger = createLogger('File');
 export const mainLogger = createLogger('Main');
 export const workerLogger = createLogger('Worker');
 export const extractorLogger = createLogger('Extractor');
+
+// scannerLogger 延迟创建，确保在 EventBus 初始化后使用
+// 使用时通过 getScannerLogger() 获取
+let _scannerLogger: Logger | null = null;
+export function getScannerLogger(): Logger {
+    if (!_scannerLogger) {
+        _scannerLogger = createLogger('Scanner');
+    }
+    return _scannerLogger;
+}
+
+export const logManagerLogger = createLogger({context: 'LogManager', enableFrontend: false});

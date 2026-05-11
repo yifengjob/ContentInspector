@@ -1,16 +1,13 @@
 /**
  * 事件总线模块 - 轻量级发布-订阅模式
- * 
+ *
  * 职责：
  * - 统一管理所有状态变化事件
  * - 提供类型安全的事件发布和订阅
  * - 支持错误隔离和异常处理
  */
 
-import {createScannerLogger} from '../utils/scanner-helpers';
-import type {ScanState} from './scan-state';
-import type {BrowserWindow} from 'electron';
-import type {Logger} from '../logger/logger';
+import {createLogger, Logger} from '../logger/logger';
 
 /**
  * Worker 事件类型定义
@@ -21,7 +18,9 @@ export type WorkerEventType =
     | 'worker.busy'         // Worker 变为繁忙（预留）
     | 'task.enqueued'       // 任务入队
     | 'task.completed'      // 任务完成（预留）
-    | 'walker.batch-ready'; // Walker 批量文件就绪
+    | 'walker.batch-ready'  // Walker 批量文件就绪
+    | 'log:message';        // 【新增】日志消息事件
+
 
 /**
  * 事件处理器类型
@@ -30,30 +29,55 @@ export type EventHandler = (data?: any) => void;
 
 /**
  * 事件总线类
- * 
+ *
+ * 【单例模式】整个应用只创建一个 EventBus 实例
+ *
  * 使用示例：
  * ```typescript
- * const eventBus = new EventBus(scanState, mainWindow);
- * 
+ * const eventBus = EventBus.getInstance();
+ *
  * // 订阅事件
  * eventBus.on('worker.idle', (consumer) => {
  *     console.log('Worker 空闲:', consumer.id);
  * });
- * 
+ *
  * // 发布事件
  * eventBus.emit('worker.idle', consumer);
- * 
+ *
  * // 清理所有监听器
  * eventBus.clearAll();
  * ```
  */
 export class EventBus {
+    private static instance: EventBus | null = null;
     private listeners: Map<WorkerEventType, EventHandler[]>;
     private log: Logger;
 
-    constructor(scanState: ScanState, mainWindow: BrowserWindow) {
+    /**
+     * 私有构造函数，防止外部直接创建实例
+     */
+    private constructor() {
         this.listeners = new Map();
-        this.log = createScannerLogger(scanState, mainWindow);
+        this.log = createLogger("EventBus");
+    }
+
+    /**
+     * 获取 EventBus 单例实例
+     *
+     * @returns EventBus 单例实例
+     */
+    static getInstance(): EventBus {
+        if (!EventBus.instance) {
+            EventBus.instance = new EventBus();
+        }
+        return EventBus.instance;
+    }
+
+    /**
+     * 重置单例（用于测试或重新初始化）
+     */
+    static resetInstance(): void {
+        EventBus.instance = null;
     }
 
     /**
@@ -114,4 +138,30 @@ export class EventBus {
     getListenerCount(event: WorkerEventType): number {
         return this.listeners.get(event)?.length || 0;
     }
+}
+
+// ==================== 全局 EventBus 管理 ====================
+
+/**
+ * 全局 EventBus 引用（供 logger.ts 使用）
+ */
+let globalEventBus: EventBus | null = null;
+
+/**
+ * 设置全局 EventBus 实例
+ * 应该在应用启动时调用
+ *
+ * @param bus - EventBus 实例
+ */
+export function setGlobalEventBus(bus: EventBus | null): void {
+    globalEventBus = bus;
+}
+
+/**
+ * 获取全局 EventBus 实例
+ *
+ * @returns EventBus 实例或 null（如果未初始化）
+ */
+export function getGlobalEventBus(): EventBus | null {
+    return globalEventBus;
 }

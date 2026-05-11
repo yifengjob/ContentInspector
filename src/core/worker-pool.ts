@@ -1,6 +1,6 @@
 /**
  * Worker 池管理模块
- * 
+ *
  * 职责：
  * - Consumer Worker 的创建、销毁、重启
  * - Worker 状态管理
@@ -13,10 +13,10 @@ import * as path from 'path';
 import {EventBus} from './event-bus';
 import type {ScanState} from './scan-state';
 import type {BrowserWindow} from 'electron';
-import {createScannerLogger, markConsumerIdle, safelyTerminateWorker} from '../utils/scanner-helpers';
+import {markConsumerIdle, safelyTerminateWorker} from '../utils/scanner-helpers';
 import {WORKER_RESTART_DELAY} from './scan-config';
 import type {Task} from './task-queue';
-import type {Logger} from '../logger/logger';
+import {createLogger, Logger} from '../logger/logger';
 
 /**
  * Consumer Worker 接口
@@ -46,7 +46,7 @@ interface PendingTask {
 
 /**
  * Worker 池管理器
- * 
+ *
  * 使用示例：
  * ```typescript
  * const workerPool = new WorkerPool(
@@ -59,37 +59,37 @@ interface PendingTask {
  *     dynamicOldGenMB,
  *     dynamicYoungGenMB
  * );
- * 
+ *
  * await workerPool.initialize();
- * 
+ *
  * // 获取空闲 Worker
  * const idleConsumer = workerPool.getIdleConsumer();
- * 
+ *
  * // 清理资源
  * workerPool.cleanup();
  * ```
  */
 export class WorkerPool {
     private readonly consumers: Map<number, Consumer>;
-    private eventBus: EventBus;
+    private readonly eventBus: EventBus;
     private scanState: ScanState;
     private readonly mainWindow: BrowserWindow;
     private readonly log: Logger;
     private config: any;
-    
+
     // Worker 创建队列
-    private workerCreateQueue: Array<{consumerId: number, oldGen?: number, youngGen?: number}> = [];
+    private workerCreateQueue: Array<{ consumerId: number, oldGen?: number, youngGen?: number }> = [];
     private isCreatingWorker = false;
-    
+
     // 计数器
     private activeWorkerCount = 0;
     private nextTaskId = 0;
     private pendingTasks = new Map<number, PendingTask>();
-    
+
     // 内存配置
     private readonly dynamicOldGenMB: number;
     private readonly dynamicYoungGenMB: number;
-    
+
     // 回调函数（由外部传入）
     private readonly onUpdateConsumerCount: (taskId?: number) => void;
     private readonly onCleanupConsumerState: (consumer: Consumer) => void;
@@ -123,11 +123,11 @@ export class WorkerPool {
         this.eventBus = eventBus;
         this.scanState = scanState;
         this.mainWindow = mainWindow;
-        this.log = createScannerLogger(scanState, mainWindow);
+        this.log = createLogger("WorkerPool");
         this.config = config;
         this.dynamicOldGenMB = dynamicOldGenMB;
         this.dynamicYoungGenMB = dynamicYoungGenMB;
-        
+
         this.onUpdateConsumerCount = onUpdateConsumerCount;
         this.onCleanupConsumerState = onCleanupConsumerState;
         this.onSendProgressUpdate = onSendProgressUpdate;
@@ -144,11 +144,11 @@ export class WorkerPool {
      */
     async initialize(): Promise<void> {
         this.log.info(`正在初始化 ${this.poolSize} 个 Consumer Workers...`);
-        
+
         for (let i = 0; i < this.poolSize; i++) {
             this.workerCreateQueue.push({consumerId: i});
         }
-        
+
         // 异步处理初始 Worker 创建
         return new Promise((resolve, reject) => {
             setImmediate(async () => {
@@ -170,12 +170,12 @@ export class WorkerPool {
         if (this.isCreatingWorker || this.workerCreateQueue.length === 0) {
             return;
         }
-        
+
         this.isCreatingWorker = true;
-        
+
         while (this.workerCreateQueue.length > 0) {
             const {consumerId, oldGen, youngGen} = this.workerCreateQueue.shift()!;
-            
+
             try {
                 this.createConsumer(consumerId, oldGen, youngGen);
                 // 【关键】每个 Worker 创建后延迟 50ms，避免资源竞争
@@ -188,7 +188,7 @@ export class WorkerPool {
                 await new Promise(resolve => setTimeout(resolve, 200));
             }
         }
-        
+
         this.isCreatingWorker = false;
     }
 
@@ -212,12 +212,12 @@ export class WorkerPool {
             });
         } catch (error: any) {
             this.log.error(`无法创建 Worker ${id} - ${error.message}`);
-            
+
             // 【修复】如果是因为资源不足（EAGAIN），将创建请求放回队列重试
             if (error.code === 'EAGAIN') {
                 this.log.warn(`[Worker创建] 系统资源不足，Worker ${id} 将在稍后重试创建`);
             }
-            
+
             throw error; // 抛出错误，让队列处理重试
         }
 
@@ -231,7 +231,7 @@ export class WorkerPool {
         };
 
         this.consumers.set(id, consumer);
-        
+
         this.log.info(`[Worker创建] Worker ${id} 创建成功`);
 
         // 【事件总线】发布 Worker 创建事件
@@ -248,6 +248,21 @@ export class WorkerPool {
      */
     private setupWorkerMessageListener(consumer: Consumer): void {
         consumer.worker.on('message', (result) => {
+            // 【新增】处理日志消息
+            if (result.type === 'log') {
+                // 委托给 LogManager 处理（通过全局 EventBus）
+                const eventBus = this.eventBus;
+                if (eventBus) {
+                    eventBus.emit('log:message', {
+                        level: result.level,
+                        message: `[Worker #${consumer.id}] ${result.message}`,
+                        context: result.context || 'Worker',
+                        timestamp: result.timestamp
+                    });
+                }
+                return; // 不再继续处理其他逻辑
+            }
+
             if (result.type === 'ready') {
                 return;
             }
@@ -276,7 +291,7 @@ export class WorkerPool {
             this.onCleanupConsumerState(consumer);
 
             // 更新最后活动时间（通过事件触发）
-            
+
             // 更新进度
             this.onSendProgressUpdate(result.filePath || '');
 
@@ -287,7 +302,7 @@ export class WorkerPool {
             } else {
                 if (result.total && result.total > 0) {
                     this.onResultLog(result.total, result);
-                    
+
                     const resultItem = {
                         filePath: result.filePath,
                         fileSize: result.fileSize || 0,
@@ -380,10 +395,10 @@ export class WorkerPool {
         safelyTerminateWorker(consumer.worker, consumer, this.log);
 
         const consumerId = consumer.id;
-        
+
         // 将 Worker 创建请求加入队列
         this.workerCreateQueue.push({consumerId});
-        
+
         // 异步处理队列
         setImmediate(() => {
             this.processWorkerCreateQueue().catch(error => {
@@ -410,7 +425,7 @@ export class WorkerPool {
         consumer: Consumer,
         task: Task,
         processingTypeCount: Map<string, number>,
-        largeFilesProcessingRef: {value: number},
+        largeFilesProcessingRef: { value: number },
         lastTypeScheduleTime: Map<string, number>
     ): void {
         // 更新调度状态
@@ -442,8 +457,10 @@ export class WorkerPool {
         // 添加到待处理任务
         this.pendingTasks.set(this.nextTaskId, {
             filePath: task.filePath,
-            resolve: () => {},
-            reject: () => {},
+            resolve: () => {
+            },
+            reject: () => {
+            },
             timeoutId
         });
 

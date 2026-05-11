@@ -39,6 +39,7 @@ declare global {
             onScanFinished: (callback: () => void) => () => void;
             onScanError: (callback: (error: string) => void) => () => void;
             onScanLog: (callback: (msg: string) => void) => () => void;
+            onScanLogBatch: (callback: (logs: string[]) => void) => () => void;  // 【新增】批量日志监听
         };
     }
 }
@@ -177,6 +178,11 @@ export async function onScanError(callback: (error: string) => void): Promise<()
 // 监听扫描日志事件
 export async function onScanLog(callback: (log: string) => void): Promise<() => void> {
     return window.electronAPI.onScanLog(callback)
+}
+
+// 【新增】监听批量日志事件（带节流）
+export async function onScanLogBatch(callback: (logs: string[]) => void): Promise<() => void> {
+    return window.electronAPI.onScanLogBatch(callback)
 }
 
 // 显示消息对话框
