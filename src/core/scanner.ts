@@ -613,8 +613,9 @@ export async function startScan(
             break;
         }
 
+        // 【关键修复】使用异步文件操作，防止阻塞主线程
         try {
-            const stat = fs.statSync(rootPath);
+            const stat = await fs.promises.stat(rootPath);
             if (stat.isFile()) {
                 const basename = path.basename(rootPath);
                 if (config.ignoreDirNames.includes(basename)) {
@@ -629,8 +630,11 @@ export async function startScan(
 
         log.info(`正在扫描: ${rootPath} (${currentPathIndex}/${totalPaths})`);
 
-        if (!fs.existsSync(rootPath)) {
-            log.info(`路径不存在: ${rootPath}`);
+        // 【关键修复】使用异步检查，防止阻塞主线程
+        try {
+            await fs.promises.access(rootPath, fs.constants.F_OK);
+        } catch (error: any) {
+            log.info(`路径不存在或无权限: ${rootPath}`);
             continue;
         }
 
