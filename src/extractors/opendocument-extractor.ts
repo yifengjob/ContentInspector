@@ -4,8 +4,10 @@
  */
 
 import {unzipFile, extractEntriesText} from '../utils/zip-utils';
+import {calculateParserTimeout} from '../core/scan-config';  // 【新增】导入超时配置
 import {extractorLogger} from '../logger/logger';
 import type {ExtractorResult} from './types';
+import * as fs from 'fs';
 
 /**
  * 【重构】提取公共的 OpenDocument 解析逻辑
@@ -19,41 +21,85 @@ async function extractOpenDocument(
     fileTypeName: string,
     extractTextFn: (xmlContent: string) => string[]
 ): Promise<ExtractorResult> {
+    // 【关键修复】添加智能超时保护，防止解析卡死
+    let isResolved = false;
+
+    // 先获取文件大小，然后计算智能超时
+    let stat: fs.Stats;
     try {
-        const entries = await unzipFile(filePath);
-
-        // OpenDocument 的内容在 content.xml 中
-        const contentEntry = entries.find(e => e.name === 'content.xml');
-        if (!contentEntry) {
-            return {text: '', unsupportedPreview: true};
-        }
-
-        const xmlContent = extractEntriesText([contentEntry])[0];
-        if (!xmlContent) {
-            return {text: '', unsupportedPreview: true};
-        }
-
-        // 使用自定义函数提取文本
-        const textChunks = extractTextFn(xmlContent);
-
-        // 【优化】使用 join 合并所有文本块
-        const allText = textChunks.join('\n');
-        const hasContent = allText && allText.trim().length > 0;
-
-        return {
-            text: hasContent ? allText : '',
-            unsupportedPreview: !hasContent
-        };
-
+        stat = await fs.promises.stat(filePath);
     } catch (error: any) {
-        // 【新增】识别加密或损坏的 OpenDocument 文件
-        if (error.message.includes('unknown compression type')) {
-            extractorLogger.warn('{} 文件可能已加密或损坏，跳过: {}', fileTypeName, filePath);
-        } else {
-            extractorLogger.error(`extract${fileTypeName}: ${error.message}`);
-        }
+        extractorLogger.error(`extract${fileTypeName}: ${error.message}`);
         return {text: '', unsupportedPreview: true};
     }
+
+    const timeoutMs = calculateParserTimeout(stat.size);
+
+    return new Promise((resolve) => {
+        const timeoutId = setTimeout(() => {
+            if (!isResolved) {
+                isResolved = true;
+                extractorLogger.warn(`extract${fileTypeName}: 解析超时 (${timeoutMs / 1000}秒)`);
+                resolve({text: '', unsupportedPreview: true});
+            }
+        }, timeoutMs);
+
+        (async () => {
+            try {
+                const entries = await unzipFile(filePath);
+
+                // OpenDocument 的内容在 content.xml 中
+                const contentEntry = entries.find(e => e.name === 'content.xml');
+                if (!contentEntry) {
+                    clearTimeout(timeoutId);
+                    if (!isResolved) {
+                        isResolved = true;
+                        resolve({text: '', unsupportedPreview: true});
+                    }
+                    return;
+                }
+
+                const xmlContent = extractEntriesText([contentEntry])[0];
+                if (!xmlContent) {
+                    clearTimeout(timeoutId);
+                    if (!isResolved) {
+                        isResolved = true;
+                        resolve({text: '', unsupportedPreview: true});
+                    }
+                    return;
+                }
+
+                // 使用自定义函数提取文本
+                const textChunks = extractTextFn(xmlContent);
+
+                // 【优化】使用 join 合并所有文本块
+                const allText = textChunks.join('\n');
+                const hasContent = allText && allText.trim().length > 0;
+
+                clearTimeout(timeoutId);
+                if (!isResolved) {
+                    isResolved = true;
+                    resolve({
+                        text: hasContent ? allText : '',
+                        unsupportedPreview: !hasContent
+                    });
+                }
+
+            } catch (error: any) {
+                clearTimeout(timeoutId);
+                if (!isResolved) {
+                    isResolved = true;
+                    // 【新增】识别加密或损坏的 OpenDocument 文件
+                    if (error.message.includes('unknown compression type')) {
+                        extractorLogger.warn('{} 文件可能已加密或损坏，跳过: {}', fileTypeName, filePath);
+                    } else {
+                        extractorLogger.error(`extract${fileTypeName}: ${error.message}`);
+                    }
+                    resolve({text: '', unsupportedPreview: true});
+                }
+            }
+        })();
+    });
 }
 
 export async function extractOdt(filePath: string): Promise<ExtractorResult> {
