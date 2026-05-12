@@ -46,8 +46,18 @@ function shouldIgnoreDirectory(dirName: string, dirPath: string, config: WalkerC
  */
 async function initWalkdir() {
   if (!walkdir) {
-    const module = await import('walkdir');
-    walkdir = module.default || module;
+    try {
+      const module = await import('walkdir');
+      // walkdir 可能以不同方式导出，尝试多种方式
+      walkdir = (module as any).default || (module as any).walkdir || module;
+      
+      if (typeof walkdir !== 'function') {
+        throw new Error(`walkdir 模块导出无效: ${typeof walkdir}`);
+      }
+    } catch (error: any) {
+      workerLogger.error('[Walker] walkdir 模块加载失败:', error.message);
+      throw error;
+    }
   }
 }
 
@@ -177,7 +187,7 @@ async function startWalking(config: WalkerConfig) {
       // 【调试】输出 walker 配置
       
       // 【新增】超时保护 - 如果 30 秒内没有完成，强制 resolve（调试用）
-      const timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(() => {  // ✅ 修复：使用赋值而非重新声明
         // 【批量优化】发送剩余批次
         flushBatch();
         

@@ -10,7 +10,6 @@
  */
 
 import * as fs from 'fs';
-import {calculateParserTimeout} from '../core/scan-config';
 import {extractorLogger} from '../logger/logger';
 import type {ExtractorResult} from './types';
 
@@ -20,10 +19,6 @@ import type {ExtractorResult} from './types';
 export interface ExtractorConfig {
     /** 解析器名称（用于日志） */
     name: string;
-    /** 是否启用超时保护（默认 true） */
-    enableTimeout?: boolean;
-    /** 自定义超时时间（毫秒），不提供则自动计算 */
-    customTimeout?: number;
     /** 是否记录详细日志（默认 false） */
     verboseLogging?: boolean;
 }
@@ -47,14 +42,12 @@ export interface ExtractorConfig {
  * ```
  */
 export abstract class BaseExtractor {
-    protected readonly config: Required<ExtractorConfig>;
+    protected readonly config: ExtractorConfig;
     protected readonly logger: typeof extractorLogger;
 
     protected constructor(config: ExtractorConfig) {
         this.config = {
             name: config.name,
-            enableTimeout: config.enableTimeout ?? true,
-            customTimeout: config.customTimeout ?? 0,
             verboseLogging: config.verboseLogging ?? false
         };
         this.logger = extractorLogger;
@@ -65,7 +58,7 @@ export abstract class BaseExtractor {
      * 
      * 流程：
      * 1. 验证文件
-     * 2. 执行提取（带超时保护）
+     * 2. 执行提取（由装饰器提供超时保护）
      * 3. 处理结果
      * 4. 返回结果
      * 
@@ -79,8 +72,8 @@ export abstract class BaseExtractor {
             // 1. 验证文件
             await this.validateFile(filePath);
             
-            // 2. 执行提取（带超时保护）
-            const result = await this.executeWithTimeout(filePath);
+            // 2. 执行提取（超时由装饰器处理）
+            const result = await this.doExtract(filePath);
             
             // 3. 记录成功日志
             const duration = Date.now() - startTime;
@@ -90,9 +83,7 @@ export abstract class BaseExtractor {
             
             return result;
         } catch (error: any) {
-            // 4. 处理错误
-            const duration = Date.now() - startTime;
-            this.logger.error(`[${this.config.name}] 提取失败 (${duration}ms): ${error.message}`);
+            // 4. 处理错误（不记录日志，由装饰器统一记录）
             return this.handleError(error, filePath);
         }
     }
@@ -131,29 +122,6 @@ export abstract class BaseExtractor {
     protected async doValidateFile(filePath: string, stat: fs.Stats): Promise<void> {
         // 默认不做额外验证，子类可重写
     }
-
-    /**
-     * 【模板方法】带超时保护的执行
-     * 
-     * @param filePath 文件路径
-     * @returns 提取结果
-     */
-    protected async executeWithTimeout(filePath: string): Promise<ExtractorResult> {
-        if (!this.config.enableTimeout) {
-            // 不启用超时，直接执行
-            return await this.doExtract(filePath);
-        }
-
-        // 计算超时时间
-        const timeoutMs = this.config.customTimeout || await this.calculateTimeout(filePath);
-
-        // 使用 Promise.race 实现超时
-        return Promise.race([
-            this.doExtract(filePath),
-            this.createTimeoutPromise(timeoutMs, filePath)
-        ]);
-    }
-
     /**
      * 【抽象方法】子类必须实现的提取逻辑
      * 
@@ -162,37 +130,7 @@ export abstract class BaseExtractor {
      */
     protected abstract doExtract(filePath: string): Promise<ExtractorResult>;
 
-    /**
-     * 【工具方法】计算超时时间
-     * 
-     * @param filePath 文件路径
-     * @returns 超时时间（毫秒）
-     */
-    protected async calculateTimeout(filePath: string): Promise<number> {
-        try {
-            const stat = await fs.promises.stat(filePath);
-            return calculateParserTimeout(stat.size);
-        } catch (error: any) {
-            // 如果无法获取文件大小，使用默认超时
-            return 30000; // 30秒
-        }
-    }
 
-    /**
-     * 【工具方法】创建超时 Promise
-     * 
-     * @param timeoutMs 超时时间（毫秒）
-     * @param filePath 文件路径（用于日志）
-     * @returns 超时的 Promise
-     */
-    protected createTimeoutPromise(timeoutMs: number, filePath: string): Promise<ExtractorResult> {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                this.logger.warn(`[${this.config.name}] 提取超时 (${timeoutMs / 1000}秒)`);
-                resolve({text: '', unsupportedPreview: true});
-            }, timeoutMs);
-        });
-    }
 
     /**
      * 【工具方法】处理错误

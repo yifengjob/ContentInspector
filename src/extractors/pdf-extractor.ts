@@ -39,7 +39,7 @@ const PDF_DOCUMENT_OPTIONS = {
 let workerPdfJsLib: any = null;
 
 /**
- * 为每个 Worker 初始化独立的 pdf.js 实例
+ * 为每个 Worker 初始化独立的 pdf.js 实例（模块级别初始化，只执行一次）
  */
 function getWorkerPdfJsLib() {
     if (workerPdfJsLib) {
@@ -81,6 +81,9 @@ function getWorkerPdfJsLib() {
     }
 }
 
+// 模块级别初始化（只执行一次）
+getWorkerPdfJsLib();
+
 // PDF 文件大小限制（MB）
 const MAX_PDF_SIZE_MB = DEFAULT_MAX_PDF_SIZE_MB;
 
@@ -114,9 +117,6 @@ class PdfExtractor extends BaseExtractor {
             name: 'PdfExtractor',
             verboseLogging: false
         });
-        
-        // 初始化 pdf.js
-        getWorkerPdfJsLib();
     }
 
     protected async doValidateFile(filePath: string, stat: any): Promise<void> {
@@ -283,11 +283,11 @@ class PdfExtractor extends BaseExtractor {
 // 创建基础实例
 const baseExtractor = new PdfExtractor();
 
-// 应用装饰器：超时 + 日志
+// 应用装饰器：PDF 总超时 + 日志
 const enhancedExtract = composeDecorators(
     baseExtractor.extract.bind(baseExtractor),
     [
-        (fn) => withTimeout(fn, { timeoutMs: PDF_TOTAL_TIMEOUT_MS }),
+        (fn) => withTimeout(fn, { timeoutMs: PDF_TOTAL_TIMEOUT_MS, useSmartTimeout: false }),
         (fn) => withLogging(fn, { 
             logStart: false,
             logEnd: false,

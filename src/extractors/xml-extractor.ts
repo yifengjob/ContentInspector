@@ -5,101 +5,135 @@
 
 import {createReadStream} from 'fs';
 import * as sax from 'sax';
-import {MAX_TEXT_CONTENT_SIZE_MB, BYTES_TO_MB, calculateParserTimeout} from '../core/scan-config';
+import {MAX_TEXT_CONTENT_SIZE_MB, BYTES_TO_MB} from '../core/scan-config';
 import type {ExtractorResult} from './types';
+import {BaseExtractor} from './base-extractor';
 import {extractTextFile} from './text-extractor';
-import {buildExtractorResult} from './extractor-utils';
-import {extractorLogger} from "../logger/logger";
-import * as fs from 'fs';
+import {withTimeout, withLogging, composeDecorators} from './extractor-decorators';
 
-export async function extractXmlFile(filePath: string): Promise<ExtractorResult> {
-    let isResolved = false;
+/**
+ * XML 文件提取器类
+ */
+class XmlExtractor extends BaseExtractor {
+    private isCancelled: boolean = false;
+    private stream: any = null;
+    private parser: any = null;
 
-    // 获取文件大小并计算智能超时
-    let stat: fs.Stats;
-    try {
-        stat = await fs.promises.stat(filePath);
-    } catch (error: any) {
-        extractorLogger.error(`extractXmlFile: ${error.message}`);
-        return {text: '', unsupportedPreview: true};
+    constructor() {
+        super({ 
+            name: 'XmlExtractor',
+            verboseLogging: false
+        });
     }
 
-    const timeoutMs = calculateParserTimeout(stat.size);
-
-    return new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-            if (!isResolved) {
-                isResolved = true;
-                stream.destroy();
-                parser.destroy();
-                extractorLogger.warn(`extractXmlFile: 解析超时 (${timeoutMs / 1000}秒)`);
-                resolve({text: '', unsupportedPreview: true});
+    /**
+     * 取消当前解析操作
+     */
+    public cancel(): void {
+        this.isCancelled = true;
+        // ✅ 立即销毁流和解析器
+        if (this.stream) {
+            try {
+                this.stream.destroy();
+            } catch (e) {
+                // 忽略错误
             }
-        }, timeoutMs);
+        }
+        if (this.parser) {
+            try {
+                this.parser.destroy();
+            } catch (e) {
+                // 忽略错误
+            }
+        }
+    }
 
-        const stream = createReadStream(filePath, {
-            highWaterMark: 64 * 1024
-        });
+    protected async doExtract(filePath: string): Promise<ExtractorResult> {
+        return new Promise((resolve) => {
+            this.isCancelled = false;  // 重置取消标志
 
-        // 创建严格模式的 sax 解析器
-        const parser = sax.createStream(true, {trim: true});
+            this.stream = createReadStream(filePath, {
+                highWaterMark: 64 * 1024
+            });
 
-        const textChunks: string[] = [];
-        let totalTextLength = 0;
-        const maxTextLength = MAX_TEXT_CONTENT_SIZE_MB * BYTES_TO_MB;
+            // 创建严格模式的 sax 解析器
+            this.parser = sax.createStream(true, {trim: true});
 
-        // 监听文本节点事件
-        parser.on('text', (text: string) => {
-            if (isResolved) return;
+            const textChunks: string[] = [];
+            let totalTextLength = 0;
+            const maxTextLength = MAX_TEXT_CONTENT_SIZE_MB * BYTES_TO_MB;
 
-            const trimmed = text.trim();
-            if (trimmed) {
-                totalTextLength += trimmed.length + 1;
-
-                if (totalTextLength > maxTextLength) {
-                    stream.destroy();
-                    parser.destroy();
-                    clearTimeout(timeoutId);
-                    extractorLogger.warn(`extractXmlFile: XML 文本内容过大 (${(totalTextLength / BYTES_TO_MB).toFixed(1)}MB)`);
-                    if (!isResolved) {
-                        isResolved = true;
-                        resolve({text: '', unsupportedPreview: true});
-                    }
+            // 监听文本节点事件
+            this.parser.on('text', (text: string) => {
+                // ✅ 检查取消标志
+                if (this.isCancelled) {
+                    this.cancel();
+                    resolve({text: '', unsupportedPreview: true});
                     return;
                 }
 
-                textChunks.push(trimmed);
-            }
-        });
+                const trimmed = text.trim();
+                if (trimmed) {
+                    totalTextLength += trimmed.length + 1;
 
-        parser.on('end', () => {
-            if (!isResolved) {
-                isResolved = true;
-                clearTimeout(timeoutId);
-                const textContent = textChunks.join(' ');
-                resolve(buildExtractorResult(textContent, 'XmlExtractor'));
-            }
-        });
+                    if (totalTextLength > maxTextLength) {
+                        this.cancel();
+                        this.logger.warn(`[${this.config.name}] XML 文本内容过大 (${(totalTextLength / BYTES_TO_MB).toFixed(1)}MB)`);
+                        resolve({text: '', unsupportedPreview: true});
+                        return;
+                    }
 
-        parser.on('error', (error: any) => {
-            if (!isResolved) {
-                isResolved = true;
-                clearTimeout(timeoutId);
-                extractorLogger.warn(`extractXmlFile: ${error.message}`);
-                // XML 解析失败时，降级到普通文本读取
-                extractTextFile(filePath).then(resolve).catch(reject);
-            }
-        });
+                    textChunks.push(trimmed);
+                }
+            });
 
-        stream.pipe(parser);
+            this.parser.on('end', () => {
+                // ✅ 检查取消标志
+                if (!this.isCancelled) {
+                    const textContent = textChunks.join(' ');
+                    resolve(this.buildResult(textContent, 'XmlExtractor'));
+                }
+            });
 
-        stream.on('error', (error: any) => {
-            if (!isResolved) {
-                isResolved = true;
-                clearTimeout(timeoutId);
-                extractorLogger.error(`extractXmlFile-stream: ${error}`);
-                reject(error);
-            }
+            this.parser.on('error', (error: any) => {
+                // ✅ 检查取消标志
+                if (!this.isCancelled) {
+                    this.logger.warn(`[${this.config.name}] ${error.message}`);
+                    // XML 解析失败时，降级到普通文本读取
+                    extractTextFile(filePath).then(resolve);
+                }
+            });
+
+            this.stream.pipe(this.parser);
+
+            this.stream.on('error', (error: any) => {
+                // ✅ 检查取消标志
+                if (!this.isCancelled) {
+                    this.logger.error(`[${this.config.name}] 流读取错误: ${error}`);
+                    resolve(this.handleError(error, filePath));
+                }
+            });
         });
-    });
+    }
+}
+
+// 导出单例实例
+const extractor = new XmlExtractor();
+
+// 应用装饰器：智能超时 + 日志
+const enhancedExtract = composeDecorators(
+    extractor.extract.bind(extractor),
+    [
+        (fn) => withTimeout(fn),  // 智能超时（基于文件大小）
+        (fn) => withLogging(fn, { logError: true, prefix: 'XmlExtractor' })
+    ]
+);
+
+/**
+ * 提取 XML 文件内容（兼容旧接口）
+ * @param filePath 文件路径
+ * @returns 提取结果
+ */
+export async function extractXmlFile(filePath: string): Promise<ExtractorResult> {
+    return await enhancedExtract(filePath);
 }

@@ -9,32 +9,45 @@
  * - 使用装饰器模式增强解析器功能
  */
 
+import * as fs from 'fs';
+import {calculateParserTimeout, PDF_TOTAL_TIMEOUT_MS} from '../core/scan-config';
 import type {ExtractorResult} from './types';
 import {extractorLogger} from '../logger/logger';
 
 /**
- * 解析器函数类型
+ * 解析器函数类型（支持取消）
  */
-export type ExtractorFunction = (filePath: string) => Promise<ExtractorResult>;
+export interface CancelableExtractorFunction {
+    (filePath: string): Promise<ExtractorResult>;
+    cancel?: () => void;
+}
+
+export type ExtractorFunction = CancelableExtractorFunction;
 
 /**
  * 超时装饰器配置
  */
 export interface TimeoutDecoratorConfig {
-    /** 超时时间（毫秒） */
-    timeoutMs: number;
+    /** 超时时间（毫秒），不提供则根据文件大小智能计算 */
+    timeoutMs?: number;
+    /** 是否使用智能超时计算（默认 true） */
+    useSmartTimeout?: boolean;
     /** 超时后的默认返回值 */
     fallbackResult?: ExtractorResult;
 }
 
 /**
- * 【装饰器】添加超时保护
+ * 【装饰器】添加超时保护（使用 AbortController）
  * 
  * 使用示例：
  * ```typescript
- * const extractWithTimeout = withTimeout(
+ * // 智能超时（根据文件大小自动计算）
+ * const extractWithTimeout = withTimeout(extractTextFile);
+ * 
+ * // 固定超时
+ * const extractWithFixedTimeout = withTimeout(
  *     extractTextFile,
- *     { timeoutMs: 30000 }
+ *     { timeoutMs: 30000, useSmartTimeout: false }
  * );
  * ```
  * 
@@ -44,34 +57,78 @@ export interface TimeoutDecoratorConfig {
  */
 export function withTimeout(
     extractor: ExtractorFunction,
-    config: TimeoutDecoratorConfig
+    config: TimeoutDecoratorConfig = {}
 ): ExtractorFunction {
-    const {timeoutMs, fallbackResult = {text: '', unsupportedPreview: true}} = config;
+    const {
+        timeoutMs,
+        useSmartTimeout = true,
+        fallbackResult = {text: '', unsupportedPreview: true}
+    } = config;
 
     return async (filePath: string): Promise<ExtractorResult> => {
-        let isResolved = false;
+        // 计算超时时间
+        let actualTimeoutMs: number;
+        
+        if (timeoutMs !== undefined && !useSmartTimeout) {
+            // 使用固定超时
+            actualTimeoutMs = timeoutMs;
+        } else {
+            // 智能计算超时（基于文件大小）
+            try {
+                const stat = await fs.promises.stat(filePath);
+                actualTimeoutMs = timeoutMs || calculateParserTimeout(stat.size);
+            } catch (error) {
+                // 如果无法获取文件大小，使用默认值
+                actualTimeoutMs = timeoutMs || 30000;
+            }
+        }
 
-        return Promise.race([
-            (async () => {
-                try {
-                    const result = await extractor(filePath);
+        return new Promise((resolve, reject) => {
+            let isResolved = false;
+
+            // 设置超时定时器
+            const timeoutId = setTimeout(() => {
+                if (!isResolved) {
                     isResolved = true;
-                    return result;
-                } catch (error: any) {
-                    isResolved = true;
-                    throw error;
+                    extractorLogger.warn(`[TimeoutDecorator] 解析超时 (${actualTimeoutMs / 1000}秒): ${filePath}`);
+                    
+                    // ✅ 尝试调用解析器的取消方法
+                    if ((extractor as any).cancel) {
+                        try {
+                            (extractor as any).cancel();
+                        } catch (e) {
+                            // 忽略取消错误
+                        }
+                    }
+                    
+                    resolve(fallbackResult);
                 }
-            })(),
-            new Promise<ExtractorResult>((resolve) => {
-                setTimeout(() => {
+            }, actualTimeoutMs);
+
+            // 执行解析
+            extractor(filePath)
+                .then(result => {
                     if (!isResolved) {
                         isResolved = true;
-                        extractorLogger.warn(`[TimeoutDecorator] 解析超时 (${timeoutMs / 1000}秒): ${filePath}`);
-                        resolve(fallbackResult);
+                        clearTimeout(timeoutId);
+                        resolve(result);
                     }
-                }, timeoutMs);
-            })
-        ]);
+                })
+                .catch(error => {
+                    if (!isResolved) {
+                        isResolved = true;
+                        clearTimeout(timeoutId);
+                        
+                        // 如果是被取消的，返回降级结果
+                        if (error.message === 'Cancelled' || error.message.includes('cancelled')) {
+                            extractorLogger.warn(`[TimeoutDecorator] 解析被取消: ${filePath}`);
+                            resolve(fallbackResult);
+                        } else {
+                            reject(error);
+                        }
+                    }
+                });
+        });
     };
 }
 
@@ -91,6 +148,8 @@ export interface LoggingDecoratorConfig {
 
 /**
  * 【装饰器】添加日志记录
+ * 
+ * 注意：错误日志只在此处记录，避免与 BaseExtractor 重复
  * 
  * 使用示例：
  * ```typescript
@@ -136,6 +195,7 @@ export function withLogging(
             
             return result;
         } catch (error: any) {
+            // 只在这里记录错误日志，BaseExtractor 不再记录
             if (logError) {
                 const duration = Date.now() - startTime;
                 extractorLogger.error(`[${prefix}] 解析失败 (${duration}ms): ${error.message}`);
