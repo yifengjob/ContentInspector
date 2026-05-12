@@ -210,7 +210,7 @@ export async function startScan(
         if (activeWorkerCount > 0) {
             activeWorkerCount--;
         }
-        log.info(`[调试] updateConsumerCount: taskId=${taskId}, activeWorkerCount=${activeWorkerCount}`);
+        log.debug(`[调试] updateConsumerCount: taskId=${taskId}, activeWorkerCount=${activeWorkerCount}`);
         if (taskId !== undefined) {
             incrementConsumerCount(taskId);
         }
@@ -307,14 +307,14 @@ export async function startScan(
     cleanupConsumerStateRef.fn = scheduler.cleanupConsumerState.bind(scheduler);
 
     // 11. 初始化调度器
-    log.info('[调试] 开始初始化调度器...');
+    log.debug('[调试] 开始初始化调度器...');
     scheduler.initialize();
-    log.info('[调试] 调度器初始化完成');
+    log.debug('[调试] 调度器初始化完成');
 
     // 12. 初始化 Worker 池
-    log.info('[调试] 开始初始化 Worker 池...');
+    log.debug('[调试] 开始初始化 Worker 池...');
     await workerPool.initialize();
-    log.info('[调试] Worker 池初始化完成');
+    log.debug('[调试] Worker 池初始化完成');
 
     // ==================== 【Walker Worker】====================
 
@@ -471,7 +471,7 @@ export async function startScan(
         const allWalkersCompleted = walkerCompletedCount >= totalWalkerTasks;
 
         if (allWalkersCompleted && (workerPool.getActiveWorkerCount() > 0 || queueManager.getQueueLength() > 0 || hasPendingTasks)) {
-            log.info(`[checkAndComplete] Walker已完成，但仍在等待: activeWorkers=${workerPool.getActiveWorkerCount()}, taskQueue=${queueManager.getQueueLength()}, pendingTasks=${workerPool.getPendingTasks().size}`);
+            log.debug(`[checkAndComplete] Walker已完成，但仍在等待: activeWorkers=${workerPool.getActiveWorkerCount()}, taskQueue=${queueManager.getQueueLength()}, pendingTasks=${workerPool.getPendingTasks().size}`);
         }
 
         if (queueManager.getQueueLength() === 0) {
@@ -479,7 +479,7 @@ export async function startScan(
         }
 
         if (allWalkersCompleted && workerPool.getActiveWorkerCount() === 0 && queueManager.getQueueLength() === 0 && !hasPendingTasks) {
-            log.info(`[调试] 满足完成条件: allWalkersCompleted=${allWalkersCompleted}, activeWorkers=${workerPool.getActiveWorkerCount()}, queueLength=${queueManager.getQueueLength()}, hasPendingTasks=${hasPendingTasks}`);
+            log.debug(`[调试] 满足完成条件: allWalkersCompleted=${allWalkersCompleted}, activeWorkers=${workerPool.getActiveWorkerCount()}, queueLength=${queueManager.getQueueLength()}, hasPendingTasks=${hasPendingTasks}`);
             log.info(`扫描完成: 遍历 ${walkerTotalCount} 个文件, 处理 ${consumerProcessedCount} 个, 跳过 ${walkerSkippedCount} 个, 发现 ${resultCount} 个敏感文件`);
             cleanup();
             return;
@@ -487,7 +487,7 @@ export async function startScan(
 
         // 【调试】记录未满足的完成条件
         if (allWalkersCompleted) {
-            log.info(`[调试] 未完成检查: Walker已完成, activeWorkers=${workerPool.getActiveWorkerCount()}, queueLength=${queueManager.getQueueLength()}, pendingTasks=${workerPool.getPendingTasks().size}`);
+            log.debug(`[调试] 未完成检查: Walker已完成, activeWorkers=${workerPool.getActiveWorkerCount()}, queueLength=${queueManager.getQueueLength()}, pendingTasks=${workerPool.getPendingTasks().size}`);
         }
 
         lastActivityTime = Date.now();

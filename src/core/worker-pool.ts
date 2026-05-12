@@ -172,7 +172,7 @@ export class WorkerPool {
         }
 
         this.isCreatingWorker = true;
-        this.log.info(`[调试] processWorkerCreateQueue 开始，队列长度: ${this.workerCreateQueue.length}`);
+        this.log.debug(`[调试] processWorkerCreateQueue 开始，队列长度: ${this.workerCreateQueue.length}`);
         
         let iterationCount = 0;
         const MAX_ITERATIONS = 50; // 【关键】防止无限循环，降低到 50 次
@@ -195,7 +195,7 @@ export class WorkerPool {
                 continue; // 跳过这个 Worker，继续处理其他 Worker
             }
             
-            this.log.info(`[调试] 尝试创建 Worker ${consumerId} (第${iterationCount}次迭代, 重试${currentRetry + 1}/${MAX_RETRY_PER_WORKER})`);
+            this.log.debug(`[调试] 尝试创建 Worker ${consumerId} (第${iterationCount}次迭代, 重试${currentRetry + 1}/${MAX_RETRY_PER_WORKER})`);
 
             try {
                 this.createConsumer(consumerId, oldGen, youngGen);
@@ -219,7 +219,7 @@ export class WorkerPool {
         }
 
         this.isCreatingWorker = false;
-        this.log.info(`[调试] processWorkerCreateQueue 完成，总迭代次数: ${iterationCount}`);
+        this.log.debug(`[调试] processWorkerCreateQueue 完成，总迭代次数: ${iterationCount}`);
     }
 
     /**
