@@ -79,17 +79,20 @@ const loadChildren = async () => {
   
   if (children.value.length === 0) {
     try {
+      // 【修复】在加载子节点之前，先保存父节点的选中状态
+      const parentWasChecked = appStore.selectedPaths.has(props.node.path)
+      
       children.value = await getDirectoryTree(props.node.path)
       // 将子节点添加到父组件的映射表
       children.value.forEach(child => {
         props.allNodesMap.set(child.path, child)
       })
       
-      // 【修复】如果父节点是选中状态，自动选中所有新加载的子节点
-      if (checkState.value === 'checked') {
+      // 【修复】如果父节点之前是选中状态，自动选中所有新加载的子节点
+      if (parentWasChecked) {
         children.value.forEach(child => {
           appStore.selectedPaths.add(child.path)
-          // 递归选中子节点的子节点（如果有的话）
+          // 递归选中子节点的子孙节点（如果有的话）
           if (child.children && child.children.length > 0) {
             const selectDescendants = (node: DirectoryNode) => {
               appStore.selectedPaths.add(node.path)
