@@ -177,7 +177,7 @@ async function startWalking(config: WalkerConfig) {
       // 【调试】输出 walker 配置
       
       // 【新增】超时保护 - 如果 30 秒内没有完成，强制 resolve（调试用）
-      const timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(() => {  // ✅ 使用赋值而非重新声明
         // 【批量优化】发送剩余批次
         flushBatch();
         
