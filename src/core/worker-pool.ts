@@ -350,6 +350,8 @@ export class WorkerPool {
                 this.callbacks.onCheckAndComplete();
             } catch (error: any) {
                 this.log.error(`[Consumer ${consumer.id}] 检查完成状态失败: ${error.message}`);
+                // 【修复】不静默吞掉错误，通知调用者
+                this.callbacks.onErrorLog(`检查完成状态失败: ${error.message}`);
             }
         });
     }
