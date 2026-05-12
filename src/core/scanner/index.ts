@@ -17,10 +17,8 @@ export { ScanCleanup, type CleanupOptions } from './scan-cleanup';
 export {
     createProgressUpdater,
     cleanupPendingTask,
-    markConsumerIdle,
     sendToMainWindow,
     calculateTimeout,
-    safelyTerminateWorker,
     BatchSender,
     resultBatchSender,
     configureBatchSender,

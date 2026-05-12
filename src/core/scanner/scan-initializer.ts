@@ -11,21 +11,20 @@ import * as os from 'os';
 import {BrowserWindow} from 'electron';
 import {ScanConfig} from '../../types';
 import {ScanState} from '../state';
-import {calculateActualConcurrency} from '../config/manager';
 import {
     BYTES_TO_MB,
-    ERROR_LOG_INTERVAL,
+    ERROR_LOG_INTERVAL, PROGRESS_THROTTLE_INTERVAL, RESULT_LOG_COUNT_INTERVAL, RESULT_LOG_TIME_INTERVAL,
     WORKER_MAX_OLD_GENERATION_MB,
     WORKER_MAX_YOUNG_GENERATION_MB
-} from '../config/constants';
+} from '../config';
 import {configureBatchSender, createProgressUpdater, resultBatchSender, calculateTimeout} from './helpers/scanner-helpers';
-import {RESULT_LOG_COUNT_INTERVAL, RESULT_LOG_TIME_INTERVAL, PROGRESS_THROTTLE_INTERVAL} from '../config/constants';
-import {EventBus} from '../infra/event-bus';
-import {TaskQueueManager} from '../queue/task-queue';
-import {Consumer, WorkerPool} from '../worker/worker-pool';
-import {SmartScheduler} from '../scheduler/smart-scheduler';
+import {EventBus} from '../infra';
+import {TaskQueueManager} from '../queue';
+import {Consumer, WorkerPool} from '../worker';
+import {SmartScheduler} from '../scheduler';
 import {getScannerLogger} from "../../logger/logger";
 import {LogThrottler} from './helpers/scanner-helpers';
+import {calculateActualConcurrency} from "../config/manager";
 
 export interface ScannerContext {
     state: ScanState;

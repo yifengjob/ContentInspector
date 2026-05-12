@@ -4,7 +4,7 @@
  */
 
 import * as fs from 'fs';
-import { 
+import {
   FILE_READ_TIMEOUT_STANDARD_MS, 
   FILE_OPEN_TIMEOUT_MS, 
   FILE_STAT_TIMEOUT_MS, 

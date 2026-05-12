@@ -13,10 +13,11 @@ import * as path from 'path';
 import {EventBus} from '../infra/event-bus';
 import type {ScanState} from '../state/scan-state';
 import type {BrowserWindow} from 'electron';
-import {markConsumerIdle, safelyTerminateWorker} from '../scanner/helpers/scanner-helpers';
+import {markConsumerIdle, safelyTerminateWorker} from './worker-utils';  // 【修复】从本地导入，避免循环依赖
 import {WORKER_RESTART_DELAY, WORKER_RESTART_SCHEDULE_DELAY} from '../config/constants';
 import type {Task} from '../queue/task-queue';
 import {createLogger, Logger} from '../../logger/logger';
+import {FILE_WORKER_PATH} from "../../workers/file-worker";
 
 /**
  * Consumer Worker 接口
@@ -226,7 +227,8 @@ export class WorkerPool {
      * 创建 Consumer Worker
      */
     private createConsumer(id: number, customOldGen?: number, customYoungGen?: number): void {
-        const workerPath = path.join(__dirname, '..', 'workers', 'file-worker.js');
+        // 【优化】使用统一的常量路径，便于维护和 IDE 跟踪
+        const workerPath = FILE_WORKER_PATH;
 
         // 使用自定义内存限制或默认值
         const oldGenLimit = customOldGen || this.dynamicOldGenMB;

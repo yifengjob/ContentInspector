@@ -8,3 +8,4 @@
  */
 
 export { WorkerPool, type Consumer, type WorkerPoolCallbacks } from './worker-pool';
+export { markConsumerIdle, safelyTerminateWorker } from './worker-utils';

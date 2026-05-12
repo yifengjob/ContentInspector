@@ -18,6 +18,7 @@ import {WalkerHandler} from './scan-walker-handler';
 import {StagnationDetector} from './scan-stagnation-detector';
 import {ScanCleanup} from './scan-cleanup';
 import {getScannerLogger} from "../../logger/logger";
+import {WALKER_WORKER_PATH} from "../../workers/walker-worker";
 
 export async function startScan(
     config: ScanConfig,
@@ -51,7 +52,8 @@ export async function startScan(
     const context = await initializeScanner(config, mainWindow, state);
 
     // ==================== 【Walker Worker】====================
-    const walkerWorker = new Worker(path.join(__dirname, '..', 'workers', 'walker-worker.js'));
+    // 【优化】使用统一的常量路径，便于维护和 IDE 跟踪
+    const walkerWorker = new Worker(WALKER_WORKER_PATH);
 
     // Walker 完成计数
     const walkerCompletedCountRef = {value: 0};
@@ -110,6 +112,7 @@ export async function startScan(
             workerPool: context.workerPool,
             queueManager: context.queueManager,
             eventBus: context.eventBus,
+            scheduler: context.scheduler,  // 【新增】传递调度器
             resultLogThrottler: context.resultLogThrottler,
             log,
             walkerWorker,
@@ -121,7 +124,8 @@ export async function startScan(
     // ==================== 【启动扫描】====================
 
     // 【关键修复】创建取消函数并保存到局部变量（避免使用 any 类型断言）
-    const doCancelScan = () => {
+    // 将取消函数挂载到 ScanState，供外部 cancelScan() 调用
+    (state as any)._cancelScan = () => {
         if (state.cancelFlag) {
             log.info('[取消扫描] 已经在取消过程中，忽略重复请求');
             return;
@@ -138,9 +142,6 @@ export async function startScan(
         performCleanup();
         log.info('[取消扫描] cleanup 调用完成');
     };
-
-    // 将取消函数挂载到 ScanState，供外部 cancelScan() 调用
-    (state as any)._cancelScan = doCancelScan;
 
     const totalPaths = config.selectedPaths.length;
     let currentPathIndex = 0;

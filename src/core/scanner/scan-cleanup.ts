@@ -10,9 +10,10 @@
 
 import {BrowserWindow} from 'electron';
 import {ScanState} from '../state';
-import {WorkerPool} from '../worker/worker-pool';
-import {TaskQueueManager} from '../queue/task-queue';
-import {EventBus} from '../infra/event-bus';
+import {WorkerPool} from '../worker';
+import {TaskQueueManager} from '../queue';
+import {EventBus} from '../infra';
+import {SmartScheduler} from '../scheduler';
 import {LogThrottler, resultBatchSender, sendToMainWindow} from './helpers/scanner-helpers';
 import {StagnationDetector} from './scan-stagnation-detector';
 
@@ -22,6 +23,7 @@ export interface CleanupOptions {
     workerPool: WorkerPool;
     queueManager: TaskQueueManager;
     eventBus: EventBus;
+    scheduler: SmartScheduler;  // 【新增】智能调度器
     resultLogThrottler: LogThrottler;
     log: any;
     walkerWorker: any; // Walker Worker 实例
@@ -79,11 +81,11 @@ export class ScanCleanup {
 
             this.options.log.info('[cleanup] 资源清理完成');
 
-            // 10. 触发垃圾回收
-            this.triggerGC();
+            // 10. 【修复】销毁调度器，清除扫描相关的事件监听器（保留日志监听器）
+            this.options.scheduler.destroy();
 
-            // 11. 清空事件总线
-            this.options.eventBus.clearAll();
+            // 11. 触发垃圾回收（在所有资源清理完成后）
+            this.triggerGC();
         } catch (error) {
             this.options.log('[cleanup] 清理过程中出错: ' + error);
             this.options.state.isScanning = false;

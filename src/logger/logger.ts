@@ -298,7 +298,7 @@ function bridgeWorkerLogToMain(level: LogLevel, message: string, context: string
 function emitLogToEventBus(level: LogLevel, message: string, context: string): void {
     try {
         // 【修复】直接使用 EventBus 单例，不依赖全局变量
-        const {EventBus} = require('../core/event-bus');
+        const {EventBus} = require('../core/infra/event-bus');
         const eventBus = EventBus.getInstance();
         if (eventBus) {
             eventBus.emit('log:message', {

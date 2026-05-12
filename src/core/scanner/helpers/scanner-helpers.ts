@@ -13,7 +13,7 @@ import {
     PROGRESS_THROTTLE_MAX_INTERVAL,
     PROGRESS_FAST_SPEED_THRESHOLD,
     PROGRESS_SLOW_SPEED_THRESHOLD
-} from '../../config/constants';
+} from '../../config';
 
 /**
  * 创建进度更新函数（带自适应节流）
@@ -103,16 +103,6 @@ export function cleanupPendingTask(
 }
 
 /**
- * 标记 Consumer 为空闲状态
- * @param consumer Consumer 对象
- */
-export function markConsumerIdle(consumer: any): void {
-    consumer.busy = false;
-    consumer.taskId = undefined;
-    consumer.counted = false;  // 【P0修复】重置计数标志，允许下次任务重新计数
-}
-
-/**
  * 检查窗口是否可用并发送消息
  * @param mainWindow 主窗口
  * @param channel IPC 通道
@@ -149,25 +139,6 @@ export function calculateTimeout(fileSize: number): number {
     timeoutMs = Math.max(timeoutMs, WORKER_BASE_TIMEOUT);
 
     return Math.floor(timeoutMs);
-}
-
-/**
- * 安全地终止 Worker
- * @param worker Worker 对象
- * @param consumer Consumer 对象
- * @param log 日志函数
- */
-export function safelyTerminateWorker(
-    worker: any,
-    consumer: any,
-    log: (msg: string) => void
-): void {
-    try {
-        consumer.isTerminating = true;
-        worker.terminate();
-    } catch (error: any) {
-        log(`终止 Worker 失败: ${error.message}`);
-    }
 }
 
 /**

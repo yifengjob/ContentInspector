@@ -7,8 +7,8 @@
  */
 
 import {ScanState} from '../state';
-import {WorkerPool} from '../worker/worker-pool';
-import {STAGNATION_CHECK_INTERVAL, STAGNATION_THRESHOLD, MAX_IDLE_TIME} from '../config/constants';
+import {WorkerPool} from '../worker';
+import {STAGNATION_CHECK_INTERVAL, STAGNATION_THRESHOLD, MAX_IDLE_TIME} from '../config';
 
 export interface StagnationDetectorOptions {
     state: ScanState;
@@ -19,7 +19,7 @@ export interface StagnationDetectorOptions {
 }
 
 export class StagnationDetector {
-    private options: StagnationDetectorOptions;
+    private readonly options: StagnationDetectorOptions;
     private timer: NodeJS.Timeout | null = null;
     private lastCheckState: any;
     private lastCheckTime: number;

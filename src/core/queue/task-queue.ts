@@ -7,7 +7,7 @@
  * - 队列状态查询和清理
  */
 
-import {EventBus} from '../infra/event-bus';
+import {EventBus} from '../infra';
 
 /**
  * 任务接口

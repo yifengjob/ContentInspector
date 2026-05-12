@@ -1,6 +1,6 @@
 /**
  * 智能调度器模块
- * 
+ *
  * 职责：
  * - 实现4层智能调度策略
  * - 类型互斥和超时检测
@@ -8,26 +8,26 @@
  * - 事件驱动的 Worker 任务分配
  */
 
-import {EventBus} from '../infra/event-bus';
-import type {TaskQueueManager, Task} from '../queue/task-queue';
-import type {WorkerPool, Consumer} from '../worker/worker-pool';
+import {EventBus} from '../infra';
+import type {TaskQueueManager, Task} from '../queue';
+import type {WorkerPool, Consumer} from '../worker';
 import {
     ENABLE_SMART_SCHEDULING,
     LARGE_FILE_THRESHOLD_MB,
     MAX_LARGE_FILES_CONCURRENT,
     TYPE_MUTEX_TIMEOUT_MS,
     BYTES_TO_MB
-} from '../config/constants';
+} from '../config';
 
 /**
  * 智能调度器
- * 
+ *
  * 调度策略优先级：
  * 1. 优先处理大文件（如果未达上限且类型不冲突）
  * 2. 选择不同类型的小文件（确保 Worker 不闲置）
  * 3. 类型超时后允许同类型（防止死锁）
  * 4. 兜底：违反类型互斥，但遵守大文件限制（确保 Worker 不闲置）
- * 
+ *
  * 使用示例：
  * ```typescript
  * const scheduler = new SmartScheduler(
@@ -36,7 +36,7 @@ import {
  *     workerPool,
  *     assignTaskToConsumerCallback
  * );
- * 
+ *
  * scheduler.initialize();
  * ```
  */
@@ -45,15 +45,21 @@ export class SmartScheduler {
     private queueManager: TaskQueueManager;
     private workerPool: WorkerPool;
     private readonly assignTaskToConsumer: (consumer: Consumer, task: Task) => void;
-    
+
     // 【智能调度】状态跟踪
     private processingTypeCount = new Map<string, number>();
     private largeFilesProcessing = 0;
     private lastTypeScheduleTime = new Map<string, number>();
-    
+
     // 【新架构】轮询索引
     private nextTypeIndex = 0;
     private typeOrder: string[] = [];
+
+    // 【新增】保存事件处理器引用，用于清理
+    private onWorkerCreated: (consumer: Consumer) => void = () => {};
+    private onWorkerIdle: (consumer: Consumer) => void = () => {};
+    private onTaskEnqueued: () => void = () => {};
+    private onWalkerBatchReady: () => void = () => {};
 
     constructor(
         eventBus: EventBus,
@@ -76,34 +82,43 @@ export class SmartScheduler {
             return;
         }
 
-        // 订阅 Worker 创建事件
-        this.eventBus.on('worker.created', (consumer: Consumer) => {
+        // 【新增】创建并保存事件处理器引用
+        this.onWorkerCreated = (consumer: Consumer) => {
             this.assignTaskToIdleConsumer(consumer);
-        });
-        
-        // 订阅 Worker 空闲事件
-        this.eventBus.on('worker.idle', (consumer: Consumer) => {
+        };
+
+        this.onWorkerIdle = (consumer: Consumer) => {
             this.assignTaskToIdleConsumer(consumer);
-        });
-        
-        // 订阅任务入队事件
-        this.eventBus.on('task.enqueued', () => {
+        };
+
+        this.onTaskEnqueued = () => {
             // 为第一个空闲 Worker 分配任务
             const idleConsumer = this.workerPool.getIdleConsumer();
             if (idleConsumer) {
                 this.assignTaskToIdleConsumer(idleConsumer);
             }
-        });
-        
-        // 订阅 Walker 批量文件就绪事件
-        this.eventBus.on('walker.batch-ready', () => {
+        };
+
+        this.onWalkerBatchReady = () => {
             // 为所有空闲 Worker 分配任务
             for (const consumer of this.workerPool.getConsumers().values()) {
                 if (!consumer.busy) {
                     this.assignTaskToIdleConsumer(consumer);
                 }
             }
-        });
+        };
+
+        // 订阅 Worker 创建事件
+        this.eventBus.on('worker.created', this.onWorkerCreated);
+
+        // 订阅 Worker 空闲事件
+        this.eventBus.on('worker.idle', this.onWorkerIdle);
+
+        // 订阅任务入队事件
+        this.eventBus.on('task.enqueued', this.onTaskEnqueued);
+
+        // 订阅 Walker 批量文件就绪事件
+        this.eventBus.on('walker.batch-ready', this.onWalkerBatchReady);
     }
 
     /**
@@ -151,7 +166,7 @@ export class SmartScheduler {
 
     /**
      * 为指定 Worker 选择最优任务
-     * 
+     *
      * @returns 选中的任务，如果没有可用任务则返回 null
      */
     selectOptimalTask(): Task | null {
@@ -245,11 +260,11 @@ export class SmartScheduler {
     assignTaskToIdleConsumer(requestingConsumer: Consumer): void {
         // 【关键】只为这个特定的 Worker 选择任务，不遍历其他 Worker
         const selectedTask = this.selectOptimalTask();
-        
+
         if (selectedTask) {
             // 分配任务
             this.assignTaskToConsumer(requestingConsumer, selectedTask);
-            
+
             // 更新调度状态
             this.processingTypeCount.set(
                 selectedTask.fileType,
@@ -316,5 +331,24 @@ export class SmartScheduler {
      */
     getLastTypeScheduleTime(): Map<string, number> {
         return this.lastTypeScheduleTime;
+    }
+
+    /**
+     * 【新增】销毁调度器，清理事件监听器
+     * 防止内存泄漏：每次扫描结束后必须调用
+     */
+    destroy(): void {
+        // 移除所有事件监听器
+        this.eventBus.off('worker.created', this.onWorkerCreated);
+        this.eventBus.off('worker.idle', this.onWorkerIdle);
+        this.eventBus.off('task.enqueued', this.onTaskEnqueued);
+        this.eventBus.off('walker.batch-ready', this.onWalkerBatchReady);
+
+        // 清空状态
+        this.processingTypeCount.clear();
+        this.lastTypeScheduleTime.clear();
+        this.largeFilesProcessing = 0;
+        this.typeOrder = [];
+        this.nextTypeIndex = 0;
     }
 }

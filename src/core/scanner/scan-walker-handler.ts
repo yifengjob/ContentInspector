@@ -11,8 +11,8 @@ import {Worker} from 'worker_threads';
 import {ScanState} from '../state';
 import {ScannerContext} from './scan-initializer';
 import {getFileType} from '../../utils/file-types';
-import {LARGE_FILE_THRESHOLD_MB, BYTES_TO_MB, WORKER_RESTART_DELAY} from '../config/constants';
-import {EventBus} from '../infra/event-bus';
+import {LARGE_FILE_THRESHOLD_MB, BYTES_TO_MB, WORKER_RESTART_DELAY} from '../config';
+import {EventBus} from '../infra';
 
 export interface WalkerHandlerOptions {
     state: ScanState;
@@ -24,7 +24,7 @@ export interface WalkerHandlerOptions {
 
 export class WalkerHandler {
     private worker: Worker;
-    private options: WalkerHandlerOptions;
+    private readonly options: WalkerHandlerOptions;
     private lastProgressUpdateTime = 0;
     private lastTaskEnqueueTime = Date.now();
 
