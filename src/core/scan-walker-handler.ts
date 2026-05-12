@@ -164,20 +164,25 @@ export class WalkerHandler {
 
                 context.log.info(`【智能内存调整】平均文件大小: ${avgFileSizeMB.toFixed(2)}MB, 新内存限制: 老生代=${newLimits.oldGen}MB, 新生代=${newLimits.youngGen}MB`);
 
-                // 关键：重启所有空闲的 Consumer Workers 以应用新配置
-                setTimeout(() => {
-                    const restartedCount = workerPool.restartIdleWorkers(newLimits.oldGen, newLimits.youngGen);
+                // 【关键修复】只有在扫描进行中才重启 Worker
+                if (!state.cancelFlag && state.isScanning) {
+                    setTimeout(() => {
+                        // 【再次检查】防止在延迟期间扫描已结束
+                        if (!state.cancelFlag && state.isScanning) {
+                            const restartedCount = workerPool.restartIdleWorkers(newLimits.oldGen, newLimits.youngGen);
 
-                    if (restartedCount > 0) {
-                        context.log.info(`【智能内存】已重启 ${restartedCount} 个空闲 Worker 以应用新内存配置`);
+                            if (restartedCount > 0) {
+                                context.log.info(`【智能内存】已重启 ${restartedCount} 个空闲 Worker 以应用新内存配置`);
 
-                        // 批量重启后强制 GC，释放内存
-                        if ((global as any).gc) {
-                            context.log.info(`【智能内存】执行强制垃圾回收...`);
-                            (global as any).gc();
+                                // 批量重启后强制 GC，释放内存
+                                if ((global as any).gc) {
+                                    context.log.info(`【智能内存】执行强制垃圾回收...`);
+                                    (global as any).gc();
+                                }
+                            }
                         }
-                    }
-                }, 100);
+                    }, 100);
+                }
             } else {
                 context.log.info(`【智能内存调整】平均文件大小: ${avgFileSizeMB.toFixed(2)}MB`);
             }
@@ -195,6 +200,13 @@ export class WalkerHandler {
         } catch (error) {
             this.options.context.log.info(`终止 Walker Worker 失败: ${error}`);
         }
+    }
+
+    /**
+     * 更新总任务数（在 for 循环结束后调用）
+     */
+    updateTotalTasks(totalTasks: number): void {
+        this.options.totalWalkerTasks = totalTasks;
     }
 
     /**

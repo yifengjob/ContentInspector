@@ -56,7 +56,7 @@ export async function startScan(
     // Walker 完成计数
     const walkerCompletedCountRef = {value: 0};
     const totalPathsCount = config.selectedPaths.length;  // 总路径数
-    let actualWalkerTasks = 0;  // 【修复】实际发送的任务数，动态计算
+    const actualWalkerTasksRef = {value: 0};  // 【修复】使用引用传递，动态更新
 
     // 检查并完成扫描
     function checkAndComplete(): void {
@@ -65,7 +65,7 @@ export async function startScan(
             return;
         }
 
-        const allWalkersCompleted = walkerCompletedCountRef.value >= actualWalkerTasks;
+        const allWalkersCompleted = walkerCompletedCountRef.value >= actualWalkerTasksRef.value;
 
         // 【重构】使用 state.isScanComplete 统一完成条件判断
         if (state.isScanComplete(allWalkersCompleted)) {
@@ -83,7 +83,7 @@ export async function startScan(
         state,
         context,
         walkerCompletedCountRef,
-        totalWalkerTasks: actualWalkerTasks,  // 【修复】使用动态计算的值
+        totalWalkerTasks: actualWalkerTasksRef.value,  // 【修复】使用引用值
         onCheckAndComplete: checkAndComplete
     });
 
@@ -177,7 +177,7 @@ export async function startScan(
         }
 
         // 【修复】只有成功发送的任务才计入总数
-        actualWalkerTasks++;
+        actualWalkerTasksRef.value++;
 
         walkerWorker.postMessage({
             type: 'start-walking',
@@ -193,7 +193,10 @@ export async function startScan(
     }
     
     // 【修复】输出实际发送的任务数
-    log.info(`[Walker] 实际发送任务数: ${actualWalkerTasks}/${totalPathsCount}`);
+    log.info(`[Walker] 实际发送任务数: ${actualWalkerTasksRef.value}/${totalPathsCount}`);
+    
+    // 【关键修复】更新 WalkerHandler 中的 totalWalkerTasks
+    walkerHandler.updateTotalTasks(actualWalkerTasksRef.value);
 }
 
 export function cancelScan(scanState?: ScanState): void {
