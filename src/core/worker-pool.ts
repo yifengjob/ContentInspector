@@ -175,28 +175,46 @@ export class WorkerPool {
         this.log.info(`[调试] processWorkerCreateQueue 开始，队列长度: ${this.workerCreateQueue.length}`);
         
         let iterationCount = 0;
-        const MAX_ITERATIONS = 100; // 【关键】防止无限循环
+        const MAX_ITERATIONS = 50; // 【关键】防止无限循环，降低到 50 次
+        const retryCounts = new Map<number, number>(); // consumerId -> retry count
+        const MAX_RETRY_PER_WORKER = 3; // 每个 Worker 最多重试 3 次
 
         while (this.workerCreateQueue.length > 0) {
             iterationCount++;
             if (iterationCount > MAX_ITERATIONS) {
-                this.log.error(`[致命错误] processWorkerCreateQueue 迭代次数过多（${MAX_ITERATIONS}次），强制退出以防止卡死`);
+                this.log.error(`[致命错误] processWorkerCreateQueue 迭代次数过多（${iterationCount}/${MAX_ITERATIONS}），强制退出以防止卡死`);
                 break;
             }
             
             const {consumerId, oldGen, youngGen} = this.workerCreateQueue.shift()!;
-            this.log.info(`[调试] 尝试创建 Worker ${consumerId} (第${iterationCount}次迭代)`);
+            
+            // 检查单个 Worker 的重试次数
+            const currentRetry = retryCounts.get(consumerId) || 0;
+            if (currentRetry >= MAX_RETRY_PER_WORKER) {
+                this.log.error(`[Worker创建] Worker ${consumerId} 重试次数过多（${currentRetry}/${MAX_RETRY_PER_WORKER}），放弃创建`);
+                continue; // 跳过这个 Worker，继续处理其他 Worker
+            }
+            
+            this.log.info(`[调试] 尝试创建 Worker ${consumerId} (第${iterationCount}次迭代, 重试${currentRetry + 1}/${MAX_RETRY_PER_WORKER})`);
 
             try {
                 this.createConsumer(consumerId, oldGen, youngGen);
-                // 【关键】每个 Worker 创建后延迟 50ms，避免资源竞争
-                await new Promise(resolve => setTimeout(resolve, 50));
+                // 【关键】每个 Worker 创建后延迟 100ms，避免资源竞争
+                await new Promise(resolve => setTimeout(resolve, 100));
+                // 成功后清除重试计数
+                retryCounts.delete(consumerId);
             } catch (error: any) {
-                this.log.error(`[Worker创建] 创建 Worker ${consumerId} 失败: ${error.message}，将重试...`);
+                const newRetryCount = currentRetry + 1;
+                retryCounts.set(consumerId, newRetryCount);
+                this.log.error(`[Worker创建] 创建 Worker ${consumerId} 失败 (${newRetryCount}/${MAX_RETRY_PER_WORKER}): ${error.message}`);
+                
                 // 失败后放回队列头部，稍后重试
                 this.workerCreateQueue.unshift({consumerId, oldGen, youngGen});
-                // 等待更长时间后重试
-                await new Promise(resolve => setTimeout(resolve, 200));
+                
+                // 【关键】增加等待时间，给系统资源恢复的时间
+                const waitTime = 500 * newRetryCount; // 第一次 500ms，第二次 1000ms，第三次 1500ms
+                this.log.warn(`[Worker创建] 等待 ${waitTime}ms 后重试...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
             }
         }
 
