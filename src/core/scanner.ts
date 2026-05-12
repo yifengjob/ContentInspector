@@ -608,6 +608,18 @@ export async function startScan(
 
     // ==================== 【启动扫描】====================
 
+    // 【修复】定义取消函数，可以访问局部变量
+    const doCancelScan = () => {
+        log.info('[取消] 收到取消请求，正在停止扫描...');
+        state.cancelFlag = true;
+        
+        // 立即清理资源，停止所有 Worker
+        cleanup();
+    };
+
+    // 将取消函数挂载到 ScanState，供外部调用
+    (state as any).doCancelScan = doCancelScan;
+
     const totalPaths = config.selectedPaths.length;
     let currentPathIndex = 0;
 
@@ -660,5 +672,12 @@ export async function startScan(
 
 export function cancelScan(scanState?: ScanState): void {
     const state = scanState || ScanState.getInstance();
-    state.cancelFlag = true;
+    
+    // 【修复】如果存在内部的取消函数，调用它以真正停止扫描
+    if ((state as any).doCancelScan) {
+        (state as any).doCancelScan();
+    } else {
+        // 后备方案：仅设置标志（适用于未通过 startScan 启动的情况）
+        state.cancelFlag = true;
+    }
 }

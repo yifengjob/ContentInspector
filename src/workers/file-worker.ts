@@ -99,11 +99,6 @@ async function processTask(task: WorkerTask): Promise<void> {
   // 【优化】设置超时保护（使用配置常量）
   let timeoutId: NodeJS.Timeout | null = null;
   
-  // 【调试】记录任务开始
-  if (process.env.NODE_ENV === 'development') {
-    workerLogger.debug(`[Worker TID:${threadId}] 开始处理任务: ${filePath}`);
-  }
-  
   try {
     // 【优化】获取文件统计信息（添加错误处理）
     const fs = require('fs');
@@ -194,11 +189,6 @@ async function processTask(task: WorkerTask): Promise<void> {
               total: processor.getTotalCount(),
               unsupportedPreview: false
             } as WorkerResult);
-            
-            // 【调试】记录任务完成
-            if (process.env.NODE_ENV === 'development') {
-              workerLogger.debug(`[Worker TID:${threadId}] 任务完成: ${filePath}, 敏感项: ${processor.getTotalCount()}`);
-            }
           }
         },
         
@@ -271,11 +261,6 @@ async function processTask(task: WorkerTask): Promise<void> {
       filePath,
       error: error.message
     } as WorkerResult);
-    
-    // 【调试】记录任务失败
-    if (process.env.NODE_ENV === 'development') {
-      workerLogger.debug(`[Worker TID:${threadId}] 任务失败: ${filePath}, 错误: ${error.message}`);
-    }
   }
 }
 
