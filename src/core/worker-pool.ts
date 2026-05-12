@@ -172,9 +172,20 @@ export class WorkerPool {
         }
 
         this.isCreatingWorker = true;
+        this.log.info(`[调试] processWorkerCreateQueue 开始，队列长度: ${this.workerCreateQueue.length}`);
+        
+        let iterationCount = 0;
+        const MAX_ITERATIONS = 100; // 【关键】防止无限循环
 
         while (this.workerCreateQueue.length > 0) {
+            iterationCount++;
+            if (iterationCount > MAX_ITERATIONS) {
+                this.log.error(`[致命错误] processWorkerCreateQueue 迭代次数过多（${MAX_ITERATIONS}次），强制退出以防止卡死`);
+                break;
+            }
+            
             const {consumerId, oldGen, youngGen} = this.workerCreateQueue.shift()!;
+            this.log.info(`[调试] 尝试创建 Worker ${consumerId} (第${iterationCount}次迭代)`);
 
             try {
                 this.createConsumer(consumerId, oldGen, youngGen);
@@ -190,6 +201,7 @@ export class WorkerPool {
         }
 
         this.isCreatingWorker = false;
+        this.log.info(`[调试] processWorkerCreateQueue 完成，总迭代次数: ${iterationCount}`);
     }
 
     /**

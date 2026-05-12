@@ -170,10 +170,30 @@ export class FileStreamProcessor {
     text: string,
     options: StreamProcessorOptions
   ): Promise<void> {
+    // 【关键修复】边界检查，防止无限循环
+    if (!text || text.length === 0) {
+      options.onComplete?.({
+        totalChunks: 0,
+        totalBytes: 0,
+        totalLines: 0
+      });
+      return;
+    }
+    
+    // 【安全保护】限制最大迭代次数，防止无限循环
+    const MAX_ITERATIONS = text.length + 100; // 最多迭代 text.length + 100 次
+    let iterations = 0;
+    
     const chunkSize = this.chunkSize;
     let offset = 0;
 
     while (offset < text.length) {
+      iterations++;
+      if (iterations > MAX_ITERATIONS) {
+        console.error(`[FileStreamProcessor] 警告: processExtractedText 迭代次数过多 (${iterations}/${MAX_ITERATIONS})，强制退出`);
+        break;
+      }
+      
       // 找到合适的分割点 (优先行边界)
       let splitPos = Math.min(offset + chunkSize, text.length);
 
@@ -183,6 +203,11 @@ export class FileStreamProcessor {
         if (nextNewline !== -1 && nextNewline < splitPos + 100) {
           splitPos = nextNewline + 1;
         }
+      }
+      
+      // 【安全检查】确保 splitPos > offset，否则强制推进
+      if (splitPos <= offset) {
+        splitPos = offset + 1;
       }
 
       const chunkText = text.slice(offset, splitPos);
