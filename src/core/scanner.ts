@@ -616,16 +616,20 @@ export async function startScan(
         }
         
         log.info('[取消] 收到取消请求，正在停止扫描...');
+        log.info(`[取消] 当前状态: isScanning=${state.isScanning}, cancelFlag=${state.cancelFlag}`);
         state.cancelFlag = true;
         
         // 清除停滞检测定时器，防止干扰
         if (completionCheckTimer) {
             clearInterval(completionCheckTimer);
             completionCheckTimer = null;
+            log.info('[取消] 已清除停滞检测定时器');
         }
         
         // 立即清理资源，停止所有 Worker
+        log.info('[取消] 开始调用 cleanup...');
         cleanup();
+        log.info('[取消] cleanup 调用完成');
     };
 
     // 将取消函数挂载到 ScanState，供外部调用
