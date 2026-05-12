@@ -10,7 +10,7 @@
         <div class="about-content">
           <img src="../assets/icons/icon.svg" alt="DataGuard Scanner Logo" class="app-icon" />
           <h2 class="app-name">DataGuard Scanner - 敏感数据扫描工具</h2>
-          <p class="app-version">版本 1.0.9</p>
+          <p class="app-version">版本 1.0.10</p>
           
           <div class="app-description">
             <h4>软件介绍</h4>
