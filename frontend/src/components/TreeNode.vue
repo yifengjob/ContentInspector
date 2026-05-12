@@ -84,6 +84,23 @@ const loadChildren = async () => {
       children.value.forEach(child => {
         props.allNodesMap.set(child.path, child)
       })
+      
+      // 【修复】如果父节点是选中状态，自动选中所有新加载的子节点
+      if (checkState.value === 'checked') {
+        children.value.forEach(child => {
+          appStore.selectedPaths.add(child.path)
+          // 递归选中子节点的子节点（如果有的话）
+          if (child.children && child.children.length > 0) {
+            const selectDescendants = (node: DirectoryNode) => {
+              appStore.selectedPaths.add(node.path)
+              if (node.children) {
+                node.children.forEach(selectDescendants)
+              }
+            }
+            selectDescendants(child)
+          }
+        })
+      }
     } catch (error) {
       console.error('加载子目录失败:', error)
     }
