@@ -8,16 +8,16 @@
  * - 事件驱动的 Worker 任务分配
  */
 
-import {EventBus} from './event-bus';
-import type {TaskQueueManager, Task} from './task-queue';
-import type {WorkerPool, Consumer} from './worker-pool';
+import {EventBus} from '../infra/event-bus';
+import type {TaskQueueManager, Task} from '../queue/task-queue';
+import type {WorkerPool, Consumer} from '../worker/worker-pool';
 import {
     ENABLE_SMART_SCHEDULING,
     LARGE_FILE_THRESHOLD_MB,
     MAX_LARGE_FILES_CONCURRENT,
     TYPE_MUTEX_TIMEOUT_MS,
     BYTES_TO_MB
-} from './scan-config';
+} from '../config/constants';
 
 /**
  * 智能调度器

@@ -4,7 +4,7 @@
  */
 
 import * as iconv from 'iconv-lite';
-import {FILE_READ_TIMEOUT_STANDARD_MS} from '../core/scan-config';
+import {FILE_READ_TIMEOUT_STANDARD_MS} from '../core/config/constants';
 import type {ExtractorResult} from './types';
 import {BaseExtractor} from './base-extractor';
 import {readFileWithTimeout} from '../utils/file-utils';

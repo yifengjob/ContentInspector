@@ -4,7 +4,7 @@ import { ScanResultItem } from '../types';
 import * as ExcelJS from 'exceljs';
 import { getSensitiveRules } from '../detection/sensitive-detector';
 // 【优化】导入配置常量
-import { BYTES_TO_MB } from '../core/scan-config';
+import { BYTES_TO_MB } from '../core/config/constants';
 import {logger} from "../logger/logger";
 
 export async function exportReport(

@@ -19,14 +19,14 @@ import {setupAllPdfPolyfills} from './utils/pdf-polyfills';
 
 setupAllPdfPolyfills();
 
-import {ScanState} from './core/scan-state';
-import {LogManager} from './core/log-manager';  // 【新增】导入日志管理器
+import {ScanState} from './core';
+import {LogManager} from './core/infra';  // 【新增】导入日志管理器
 import {getDirectoryTree} from './services/directory-tree';
 import {cancelScan, startScan} from './core/scanner';
 import {deleteFile, openFile, openFileLocation} from './services/file-operations';
 import {exportReport} from './services/report-exporter';
-import {loadConfig, saveConfig, calculateRecommendedConcurrency} from './core/config-manager';
-import {checkEnvironment} from './core/environment-check';
+import {loadConfig, saveConfig, calculateRecommendedConcurrency} from './core/config';
+import {checkEnvironment} from './core/infra';
 import {getSensitiveRules} from './detection/sensitive-detector';
 // 【优化】导入配置常量
 import {
@@ -45,7 +45,7 @@ import {
     MS_TO_DAYS,
     BYTES_TO_MB,
     LOG_RETENTION_DAYS// 【方案 C】预览文件大小限制
-} from './core/scan-config';
+} from './core/config';
 
 // 【修复】添加全局未处理异常处理器，防止 Windows 闪退
 process.on('unhandledRejection', (reason, _promise) => {

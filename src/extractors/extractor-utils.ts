@@ -10,7 +10,7 @@
 
 import * as fs from 'fs';
 import {createReadStream} from 'fs';
-import {calculateParserTimeout, BYTES_TO_MB} from '../core/scan-config';
+import {calculateParserTimeout, BYTES_TO_MB} from '../core/config/constants';
 import {convertNodeError} from '../utils/error-utils';
 import {extractorLogger} from '../logger/logger';
 import type {ExtractorResult} from './types';

@@ -11,13 +11,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {Worker} from 'worker_threads';
 import {BrowserWindow} from 'electron';
-import {ScanConfig} from '../types';
-import {ScanState} from './scan-state';
+import {ScanConfig} from '../../types';
+import {ScanState} from '../state';
 import {initializeScanner} from './scan-initializer';
 import {WalkerHandler} from './scan-walker-handler';
 import {StagnationDetector} from './scan-stagnation-detector';
 import {ScanCleanup} from './scan-cleanup';
-import {getScannerLogger} from "../logger/logger";
+import {getScannerLogger} from "../../logger/logger";
 
 export async function startScan(
     config: ScanConfig,

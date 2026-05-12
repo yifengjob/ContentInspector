@@ -10,13 +10,13 @@
 
 import {Worker} from 'worker_threads';
 import * as path from 'path';
-import {EventBus} from './event-bus';
-import type {ScanState} from './scan-state';
+import {EventBus} from '../infra/event-bus';
+import type {ScanState} from '../state/scan-state';
 import type {BrowserWindow} from 'electron';
-import {markConsumerIdle, safelyTerminateWorker} from '../utils/scanner-helpers';
-import {WORKER_RESTART_DELAY, WORKER_RESTART_SCHEDULE_DELAY} from './scan-config';
-import type {Task} from './task-queue';
-import {createLogger, Logger} from '../logger/logger';
+import {markConsumerIdle, safelyTerminateWorker} from '../scanner/helpers/scanner-helpers';
+import {WORKER_RESTART_DELAY, WORKER_RESTART_SCHEDULE_DELAY} from '../config/constants';
+import type {Task} from '../queue/task-queue';
+import {createLogger, Logger} from '../../logger/logger';
 
 /**
  * Consumer Worker 接口

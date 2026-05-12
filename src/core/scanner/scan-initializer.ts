@@ -9,23 +9,23 @@
 
 import * as os from 'os';
 import {BrowserWindow} from 'electron';
-import {ScanConfig} from '../types';
-import {ScanState} from './scan-state';
-import {calculateActualConcurrency} from './config-manager';
+import {ScanConfig} from '../../types';
+import {ScanState} from '../state';
+import {calculateActualConcurrency} from '../config/manager';
 import {
     BYTES_TO_MB,
     ERROR_LOG_INTERVAL,
     WORKER_MAX_OLD_GENERATION_MB,
     WORKER_MAX_YOUNG_GENERATION_MB
-} from './scan-config';
-import {configureBatchSender, createProgressUpdater, resultBatchSender, calculateTimeout} from '../utils/scanner-helpers';
-import {RESULT_LOG_COUNT_INTERVAL, RESULT_LOG_TIME_INTERVAL, PROGRESS_THROTTLE_INTERVAL} from './scan-config';
-import {EventBus} from './event-bus';
-import {TaskQueueManager} from './task-queue';
-import {Consumer, WorkerPool} from './worker-pool';
-import {SmartScheduler} from './smart-scheduler';
-import {getScannerLogger} from "../logger/logger";
-import {LogThrottler} from '../utils/scanner-helpers';
+} from '../config/constants';
+import {configureBatchSender, createProgressUpdater, resultBatchSender, calculateTimeout} from './helpers/scanner-helpers';
+import {RESULT_LOG_COUNT_INTERVAL, RESULT_LOG_TIME_INTERVAL, PROGRESS_THROTTLE_INTERVAL} from '../config/constants';
+import {EventBus} from '../infra/event-bus';
+import {TaskQueueManager} from '../queue/task-queue';
+import {Consumer, WorkerPool} from '../worker/worker-pool';
+import {SmartScheduler} from '../scheduler/smart-scheduler';
+import {getScannerLogger} from "../../logger/logger";
+import {LogThrottler} from './helpers/scanner-helpers';
 
 export interface ScannerContext {
     state: ScanState;

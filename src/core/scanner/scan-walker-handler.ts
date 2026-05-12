@@ -8,11 +8,11 @@
  */
 
 import {Worker} from 'worker_threads';
-import {ScanState} from './scan-state';
+import {ScanState} from '../state';
 import {ScannerContext} from './scan-initializer';
-import {getFileType} from '../utils/file-types';
-import {LARGE_FILE_THRESHOLD_MB, BYTES_TO_MB, WORKER_RESTART_DELAY} from './scan-config';
-import {EventBus} from './event-bus';
+import {getFileType} from '../../utils/file-types';
+import {LARGE_FILE_THRESHOLD_MB, BYTES_TO_MB, WORKER_RESTART_DELAY} from '../config/constants';
+import {EventBus} from '../infra/event-bus';
 
 export interface WalkerHandlerOptions {
     state: ScanState;

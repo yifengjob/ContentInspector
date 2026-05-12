@@ -5,7 +5,7 @@
 
 import * as path from 'path';
 // 【修复】导入文件大小限制常量
-import {FILE_SIZE_LIMITS} from '../core/scan-config';
+import {FILE_SIZE_LIMITS} from '../core/config/constants';
 // 【重构】导入所有提取器函数
 import {
     extractTextFile,

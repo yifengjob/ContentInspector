@@ -7,7 +7,7 @@
  * - 支持错误隔离和异常处理
  */
 
-import {createLogger, Logger} from '../logger/logger';
+import {createLogger, Logger} from '../../logger/logger';
 
 /**
  * Worker 事件类型定义

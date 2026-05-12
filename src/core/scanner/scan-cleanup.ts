@@ -9,11 +9,11 @@
  */
 
 import {BrowserWindow} from 'electron';
-import {ScanState} from './scan-state';
-import {WorkerPool} from './worker-pool';
-import {TaskQueueManager} from './task-queue';
-import {EventBus} from './event-bus';
-import {LogThrottler, resultBatchSender, sendToMainWindow} from '../utils/scanner-helpers';
+import {ScanState} from '../state';
+import {WorkerPool} from '../worker/worker-pool';
+import {TaskQueueManager} from '../queue/task-queue';
+import {EventBus} from '../infra/event-bus';
+import {LogThrottler, resultBatchSender, sendToMainWindow} from './helpers/scanner-helpers';
 import {StagnationDetector} from './scan-stagnation-detector';
 
 export interface CleanupOptions {

@@ -10,7 +10,7 @@
  */
 
 import * as fs from 'fs';
-import {calculateParserTimeout} from '../core/scan-config';
+import {calculateParserTimeout} from '../core/config/constants';
 import type {ExtractorResult} from './types';
 import {extractorLogger} from '../logger/logger';
 

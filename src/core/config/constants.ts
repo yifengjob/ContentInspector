@@ -14,7 +14,7 @@
  * 9. UI 配置（窗口、显示）
  */
 
-import {LogLevel} from "../types";
+import {LogLevel} from "../../types";
 
 // ==================== 1. 单位转换常量 ====================
 

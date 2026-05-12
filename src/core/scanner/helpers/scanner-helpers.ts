@@ -13,7 +13,7 @@ import {
     PROGRESS_THROTTLE_MAX_INTERVAL,
     PROGRESS_FAST_SPEED_THRESHOLD,
     PROGRESS_SLOW_SPEED_THRESHOLD
-} from '../core/scan-config';
+} from '../../config/constants';
 
 /**
  * 创建进度更新函数（带自适应节流）

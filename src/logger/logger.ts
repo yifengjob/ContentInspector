@@ -17,7 +17,7 @@ import {
     LOG_FRONTEND_LEVEL,
     LOG_ENABLE_FILE,
     LOG_ENABLE_FRONTEND
-} from '../core/scan-config';
+} from '../core/config/constants';
 
 // 【配置】日志保留天数
 const LOG_RETENTION_DAYS = 30;

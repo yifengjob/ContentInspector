@@ -6,9 +6,9 @@
  * - 在长时间无进展时强制结束扫描
  */
 
-import {ScanState} from './scan-state';
-import {WorkerPool} from './worker-pool';
-import {STAGNATION_CHECK_INTERVAL, STAGNATION_THRESHOLD, MAX_IDLE_TIME} from './scan-config';
+import {ScanState} from '../state';
+import {WorkerPool} from '../worker/worker-pool';
+import {STAGNATION_CHECK_INTERVAL, STAGNATION_THRESHOLD, MAX_IDLE_TIME} from '../config/constants';
 
 export interface StagnationDetectorOptions {
     state: ScanState;
