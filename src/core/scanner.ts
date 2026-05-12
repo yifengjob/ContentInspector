@@ -115,7 +115,7 @@ export async function startScan(
     });
 
     // 6. 智能调度状态（由 SmartScheduler 统一管理）
-    let largeFilesProcessing = 0; // 【优化】仅保留 activeWorkerCount 需要的本地计数
+    // 【重构】移除冗余的 largeFilesProcessing 本地变量，直接使用 scheduler.getLargeFilesProcessing()
 
     // 7. 内存配置 - 【关键】macOS 需要使用 vm_stat 获取准确可用内存
     const freeMemoryMB = (process.platform === 'darwin'
@@ -295,10 +295,6 @@ export async function startScan(
                 scheduler.getLastTypeScheduleTime()
             );
 
-            // 更新本地计数（仅用于停滞检测）
-            if (task.isLargeFile) {
-                largeFilesProcessing = scheduler.getLargeFilesProcessing();
-            }
             // 【重构】使用 state 管理 activeWorkerCount
             state.incrementActiveWorkers();
             workerPool.incrementNextTaskId();
