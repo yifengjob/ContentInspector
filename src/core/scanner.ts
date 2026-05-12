@@ -15,7 +15,7 @@ import {Worker} from 'worker_threads';
 import {BrowserWindow} from 'electron';
 import {ScanConfig} from '../types';
 import {ScanState} from './scan-state';
-import {addAllowedPath, clearAllowedPaths} from '../services/file-operations';
+import {addAllowedPath, clearAllowedPaths, isPathAllowed} from '../services/file-operations';
 import {calculateActualConcurrency} from './config-manager';
 import {
     WORKER_MAX_OLD_GENERATION_MB,
@@ -68,7 +68,14 @@ export async function startScan(
 
     // 清除旧的允许路径，添加新的扫描路径
     clearAllowedPaths();
-    config.selectedPaths.forEach(p => addAllowedPath(p));
+    
+    // 【安全增强】验证所有扫描路径的合法性
+    for (const scanPath of config.selectedPaths) {
+        if (!isPathAllowed(scanPath)) {
+            throw new Error(`不允许访问的路径: ${scanPath}`);
+        }
+        addAllowedPath(scanPath);
+    }
 
     log.info('开始扫描...');
     log.info(`扫描路径数: ${config.selectedPaths.length}`);
@@ -98,8 +105,7 @@ export async function startScan(
 
     // 4. 统计信息 - 【重构】使用 ScanState 统一管理
     // 注意：walkerTotalCount, walkerFilteredCount, walkerSkippedCount, consumerProcessedCount,
-    //       resultCount, totalSensitiveItems, activeWorkerCount 等都已移到 scanState 中管理
-    const countedTaskIds = new Set<number>();  // 【保留】本地集合，用于快速查找
+    //       resultCount, totalSensitiveItems, activeWorkerCount, countedTaskIds 等都已移到 scanState 中管理
 
     // 5. 日志抑制
     let errorLogCount = 0;
@@ -243,7 +249,26 @@ export async function startScan(
         resultBatchSender.send(mainWindow, 'scan-result', resultItem);
     }
 
-    // 10. 创建 Worker 池
+    // 【重构】封装 WorkerPool 回调为接口
+    const workerPoolCallbacks = {
+        onUpdateConsumerCount: (taskId?: number) => {
+            // 【重构】使用 state 管理 activeWorkerCount
+            if (taskId !== undefined) {
+                state.incrementConsumerProcessedCount(taskId);
+            }
+            state.decrementActiveWorkers();
+        },
+        onCleanupConsumerState: cleanupConsumerState,
+        onSendProgressUpdate: sendProgressUpdate,
+        onCheckAndComplete: checkAndComplete,
+        onTryDispatch: tryDispatch,
+        onErrorLog: onErrorLog,
+        onResultLog: onResultLog,
+        onResultBatchSend: onResultBatchSend,
+        calculateTimeout: calculateTimeout
+    };
+
+    // 10. 创建 Worker 池 - 【重构】使用接口封装回调
     const workerPool = new WorkerPool(
         poolSize,
         eventBus,
@@ -252,21 +277,7 @@ export async function startScan(
         config,
         dynamicOldGenMB,
         dynamicYoungGenMB,
-        (taskId?: number) => {
-            // 【重构】使用 state 管理 activeWorkerCount
-            if (taskId !== undefined) {
-                state.incrementConsumerProcessedCount(taskId);
-            }
-            state.decrementActiveWorkers();
-        },
-        cleanupConsumerState,
-        sendProgressUpdate,
-        checkAndComplete,
-        tryDispatch,
-        onErrorLog,
-        onResultLog,
-        onResultBatchSend,
-        calculateTimeout
+        workerPoolCallbacks  // 【重构】传递回调接口
     );
 
     // 10. 创建智能调度器（统一管理调度状态）
@@ -578,7 +589,6 @@ export async function startScan(
             queueManager.clearAll();
 
             // 清空计数
-            countedTaskIds.clear();
             errorLogCount = 0;
             resultLogThrottler.reset();
 

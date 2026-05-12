@@ -28,11 +28,18 @@ export function clearAllowedPaths(): void {
 
 /**
  * 检查文件路径是否在允许的范围内
+ * 【安全增强】防止路径遍历攻击（Path Traversal）
  */
 export function isPathAllowed(filePath: string): boolean {
     // 【A2 优化】安全检查：拒绝空路径
     if (!filePath || filePath.trim() === '') {
         fileLogger.warn(`isPathAllowed: 拒绝访问：文件路径为空`);
+        return false;
+    }
+
+    // 【安全增强】检查路径遍历攻击特征
+    if (filePath.includes('..') || filePath.includes('~')) {
+        fileLogger.warn(`isPathAllowed: 拒绝访问：检测到可疑路径特征: ${filePath}`);
         return false;
     }
 
@@ -42,13 +49,27 @@ export function isPathAllowed(filePath: string): boolean {
         return false;
     }
 
+    // 【安全增强】规范化路径，消除符号链接和冗余部分
+    let normalizedPath: string;
+    try {
+        normalizedPath = path.normalize(filePath);
+        // 再次检查规范化后的路径是否仍然绝对
+        if (!path.isAbsolute(normalizedPath)) {
+            fileLogger.warn(`isPathAllowed: 拒绝访问：规范化后仍为相对路径: ${filePath}`);
+            return false;
+        }
+    } catch (error) {
+        fileLogger.error(`isPathAllowed: 路径规范化失败: ${filePath}`, error);
+        return false;
+    }
+
     // 【A2 优化】安全检查：解析真实路径，防止符号链接攻击
     let realPath: string;
     try {
-        realPath = fs.realpathSync(filePath);
+        realPath = fs.realpathSync(normalizedPath);
     } catch (error) {
-        // 文件不存在时，使用原始路径进行目录检查
-        realPath = filePath;
+        // 文件不存在时，使用规范化路径进行目录检查
+        realPath = normalizedPath;
     }
 
     // 如果没有限制，允许所有路径（向后兼容）
@@ -63,6 +84,7 @@ export function isPathAllowed(filePath: string): boolean {
         }
     }
 
+    fileLogger.warn(`isPathAllowed: 拒绝访问：路径不在允许范围内: ${filePath}`);
     return false;
 }
 

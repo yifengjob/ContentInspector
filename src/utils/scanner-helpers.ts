@@ -173,12 +173,26 @@ export function safelyTerminateWorker(
 export class BatchSender {
     private buffer: any[] = [];
     private timer: NodeJS.Timeout | null = null;
-    private readonly batchSize: number;
-    private readonly batchInterval: number;
+    private batchSize: number;  // 【优化】改为可修改
+    private batchInterval: number;  // 【优化】改为可修改
     
     constructor(batchSize: number = 100, batchInterval: number = 500) {
         this.batchSize = batchSize;
         this.batchInterval = batchInterval;
+    }
+    
+    /**
+     * 【新增】动态调整批量大小和间隔
+     * @param batchSize 新的批量大小
+     * @param batchInterval 新的批量间隔（毫秒）
+     */
+    configure(batchSize?: number, batchInterval?: number): void {
+        if (batchSize !== undefined) {
+            this.batchSize = Math.max(1, batchSize);  // 至少为 1
+        }
+        if (batchInterval !== undefined) {
+            this.batchInterval = Math.max(0, batchInterval);  // 至少为 0
+        }
     }
     
     send(mainWindow: BrowserWindow | null, channel: string, data: any): void {
