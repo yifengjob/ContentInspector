@@ -9,7 +9,7 @@
  */
 
 import {BrowserWindow} from 'electron';
-import {EventBus, setGlobalEventBus} from './event-bus';
+import {EventBus} from './event-bus';
 import {LogEventData} from "./event-types";
 import {logManagerLogger} from "../logger/logger";
 
@@ -39,9 +39,6 @@ export class LogManager {
 
         // 获取 EventBus 单例实例
         this.eventBus = EventBus.getInstance();
-
-        // 设置全局引用（供 logger.ts 使用）
-        setGlobalEventBus(this.eventBus);
 
         // 注册日志事件监听器
         this.setupLogListeners();
@@ -88,7 +85,6 @@ export class LogManager {
         }
 
         this.eventBus.clearAll();
-        setGlobalEventBus(null);
     }
 
     /**

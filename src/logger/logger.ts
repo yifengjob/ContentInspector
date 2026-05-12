@@ -18,7 +18,6 @@ import {
     LOG_ENABLE_FILE,
     LOG_ENABLE_FRONTEND
 } from '../core/scan-config';
-import {getGlobalEventBus} from '../core/event-bus';
 
 // 【配置】日志保留天数
 const LOG_RETENTION_DAYS = 30;
@@ -298,7 +297,9 @@ function bridgeWorkerLogToMain(level: LogLevel, message: string, context: string
  */
 function emitLogToEventBus(level: LogLevel, message: string, context: string): void {
     try {
-        const eventBus = getGlobalEventBus();
+        // 【修复】直接使用 EventBus 单例，不依赖全局变量
+        const {EventBus} = require('../core/event-bus');
+        const eventBus = EventBus.getInstance();
         if (eventBus) {
             eventBus.emit('log:message', {
                 level: LogLevel[level],
@@ -306,11 +307,6 @@ function emitLogToEventBus(level: LogLevel, message: string, context: string): v
                 context,
                 timestamp: getBeijingTimestamp()
             });
-        } else {
-            // 【调试】EventBus 未初始化时的警告（仅开发环境）
-            if (process.env.NODE_ENV === 'development') {
-                process.stderr.write(`[警告] EventBus 未初始化，日志无法发送到前端: [${LogLevel[level]}] ${message}\n`);
-            }
         }
     } catch (error) {
         // 静默失败，避免影响主流程

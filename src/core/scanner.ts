@@ -206,7 +206,10 @@ export async function startScan(
     }
 
     function updateConsumerCount(taskId?: number): void {
-        activeWorkerCount--;
+        // 【关键修复】防止 activeWorkerCount 变成负数
+        if (activeWorkerCount > 0) {
+            activeWorkerCount--;
+        }
         log.info(`[调试] updateConsumerCount: taskId=${taskId}, activeWorkerCount=${activeWorkerCount}`);
         if (taskId !== undefined) {
             incrementConsumerCount(taskId);

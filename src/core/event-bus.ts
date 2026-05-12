@@ -139,29 +139,3 @@ export class EventBus {
         return this.listeners.get(event)?.length || 0;
     }
 }
-
-// ==================== 全局 EventBus 管理 ====================
-
-/**
- * 全局 EventBus 引用（供 logger.ts 使用）
- */
-let globalEventBus: EventBus | null = null;
-
-/**
- * 设置全局 EventBus 实例
- * 应该在应用启动时调用
- *
- * @param bus - EventBus 实例
- */
-export function setGlobalEventBus(bus: EventBus | null): void {
-    globalEventBus = bus;
-}
-
-/**
- * 获取全局 EventBus 实例
- *
- * @returns EventBus 实例或 null（如果未初始化）
- */
-export function getGlobalEventBus(): EventBus | null {
-    return globalEventBus;
-}
