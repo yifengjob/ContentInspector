@@ -15,7 +15,7 @@
             v-for="(log, index) in logs" 
             :key="index" 
             class="log-item"
-            :class="{ error: log.includes('错误') || log.includes('失败') }"
+            :class="getLogLevelClass(log)"
           >
             {{ log }}
           </div>
@@ -99,6 +99,15 @@ onMounted(async () => {
     console.error('获取日志失败:', error)
   }
 })
+
+// 根据日志内容获取对应的级别 class
+const getLogLevelClass = (log: string): string => {
+  if (log.includes('[ERROR]')) return 'error'
+  if (log.includes('[WARN]')) return 'warn'
+  if (log.includes('[INFO]')) return 'info'
+  if (log.includes('[DEBUG]')) return 'debug'
+  return ''
+}
 
 const handleClearLogs = () => {
   logs.value.splice(0, logs.value.length)
@@ -184,6 +193,21 @@ const handleClearLogs = () => {
 
 .log-item.error {
   color: var(--error-color);
+  background-color: rgba(255, 77, 79, 0.05);
+}
+
+.log-item.warn {
+  color: var(--warning-color);
+  background-color: rgba(250, 173, 20, 0.05);
+}
+
+.log-item.info {
+  color: var(--text-color);
+}
+
+.log-item.debug {
+  color: var(--text-secondary);
+  font-style: italic;
 }
 
 .modal-footer {
