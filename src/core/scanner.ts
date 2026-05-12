@@ -17,30 +17,30 @@ import {ScanConfig} from '../types';
 import {ScanState} from './scan-state';
 import {calculateActualConcurrency} from './config-manager';
 import {
-    WORKER_MAX_OLD_GENERATION_MB,
-    WORKER_MAX_YOUNG_GENERATION_MB,
-    STAGNATION_CHECK_INTERVAL,
-    STAGNATION_THRESHOLD,
+    BYTES_TO_MB,
+    ERROR_LOG_INTERVAL,
+    LARGE_FILE_THRESHOLD_MB,
     MAX_IDLE_TIME,
     PROGRESS_THROTTLE_INTERVAL,
-    BYTES_TO_MB,
-    LARGE_FILE_THRESHOLD_MB,
-    ERROR_LOG_INTERVAL,
     RESULT_LOG_COUNT_INTERVAL,
-    RESULT_LOG_TIME_INTERVAL
+    RESULT_LOG_TIME_INTERVAL,
+    STAGNATION_CHECK_INTERVAL,
+    STAGNATION_THRESHOLD,
+    WORKER_MAX_OLD_GENERATION_MB,
+    WORKER_MAX_YOUNG_GENERATION_MB
 } from './scan-config';
 import {
-    createProgressUpdater,
-    sendToMainWindow,
     calculateTimeout as calcTimeout,
-    resultBatchSender,
     configureBatchSender,
-    LogThrottler
+    createProgressUpdater,
+    LogThrottler,
+    resultBatchSender,
+    sendToMainWindow
 } from '../utils/scanner-helpers';
 import {getFileType} from '../utils/file-types';
 import {EventBus} from './event-bus';
-import {TaskQueueManager, Task} from './task-queue';
-import {WorkerPool, Consumer} from './worker-pool';
+import {Task, TaskQueueManager} from './task-queue';
+import {Consumer, WorkerPool} from './worker-pool';
 import {SmartScheduler} from './smart-scheduler';
 import {getScannerLogger} from "../logger/logger";
 
@@ -616,30 +616,28 @@ export async function startScan(
     // ==================== 【启动扫描】====================
 
     // 【修复】定义取消函数，可以访问局部变量
-    const doCancelScan = () => {
+    // 将取消函数挂载到 ScanState，供外部调用
+    (state as any).doCancelScan = () => {
         if (state.cancelFlag) {
             log.info('[取消扫描] 已经在取消过程中，忽略重复请求');
             return;
         }
-        
+
         log.info('[取消扫描] 收到取消请求，正在停止扫描...');
         state.cancelFlag = true;
-        
+
         // 清除停滞检测定时器，防止干扰
         if (completionCheckTimer) {
             clearInterval(completionCheckTimer);
             completionCheckTimer = null;
             log.info('[取消扫描] 已清除停滞检测定时器');
         }
-        
+
         // 立即清理资源，停止所有 Worker
         log.info('[取消扫描] 开始调用 cleanup...');
         cleanup();
         log.info('[取消扫描] cleanup 调用完成');
     };
-
-    // 将取消函数挂载到 ScanState，供外部调用
-    (state as any).doCancelScan = doCancelScan;
 
     const totalPaths = config.selectedPaths.length;
     let currentPathIndex = 0;
