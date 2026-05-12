@@ -328,21 +328,18 @@ function setupIpcHandlers() {
 
     // 取消扫描
     ipcMain.handle('scan-cancel', async () => {
-        mainLogger.info('[scan-cancel] IPC handler 被调用');
-        mainLogger.info(`[scan-cancel] scanState.isScanning: ${scanState.isScanning}`);
+        mainLogger.info('[取消扫描] 收到取消请求');
         
         // 【修复】不再检查 isScanning，始终调用 cancelScan
         // 即使 isScanning 为 false，也要确保清理所有资源
-        mainLogger.info('[scan-cancel] 调用 cancelScan 函数');
         cancelScan(scanState);
-        mainLogger.info('[scan-cancel] cancelScan 函数调用完成');
 
         // 【优化】改为异步通知机制，不阻塞 IPC
         return new Promise((resolve) => {
             const checkInterval = setInterval(() => {
                 if (!scanState.isScanning) {
                     clearInterval(checkInterval);
-                    mainLogger.info('[scan-cancel] 扫描已安全取消');
+                    mainLogger.info('[取消扫描] 扫描已安全取消');
 
                     // 【新增】停止电源阻止器
                     if (powerSaveBlockerId !== null) {
@@ -359,7 +356,7 @@ function setupIpcHandlers() {
             setTimeout(() => {
                 clearInterval(checkInterval);
                 if (scanState.isScanning) {
-                    mainLogger.warn(`[scan-cancel] 警告: 等待 ${CANCEL_SCAN_MAX_WAIT / 1000} 秒后扫描仍未结束，强制重置状态`);
+                    mainLogger.warn(`[取消扫描] 警告: 等待 ${CANCEL_SCAN_MAX_WAIT / 1000} 秒后扫描仍未结束，强制重置状态`);
                     scanState.isScanning = false;
                 }
 

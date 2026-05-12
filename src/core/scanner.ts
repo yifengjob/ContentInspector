@@ -611,25 +611,24 @@ export async function startScan(
     // 【修复】定义取消函数，可以访问局部变量
     const doCancelScan = () => {
         if (state.cancelFlag) {
-            log.info('[取消] 已经在取消过程中，忽略重复请求');
+            log.info('[取消扫描] 已经在取消过程中，忽略重复请求');
             return;
         }
         
-        log.info('[取消] 收到取消请求，正在停止扫描...');
-        log.info(`[取消] 当前状态: isScanning=${state.isScanning}, cancelFlag=${state.cancelFlag}`);
+        log.info('[取消扫描] 收到取消请求，正在停止扫描...');
         state.cancelFlag = true;
         
         // 清除停滞检测定时器，防止干扰
         if (completionCheckTimer) {
             clearInterval(completionCheckTimer);
             completionCheckTimer = null;
-            log.info('[取消] 已清除停滞检测定时器');
+            log.info('[取消扫描] 已清除停滞检测定时器');
         }
         
         // 立即清理资源，停止所有 Worker
-        log.info('[取消] 开始调用 cleanup...');
+        log.info('[取消扫描] 开始调用 cleanup...');
         cleanup();
-        log.info('[取消] cleanup 调用完成');
+        log.info('[取消扫描] cleanup 调用完成');
     };
 
     // 将取消函数挂载到 ScanState，供外部调用
@@ -688,28 +687,19 @@ export async function startScan(
 export function cancelScan(scanState?: ScanState): void {
     const state = scanState || ScanState.getInstance();
     
-    // 【调试】记录取消请求
-    console.log('[cancelScan] 收到取消请求');
-    console.log('[cancelScan] state.isScanning:', state.isScanning);
-    console.log('[cancelScan] state.cancelFlag:', state.cancelFlag);
-    console.log('[cancelScan] state.doCancelScan exists:', !!(state as any).doCancelScan);
-    
     // 【修复】如果存在内部的取消函数，调用它以真正停止扫描
     if ((state as any).doCancelScan) {
-        console.log('[cancelScan] 调用 doCancelScan');
         (state as any).doCancelScan();
     } else {
         // 后备方案：仅设置标志（适用于未通过 startScan 启动的情况）
-        console.log('[cancelScan] doCancelScan 不存在，使用后备方案');
         state.cancelFlag = true;
         
         // 【新增】通过 EventBus 发布取消事件
         try {
             const eventBus = require('./event-bus').EventBus.getInstance();
             eventBus.emit('scan-cancelled', null);
-            console.log('[cancelScan] 已发布 scan-cancelled 事件');
         } catch (error) {
-            console.error('[cancelScan] 发布事件失败:', error);
+            console.error('[取消扫描] 发布事件失败:', error);
         }
     }
 }
