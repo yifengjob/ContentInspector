@@ -116,7 +116,7 @@ class PdfExtractor extends BaseExtractor {
         });
     }
 
-    protected async doValidateFile(filePath: string, stat: any): Promise<void> {
+    protected async doValidateFile(_filePath: string, stat: any): Promise<void> {
         // PDF 特殊验证：检查文件大小
         const fileSizeMB = stat.size / BYTES_TO_MB;
         if (fileSizeMB > MAX_PDF_SIZE_MB) {
