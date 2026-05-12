@@ -15,32 +15,32 @@ import {Worker} from 'worker_threads';
 import {BrowserWindow} from 'electron';
 import {ScanConfig} from '../types';
 import {ScanState} from './scan-state';
-import {addAllowedPath, clearAllowedPaths} from '../services/file-operations';
 import {calculateActualConcurrency} from './config-manager';
 import {
-    WORKER_MAX_OLD_GENERATION_MB,
-    WORKER_MAX_YOUNG_GENERATION_MB,
-    STAGNATION_CHECK_INTERVAL,
-    STAGNATION_THRESHOLD,
+    BYTES_TO_MB,
+    ERROR_LOG_INTERVAL,
+    LARGE_FILE_THRESHOLD_MB,
     MAX_IDLE_TIME,
     PROGRESS_THROTTLE_INTERVAL,
-    BYTES_TO_MB,
-    LARGE_FILE_THRESHOLD_MB,
-    ERROR_LOG_INTERVAL,
     RESULT_LOG_COUNT_INTERVAL,
-    RESULT_LOG_TIME_INTERVAL
+    RESULT_LOG_TIME_INTERVAL,
+    STAGNATION_CHECK_INTERVAL,
+    STAGNATION_THRESHOLD,
+    WORKER_MAX_OLD_GENERATION_MB,
+    WORKER_MAX_YOUNG_GENERATION_MB
 } from './scan-config';
 import {
-    createProgressUpdater,
-    sendToMainWindow,
     calculateTimeout as calcTimeout,
+    configureBatchSender,
+    createProgressUpdater,
+    LogThrottler,
     resultBatchSender,
-    LogThrottler
+    sendToMainWindow
 } from '../utils/scanner-helpers';
 import {getFileType} from '../utils/file-types';
 import {EventBus} from './event-bus';
-import {TaskQueueManager, Task} from './task-queue';
-import {WorkerPool, Consumer} from './worker-pool';
+import {Task, TaskQueueManager} from './task-queue';
+import {Consumer, WorkerPool} from './worker-pool';
 import {SmartScheduler} from './smart-scheduler';
 import {getScannerLogger} from "../logger/logger";
 
@@ -66,10 +66,6 @@ export async function startScan(
     // 1. 创建日志记录器
     const log = getScannerLogger();
 
-    // 清除旧的允许路径，添加新的扫描路径
-    clearAllowedPaths();
-    config.selectedPaths.forEach(p => addAllowedPath(p));
-
     log.info('开始扫描...');
     log.info(`扫描路径数: ${config.selectedPaths.length}`);
     log.info(`文件类型数: ${config.selectedExtensions.length}`);
@@ -88,6 +84,12 @@ export async function startScan(
 
     log.info(`使用 ${poolSize} 个 Consumer Workers (CPU: ${concurrencyInfo.cpuCount}核, 可用内存: ${concurrencyInfo.freeMemoryGB.toFixed(1)}GB)`);
 
+    // 【优化】根据扫描路径数智能配置 BatchSender
+    // 粗略估计：每个路径平均 1000 个文件
+    const estimatedTotalFiles = config.selectedPaths.length * 1000;
+    configureBatchSender(estimatedTotalFiles);
+    log.info(`【BatchSender】已根据扫描规模配置（预估文件数: ${estimatedTotalFiles}）`);
+
     // ==================== 【初始化模块】====================
 
     // 2. 获取 EventBus 单例实例
@@ -95,11 +97,15 @@ export async function startScan(
 
     // 3. 创建任务队列管理器
     const queueManager = new TaskQueueManager(eventBus);
+    
+    // 【状态同步】监听队列长度变化并更新 ScanState
+    eventBus.on('task-queue-length-changed', (length: number) => {
+        state.setTaskQueueLength(length);
+    });
 
     // 4. 统计信息 - 【重构】使用 ScanState 统一管理
     // 注意：walkerTotalCount, walkerFilteredCount, walkerSkippedCount, consumerProcessedCount,
-    //       resultCount, totalSensitiveItems, activeWorkerCount 等都已移到 scanState 中管理
-    const countedTaskIds = new Set<number>();  // 【保留】本地集合，用于快速查找
+    //       resultCount, totalSensitiveItems, activeWorkerCount, countedTaskIds 等都已移到 scanState 中管理
 
     // 5. 日志抑制
     let errorLogCount = 0;
@@ -109,7 +115,7 @@ export async function startScan(
     });
 
     // 6. 智能调度状态（由 SmartScheduler 统一管理）
-    let largeFilesProcessing = 0; // 【优化】仅保留 activeWorkerCount 需要的本地计数
+    // 【重构】移除冗余的 largeFilesProcessing 本地变量，直接使用 scheduler.getLargeFilesProcessing()
 
     // 7. 内存配置 - 【关键】macOS 需要使用 vm_stat 获取准确可用内存
     const freeMemoryMB = (process.platform === 'darwin'
@@ -243,7 +249,26 @@ export async function startScan(
         resultBatchSender.send(mainWindow, 'scan-result', resultItem);
     }
 
-    // 10. 创建 Worker 池
+    // 【重构】封装 WorkerPool 回调为接口
+    const workerPoolCallbacks = {
+        onUpdateConsumerCount: (taskId?: number) => {
+            // 【重构】使用 state 管理 activeWorkerCount
+            if (taskId !== undefined) {
+                state.incrementConsumerProcessedCount(taskId);
+            }
+            state.decrementActiveWorkers();
+        },
+        onCleanupConsumerState: cleanupConsumerState,
+        onSendProgressUpdate: sendProgressUpdate,
+        onCheckAndComplete: checkAndComplete,
+        onTryDispatch: tryDispatch,
+        onErrorLog: onErrorLog,
+        onResultLog: onResultLog,
+        onResultBatchSend: onResultBatchSend,
+        calculateTimeout: calculateTimeout
+    };
+
+    // 10. 创建 Worker 池 - 【重构】使用接口封装回调
     const workerPool = new WorkerPool(
         poolSize,
         eventBus,
@@ -252,22 +277,13 @@ export async function startScan(
         config,
         dynamicOldGenMB,
         dynamicYoungGenMB,
-        (taskId?: number) => {
-            // 【重构】使用 state 管理 activeWorkerCount
-            if (taskId !== undefined) {
-                state.incrementConsumerProcessedCount(taskId);
-            }
-            state.decrementActiveWorkers();
-        },
-        cleanupConsumerState,
-        sendProgressUpdate,
-        checkAndComplete,
-        tryDispatch,
-        onErrorLog,
-        onResultLog,
-        onResultBatchSend,
-        calculateTimeout
+        workerPoolCallbacks  // 【重构】传递回调接口
     );
+    
+    // 【状态同步】监听待处理任务数变化并更新 ScanState
+    eventBus.on('pending-tasks-size-changed', (size: number) => {
+        state.setPendingTasksSize(size);
+    });
 
     // 10. 创建智能调度器（统一管理调度状态）
     const scheduler = new SmartScheduler(
@@ -284,10 +300,6 @@ export async function startScan(
                 scheduler.getLastTypeScheduleTime()
             );
 
-            // 更新本地计数（仅用于停滞检测）
-            if (task.isLargeFile) {
-                largeFilesProcessing = scheduler.getLargeFilesProcessing();
-            }
             // 【重构】使用 state 管理 activeWorkerCount
             state.incrementActiveWorkers();
             workerPool.incrementNextTaskId();
@@ -298,14 +310,10 @@ export async function startScan(
     cleanupConsumerStateRef.fn = scheduler.cleanupConsumerState.bind(scheduler);
 
     // 11. 初始化调度器
-    log.debug('[调试] 开始初始化调度器...');
     scheduler.initialize();
-    log.debug('[调试] 调度器初始化完成');
 
     // 12. 初始化 Worker 池
-    log.debug('[调试] 开始初始化 Worker 池...');
     await workerPool.initialize();
-    log.debug('[调试] Worker 池初始化完成');
 
     // ==================== 【Walker Worker】====================
 
@@ -373,7 +381,7 @@ export async function startScan(
                 log.info(`[Walker] 已完成 ${walkerCompletedCount}/${totalWalkerTasks} 个任务`);
 
                 // 【A1 优化】Walker 完成后，根据实际文件大小重新计算内存限制
-                if (queueManager.getQueueLength() > 0) {
+                if (state.getTaskQueueLength() > 0) {
                     // 【关键修复】从 queueManager 获取所有任务来计算平均大小
                     const stats = queueManager.getAllTasksStats();
                     const avgFileSizeMB = stats.totalCount > 0
@@ -445,8 +453,8 @@ export async function startScan(
         skipped: state.getWalkerSkippedCount(),
         results: state.getResultCount(),
         sensitiveItems: state.getTotalSensitiveItems(),
-        taskQueueLength: queueManager.getQueueLength(),
-        pendingTasksSize: workerPool.getPendingTasks().size,
+        taskQueueLength: state.getTaskQueueLength(),
+        pendingTasksSize: state.getPendingTasksSize(),
         activeWorkers: state.getActiveWorkerCount(),
         lastEnqueueTime: Date.now()
     };
@@ -458,27 +466,13 @@ export async function startScan(
             return;
         }
 
-        const hasPendingTasks = workerPool.getPendingTasks().size > 0;
         const allWalkersCompleted = walkerCompletedCount >= totalWalkerTasks;
 
-        if (allWalkersCompleted && (workerPool.getActiveWorkerCount() > 0 || queueManager.getQueueLength() > 0 || hasPendingTasks)) {
-            log.debug(`[checkAndComplete] Walker已完成，但仍在等待: activeWorkers=${state.getActiveWorkerCount()}, taskQueue=${queueManager.getQueueLength()}, pendingTasks=${workerPool.getPendingTasks().size}`);
-        }
-
-        if (queueManager.getQueueLength() === 0) {
-            queueManager.cleanupEmptyQueues();
-        }
-
-        if (allWalkersCompleted && state.getActiveWorkerCount() === 0 && queueManager.getQueueLength() === 0 && !hasPendingTasks) {
-            log.debug(`[调试] 满足完成条件: allWalkersCompleted=${allWalkersCompleted}, activeWorkers=${state.getActiveWorkerCount()}, queueLength=${queueManager.getQueueLength()}, hasPendingTasks=${hasPendingTasks}`);
+        // 【重构】使用 state.isScanComplete 统一完成条件判断
+        if (state.isScanComplete(allWalkersCompleted)) {
             log.info(`扫描完成: 遍历 ${state.getWalkerTotalCount()} 个文件, 处理 ${state.getConsumerProcessedCount()} 个, 跳过 ${state.getWalkerSkippedCount()} 个, 发现 ${state.getResultCount()} 个敏感文件`);
             cleanup();
             return;
-        }
-
-        // 【调试】记录未满足的完成条件
-        if (allWalkersCompleted) {
-            log.debug(`[调试] 未完成检查: Walker已完成, activeWorkers=${state.getActiveWorkerCount()}, queueLength=${queueManager.getQueueLength()}, pendingTasks=${workerPool.getPendingTasks().size}`);
         }
 
         lastActivityTime = Date.now();
@@ -499,8 +493,8 @@ export async function startScan(
             state.getWalkerSkippedCount() !== lastStagnationCheckState.skipped ||
             state.getResultCount() !== lastStagnationCheckState.results ||
             state.getTotalSensitiveItems() !== lastStagnationCheckState.sensitiveItems ||
-            queueManager.getQueueLength() !== lastStagnationCheckState.taskQueueLength ||
-            workerPool.getPendingTasks().size !== lastStagnationCheckState.pendingTasksSize ||
+            state.getTaskQueueLength() !== lastStagnationCheckState.taskQueueLength ||
+            state.getPendingTasksSize() !== lastStagnationCheckState.pendingTasksSize ||
             state.getActiveWorkerCount() !== lastStagnationCheckState.activeWorkers ||
             lastTaskEnqueueTime !== lastStagnationCheckState.lastEnqueueTime;
 
@@ -512,8 +506,8 @@ export async function startScan(
                 skipped: state.getWalkerSkippedCount(),
                 results: state.getResultCount(),
                 sensitiveItems: state.getTotalSensitiveItems(),
-                taskQueueLength: queueManager.getQueueLength(),
-                pendingTasksSize: workerPool.getPendingTasks().size,
+                taskQueueLength: state.getTaskQueueLength(),
+                pendingTasksSize: state.getPendingTasksSize(),
                 activeWorkers: state.getActiveWorkerCount(),
                 lastEnqueueTime: lastTaskEnqueueTime
             };
@@ -522,13 +516,13 @@ export async function startScan(
             const idleTime = now - lastStagnationCheckTime;
 
             if (idleTime > STAGNATION_THRESHOLD && idleTime <= MAX_IDLE_TIME) {
-                log.warn(`提示: ${idleTime / 1000}秒内无任何进展（活跃Worker:${state.getActiveWorkerCount()}, 队列:${queueManager.getQueueLength()}, 待处理:${workerPool.getPendingTasks().size}），但仍在等待可能的恢复...`);
+                log.warn(`提示: ${idleTime / 1000}秒内无任何进展（活跃Worker:${state.getActiveWorkerCount()}, 队列:${state.getTaskQueueLength()}, 待处理:${state.getPendingTasksSize()}），但仍在等待可能的恢复...`);
             }
 
             if (idleTime > MAX_IDLE_TIME
                 || (idleTime > STAGNATION_THRESHOLD
-                    && queueManager.getQueueLength() <= 0
-                    && workerPool.getPendingTasks().size <= 0
+                    && state.getTaskQueueLength() <= 0
+                    && state.getPendingTasksSize() <= 0
                     && state.getActiveWorkerCount() <= 0
                     && (state.getConsumerProcessedCount() + state.getWalkerFilteredCount() + state.getWalkerSkippedCount()) >= state.getWalkerTotalCount())
             ) {
@@ -578,7 +572,6 @@ export async function startScan(
             queueManager.clearAll();
 
             // 清空计数
-            countedTaskIds.clear();
             errorLogCount = 0;
             resultLogThrottler.reset();
 
@@ -621,6 +614,30 @@ export async function startScan(
     }
 
     // ==================== 【启动扫描】====================
+
+    // 【修复】定义取消函数，可以访问局部变量
+    // 将取消函数挂载到 ScanState，供外部调用
+    (state as any).doCancelScan = () => {
+        if (state.cancelFlag) {
+            log.info('[取消扫描] 已经在取消过程中，忽略重复请求');
+            return;
+        }
+
+        log.info('[取消扫描] 收到取消请求，正在停止扫描...');
+        state.cancelFlag = true;
+
+        // 清除停滞检测定时器，防止干扰
+        if (completionCheckTimer) {
+            clearInterval(completionCheckTimer);
+            completionCheckTimer = null;
+            log.info('[取消扫描] 已清除停滞检测定时器');
+        }
+
+        // 立即清理资源，停止所有 Worker
+        log.info('[取消扫描] 开始调用 cleanup...');
+        cleanup();
+        log.info('[取消扫描] cleanup 调用完成');
+    };
 
     const totalPaths = config.selectedPaths.length;
     let currentPathIndex = 0;
@@ -674,5 +691,13 @@ export async function startScan(
 
 export function cancelScan(scanState?: ScanState): void {
     const state = scanState || ScanState.getInstance();
-    state.cancelFlag = true;
+    
+    // 【修复】如果存在内部的取消函数，调用它以真正停止扫描
+    if ((state as any).doCancelScan) {
+        (state as any).doCancelScan();
+    } else {
+        // 后备方案：仅设置标志（适用于未通过 startScan 启动的情况）
+        // 注意：正常情况下不应该走到这里，因为 doCancelScan 应该在 startScan 中挂载
+        state.cancelFlag = true;
+    }
 }

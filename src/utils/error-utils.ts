@@ -121,7 +121,7 @@ export function createParseError(filePath: string, format: string, originalError
   );
 }
 
-export function createUnsupportedFormatError(filePath: string, format: string): AppError {
+export function createUnsupportedFormatError(_filePath: string, format: string): AppError {
   return new AppError(
     ErrorCodes.UNSUPPORTED_FORMAT,
     `不支持的文件格式: .${format}`

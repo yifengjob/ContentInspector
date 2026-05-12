@@ -8,7 +8,11 @@ import {
     BYTES_TO_MB,
     WORKER_BASE_TIMEOUT,
     WORKER_TIMEOUT_PER_MB,
-    WORKER_MAX_TIMEOUT
+    WORKER_MAX_TIMEOUT,
+    PROGRESS_THROTTLE_MIN_INTERVAL,
+    PROGRESS_THROTTLE_MAX_INTERVAL,
+    PROGRESS_FAST_SPEED_THRESHOLD,
+    PROGRESS_SLOW_SPEED_THRESHOLD
 } from '../core/scan-config';
 
 /**
@@ -32,11 +36,11 @@ export function createProgressUpdater(
     let lastProgressTime = 0;
     let lastScannedCount = 0;
 
-    // 【B3 优化】自适应节流参数
-    const MIN_THROTTLE = 200;   // 最小间隔 200ms（快速更新）
-    const MAX_THROTTLE = 1000;  // 最大间隔 1000ms（慢速更新）
-    const FAST_THRESHOLD = 50;  // 每秒处理 > 50 个文件视为快速
-    const SLOW_THRESHOLD = 10;  // 每秒处理 < 10 个文件视为慢速
+    // 【B3 优化】自适应节流参数（从 scan-config.ts 导入）
+    const MIN_THROTTLE = PROGRESS_THROTTLE_MIN_INTERVAL;   // 最小间隔 200ms（快速更新）
+    const MAX_THROTTLE = PROGRESS_THROTTLE_MAX_INTERVAL;  // 最大间隔 1000ms（慢速更新）
+    const FAST_THRESHOLD = PROGRESS_FAST_SPEED_THRESHOLD;  // 每秒处理 > 50 个文件视为快速
+    const SLOW_THRESHOLD = PROGRESS_SLOW_SPEED_THRESHOLD;  // 每秒处理 < 10 个文件视为慢速
 
     return (currentFile: string = '') => {
         const now = Date.now();
@@ -173,12 +177,26 @@ export function safelyTerminateWorker(
 export class BatchSender {
     private buffer: any[] = [];
     private timer: NodeJS.Timeout | null = null;
-    private readonly batchSize: number;
-    private readonly batchInterval: number;
+    private batchSize: number;  // 【优化】改为可修改
+    private batchInterval: number;  // 【优化】改为可修改
     
     constructor(batchSize: number = 100, batchInterval: number = 500) {
         this.batchSize = batchSize;
         this.batchInterval = batchInterval;
+    }
+    
+    /**
+     * 【新增】动态调整批量大小和间隔
+     * @param batchSize 新的批量大小
+     * @param batchInterval 新的批量间隔（毫秒）
+     */
+    configure(batchSize?: number, batchInterval?: number): void {
+        if (batchSize !== undefined) {
+            this.batchSize = Math.max(1, batchSize);  // 至少为 1
+        }
+        if (batchInterval !== undefined) {
+            this.batchInterval = Math.max(0, batchInterval);  // 至少为 0
+        }
     }
     
     send(mainWindow: BrowserWindow | null, channel: string, data: any): void {
@@ -234,7 +252,28 @@ export class BatchSender {
 }
 
 // 导出单例（用于扫描结果批量发送）
+// 【优化】使用默认配置，可根据扫描规模动态调整
 export const resultBatchSender = new BatchSender(100, 500);
+
+/**
+ * 【新增】根据扫描规模智能配置 BatchSender
+ * @param estimatedTotalFiles 预估的文件总数
+ */
+export function configureBatchSender(estimatedTotalFiles: number): void {
+    if (estimatedTotalFiles < 100) {
+        // 小扫描：立即发送，无延迟
+        resultBatchSender.configure(1, 0);
+    } else if (estimatedTotalFiles < 1000) {
+        // 中等扫描：小批量，短延迟
+        resultBatchSender.configure(20, 200);
+    } else if (estimatedTotalFiles < 10000) {
+        // 大扫描：中批量，中等延迟
+        resultBatchSender.configure(50, 300);
+    } else {
+        // 超大扫描：大批量，长延迟
+        resultBatchSender.configure(100, 500);
+    }
+}
 
 /**
  * 【P3优化】日志抑制器 - 基于数量和时间的双重触发机制

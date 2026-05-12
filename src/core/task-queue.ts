@@ -80,6 +80,9 @@ export class TaskQueueManager {
 
         // 【事件总线】发布任务入队事件
         this.eventBus.emit('task.enqueued', task);
+        
+        // 【状态同步】通知队列长度变化
+        this.eventBus.emit('task-queue-length-changed', this.getQueueLength());
     }
 
     /**
@@ -96,6 +99,10 @@ export class TaskQueueManager {
         if (queue.length === 0) return null;
 
         const task = queue.shift();  // O(1) - 从头部移除
+        
+        // 【状态同步】通知队列长度变化
+        this.eventBus.emit('task-queue-length-changed', this.getQueueLength());
+        
         return task || null;
     }
 
@@ -130,6 +137,9 @@ export class TaskQueueManager {
             queues.small.length = 0;
         }
         this.queueByTypeAndSize.clear();
+        
+        // 【状态同步】通知队列长度变化
+        this.eventBus.emit('task-queue-length-changed', 0);
     }
 
     /**

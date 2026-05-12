@@ -45,6 +45,21 @@ interface PendingTask {
 }
 
 /**
+ * 【重构】WorkerPool 回调接口 - 减少构造函数参数数量
+ */
+export interface WorkerPoolCallbacks {
+    onUpdateConsumerCount: (taskId?: number) => void;
+    onCleanupConsumerState: (consumer: Consumer) => void;
+    onSendProgressUpdate: (filePath: string) => void;
+    onCheckAndComplete: () => void;
+    onTryDispatch: () => void;
+    onErrorLog: (error: string) => void;
+    onResultLog: (resultCount: number, result: any) => void;
+    onResultBatchSend: (mainWindow: BrowserWindow, resultItem: any) => void;
+    calculateTimeout: (fileSize: number) => number;
+}
+
+/**
  * Worker 池管理器
  *
  * 使用示例：
@@ -81,8 +96,7 @@ export class WorkerPool {
     private workerCreateQueue: Array<{ consumerId: number, oldGen?: number, youngGen?: number }> = [];
     private isCreatingWorker = false;
 
-    // 计数器
-    private activeWorkerCount = 0;
+    // 计数器 - 【重构】移除本地 activeWorkerCount，统一使用 scanState
     private nextTaskId = 0;
     private pendingTasks = new Map<number, PendingTask>();
 
@@ -90,16 +104,8 @@ export class WorkerPool {
     private readonly dynamicOldGenMB: number;
     private readonly dynamicYoungGenMB: number;
 
-    // 回调函数（由外部传入）
-    private readonly onUpdateConsumerCount: (taskId?: number) => void;
-    private readonly onCleanupConsumerState: (consumer: Consumer) => void;
-    private readonly onSendProgressUpdate: (filePath: string) => void;
-    private readonly onCheckAndComplete: () => void;
-    private readonly onTryDispatch: () => void;
-    private readonly onErrorLog: (error: string) => void;
-    private readonly onResultLog: (resultCount: number, result: any) => void;
-    private readonly onResultBatchSend: (mainWindow: BrowserWindow, resultItem: any) => void;
-    private readonly calculateTimeout: (fileSize: number) => number;
+    // 【重构】回调函数（封装为接口）
+    private readonly callbacks: WorkerPoolCallbacks;
 
     constructor(
         private poolSize: number,
@@ -109,15 +115,7 @@ export class WorkerPool {
         config: any,
         dynamicOldGenMB: number,
         dynamicYoungGenMB: number,
-        onUpdateConsumerCount: (taskId?: number) => void,
-        onCleanupConsumerState: (consumer: Consumer) => void,
-        onSendProgressUpdate: (filePath: string) => void,
-        onCheckAndComplete: () => void,
-        onTryDispatch: () => void,
-        onErrorLog: (error: string) => void,
-        onResultLog: (resultCount: number, result: any) => void,
-        onResultBatchSend: (mainWindow: BrowserWindow, resultItem: any) => void,
-        calculateTimeout: (fileSize: number) => number
+        callbacks: WorkerPoolCallbacks  // 【重构】使用接口封装所有回调
     ) {
         this.consumers = new Map();
         this.eventBus = eventBus;
@@ -127,16 +125,7 @@ export class WorkerPool {
         this.config = config;
         this.dynamicOldGenMB = dynamicOldGenMB;
         this.dynamicYoungGenMB = dynamicYoungGenMB;
-
-        this.onUpdateConsumerCount = onUpdateConsumerCount;
-        this.onCleanupConsumerState = onCleanupConsumerState;
-        this.onSendProgressUpdate = onSendProgressUpdate;
-        this.onCheckAndComplete = onCheckAndComplete;
-        this.onTryDispatch = onTryDispatch;
-        this.onErrorLog = onErrorLog;
-        this.onResultLog = onResultLog;
-        this.onResultBatchSend = onResultBatchSend;
-        this.calculateTimeout = calculateTimeout;
+        this.callbacks = callbacks;
     }
 
     /**
@@ -172,7 +161,6 @@ export class WorkerPool {
         }
 
         this.isCreatingWorker = true;
-        this.log.debug(`[调试] processWorkerCreateQueue 开始，队列长度: ${this.workerCreateQueue.length}`);
         
         let iterationCount = 0;
         const MAX_ITERATIONS = 50; // 【关键】防止无限循环，降低到 50 次
@@ -195,7 +183,7 @@ export class WorkerPool {
                 continue; // 跳过这个 Worker，继续处理其他 Worker
             }
             
-            this.log.debug(`[调试] 尝试创建 Worker ${consumerId} (第${iterationCount}次迭代, 重试${currentRetry + 1}/${MAX_RETRY_PER_WORKER})`);
+            this.log.info(`[Worker创建] 尝试创建 Worker ${consumerId} (第${iterationCount}次迭代, 重试${currentRetry + 1}/${MAX_RETRY_PER_WORKER})`);
 
             try {
                 this.createConsumer(consumerId, oldGen, youngGen);
@@ -219,7 +207,6 @@ export class WorkerPool {
         }
 
         this.isCreatingWorker = false;
-        this.log.debug(`[调试] processWorkerCreateQueue 完成，总迭代次数: ${iterationCount}`);
     }
 
     /**
@@ -303,12 +290,10 @@ export class WorkerPool {
             if (!pending) {
                 // Worker 返回空结果
                 markConsumerIdle(consumer);
-                // 【关键修复】减少 WorkerPool 内部的 activeWorkerCount
-                if (this.activeWorkerCount > 0) {
-                    this.activeWorkerCount--;
-                }
-                this.onUpdateConsumerCount(taskId);
-                this.onCleanupConsumerState(consumer);
+                // 【重构】使用 scanState 管理 activeWorkerCount
+                this.scanState.decrementActiveWorkers();
+                this.callbacks.onUpdateConsumerCount(taskId);
+                this.callbacks.onCleanupConsumerState(consumer);
 
                 // 【事件总线】发布 Worker 空闲事件
                 this.eventBus.emit('worker.idle', consumer);
@@ -318,28 +303,29 @@ export class WorkerPool {
             // 清除超时定时器
             clearTimeout(pending.timeoutId);
             this.pendingTasks.delete(taskId);
+            
+            // 【状态同步】通知待处理任务数变化
+            this.eventBus.emit('pending-tasks-size-changed', this.pendingTasks.size);
 
             // 标记 Worker 为空闲
             markConsumerIdle(consumer);
-            // 【关键修复】减少 WorkerPool 内部的 activeWorkerCount
-            if (this.activeWorkerCount > 0) {
-                this.activeWorkerCount--;
-            }
-            this.onUpdateConsumerCount(taskId);
-            this.onCleanupConsumerState(consumer);
+            // 【重构】使用 scanState 管理 activeWorkerCount
+            this.scanState.decrementActiveWorkers();
+            this.callbacks.onUpdateConsumerCount(taskId);
+            this.callbacks.onCleanupConsumerState(consumer);
 
             // 更新最后活动时间（通过事件触发）
 
             // 更新进度
-            this.onSendProgressUpdate(result.filePath || '');
+            this.callbacks.onSendProgressUpdate(result.filePath || '');
 
             // 处理结果
             if (result.error) {
-                this.onErrorLog(result.error);
+                this.callbacks.onErrorLog(result.error);
                 pending.reject(new Error(result.error));
             } else {
                 if (result.total && result.total > 0) {
-                    this.onResultLog(result.total, result);
+                    this.callbacks.onResultLog(result.total, result);
 
                     const resultItem = {
                         filePath: result.filePath,
@@ -351,7 +337,7 @@ export class WorkerPool {
                     };
 
                     // 【P3优化】使用批量发送
-                    this.onResultBatchSend(this.mainWindow, resultItem);
+                    this.callbacks.onResultBatchSend(this.mainWindow, resultItem);
                 }
                 pending.resolve(result);
             }
@@ -361,9 +347,11 @@ export class WorkerPool {
 
             // 检查是否应该结束
             try {
-                this.onCheckAndComplete();
+                this.callbacks.onCheckAndComplete();
             } catch (error: any) {
                 this.log.error(`[Consumer ${consumer.id}] 检查完成状态失败: ${error.message}`);
+                // 【修复】不静默吞掉错误，通知调用者
+                this.callbacks.onErrorLog(`检查完成状态失败: ${error.message}`);
             }
         });
     }
@@ -374,11 +362,9 @@ export class WorkerPool {
     private setupWorkerErrorListener(consumer: Consumer): void {
         consumer.worker.on('error', (error: any) => {
             this.log.error(`[Consumer ${consumer.id}] Worker 错误: ${error.message}`);
-            // 【关键修复】减少 WorkerPool 内部的 activeWorkerCount
-            if (this.activeWorkerCount > 0) {
-                this.activeWorkerCount--;
-            }
-            this.onUpdateConsumerCount(consumer.taskId);
+            // 【重构】使用 scanState 管理 activeWorkerCount
+            this.scanState.decrementActiveWorkers();
+            this.callbacks.onUpdateConsumerCount(consumer.taskId);
         });
     }
 
@@ -397,7 +383,7 @@ export class WorkerPool {
                 this.log.info(`[Consumer ${consumer.id}] Worker 已终止（代码: ${code}）`);
                 consumer.isTerminating = false;
                 consumer.busy = false;
-                this.onCleanupConsumerState(consumer);
+                this.callbacks.onCleanupConsumerState(consumer);
                 return;
             }
 
@@ -410,12 +396,10 @@ export class WorkerPool {
                     this.log.error(`[Consumer ${consumer.id}] ⚠️ 检测到 Worker OOM！将重启 Worker 并跳过当前文件`);
                 }
 
-                // 【关键修复】减少 WorkerPool 内部的 activeWorkerCount
-                if (this.activeWorkerCount > 0) {
-                    this.activeWorkerCount--;
-                }
-                this.onUpdateConsumerCount(consumer.taskId);
-                this.onCleanupConsumerState(consumer);
+                // 【重构】使用 scanState 管理 activeWorkerCount
+                this.scanState.decrementActiveWorkers();
+                this.callbacks.onUpdateConsumerCount(consumer.taskId);
+                this.callbacks.onCleanupConsumerState(consumer);
                 markConsumerIdle(consumer);
 
                 // 延迟重启 Worker
@@ -460,7 +444,7 @@ export class WorkerPool {
 
         // 延迟调度新任务
         setTimeout(() => {
-            this.onTryDispatch();
+            this.callbacks.onTryDispatch();
         }, 150);
     }
 
@@ -495,7 +479,7 @@ export class WorkerPool {
         consumer.counted = false;
 
         // 创建超时保护
-        const timeoutMs = this.calculateTimeout(task.fileSize);
+        const timeoutMs = this.callbacks.calculateTimeout(task.fileSize);
         const timeoutId = setTimeout(() => {
             this.handleTaskTimeout(consumer, task);
         }, timeoutMs);
@@ -509,6 +493,9 @@ export class WorkerPool {
             },
             timeoutId
         });
+        
+        // 【状态同步】通知待处理任务数变化
+        this.eventBus.emit('pending-tasks-size-changed', this.pendingTasks.size);
 
         // 发送任务给 Worker
         consumer.worker.postMessage({
@@ -522,7 +509,8 @@ export class WorkerPool {
             }
         });
 
-        this.activeWorkerCount++;
+        // 【重构】使用 scanState 管理 activeWorkerCount
+        this.scanState.incrementActiveWorkers();
         this.nextTaskId++;
     }
 
@@ -538,17 +526,19 @@ export class WorkerPool {
         const pending = this.pendingTasks.get(consumer.taskId!);
         if (pending) {
             this.pendingTasks.delete(consumer.taskId!);
-            // 【关键修复】减少 WorkerPool 内部的 activeWorkerCount
-            if (this.activeWorkerCount > 0) {
-                this.activeWorkerCount--;
-            }
-            this.onUpdateConsumerCount(consumer.taskId);
-            this.onSendProgressUpdate(task.filePath);
+            
+            // 【状态同步】通知待处理任务数变化
+            this.eventBus.emit('pending-tasks-size-changed', this.pendingTasks.size);
+            
+            // 【重构】使用 scanState 管理 activeWorkerCount
+            this.scanState.decrementActiveWorkers();
+            this.callbacks.onUpdateConsumerCount(consumer.taskId);
+            this.callbacks.onSendProgressUpdate(task.filePath);
             pending.reject(new Error(`文件处理超时`));
         }
 
         // 【优化】清理智能调度状态（由 scheduler 统一管理）
-        this.onCleanupConsumerState(consumer);
+        this.callbacks.onCleanupConsumerState(consumer);
 
         // 标记为空闲
         markConsumerIdle(consumer);
@@ -577,10 +567,10 @@ export class WorkerPool {
     }
 
     /**
-     * 获取活跃 Worker 数量
+     * 获取活跃 Worker 数量 - 【重构】直接从 scanState 获取
      */
     getActiveWorkerCount(): number {
-        return this.activeWorkerCount;
+        return this.scanState.getActiveWorkerCount();
     }
 
     /**

@@ -279,10 +279,10 @@ export const PROGRESS_THROTTLE_INTERVAL = 500; // 500ms
 // --- 8.1 日志级别配置 ---
 
 /** 输出到文件的日志级别 */
-export const LOG_FILE_LEVEL: LogLevel = LogLevel.DEBUG;
+export const LOG_FILE_LEVEL: LogLevel = LogLevel.INFO;
 
 /** 输出到前端的日志级别 */
-export const LOG_FRONTEND_LEVEL: LogLevel = LogLevel.WARN;
+export const LOG_FRONTEND_LEVEL: LogLevel = LogLevel.INFO;
 
 // --- 8.2 日志输出开关配置 ---
 
@@ -331,3 +331,17 @@ export const WINDOW_TARGET_RATIO = 0.85;
 
 /** 文件大小显示精度（小数位数） */
 export const FILE_SIZE_DECIMAL_PLACES = 1;
+
+// ==================== 10. 进度更新节流配置 ====================
+
+/** 进度更新最小节流间隔（毫秒）- 快速扫描时使用 */
+export const PROGRESS_THROTTLE_MIN_INTERVAL = 200;
+
+/** 进度更新最大节流间隔（毫秒）- 慢速扫描时使用 */
+export const PROGRESS_THROTTLE_MAX_INTERVAL = 1000;
+
+/** 快速扫描速度阈值（文件/秒）- 超过此值视为快速扫描 */
+export const PROGRESS_FAST_SPEED_THRESHOLD = 50;
+
+/** 慢速扫描速度阈值（文件/秒）- 低于此值视为慢速扫描 */
+export const PROGRESS_SLOW_SPEED_THRESHOLD = 10;

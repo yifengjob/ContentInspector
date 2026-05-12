@@ -120,8 +120,9 @@ export class ScanState extends EventEmitter {
     decrementActiveWorkers(): number {
         if (this.state.activeWorkerCount > 0) {
             this.state.activeWorkerCount--;
+            // 【优化】只有真正减少时才触发事件，避免不必要的通知
+            this.emit('active-workers-changed', this.state.activeWorkerCount);
         }
-        this.emit('active-workers-changed', this.state.activeWorkerCount);
         return this.state.activeWorkerCount;
     }
     
@@ -134,6 +135,25 @@ export class ScanState extends EventEmitter {
     
     /**
      * 设置活跃 Worker 计数（直接设置，慎用）
+     * 
+     * 【使用场景】
+     * 1. 紧急恢复：检测到计数异常时强制修正
+     * 2. 调试测试：模拟特定状态进行测试
+     * 3. 状态导入：从快照恢复状态
+     * 
+     * 【注意事项】
+     * - 正常情况下应使用 increment/decrement 原子操作
+     * - 直接设置可能导致计数不准确
+     * - 使用前应记录日志说明原因
+     * 
+     * 【示例】
+     * ```typescript
+     * // 检测到异常，强制修正
+     * if (state.getActiveWorkerCount() < 0) {
+     *     log.warn('检测到 activeWorkerCount 异常，强制重置为 0');
+     *     state.setActiveWorkerCount(0);
+     * }
+     * ```
      */
     setActiveWorkerCount(count: number): void {
         this.state.activeWorkerCount = Math.max(0, count);
@@ -311,6 +331,25 @@ export class ScanState extends EventEmitter {
     
     /**
      * 获取完整状态快照
+     * 
+     * 【使用场景】
+     * 1. 调试日志：定期记录扫描状态
+     * 2. 前端展示：一次性获取所有状态
+     * 3. 状态持久化：保存进度支持断点续传
+     * 4. 性能分析：分析状态变化趋势
+     * 
+     * 【示例】
+     * ```typescript
+     * // 调试：每 10 秒记录一次状态
+     * setInterval(() => {
+     *     const snapshot = state.getStateSnapshot();
+     *     log.debug('扫描状态快照:', JSON.stringify(snapshot));
+     * }, 10000);
+     * 
+     * // 前端：获取完整状态用于显示
+     * const fullState = state.getStateSnapshot();
+     * updateUI(fullState);
+     * ```
      */
     getStateSnapshot(): ScanStateData {
         return { ...this.state };
@@ -318,7 +357,33 @@ export class ScanState extends EventEmitter {
     
     /**
      * 检查是否满足完成条件
+     * 
+     * 【使用场景】
+     * 1. 简化完成判断逻辑
+     * 2. 确保判断逻辑的一致性
+     * 3. 便于单元测试
+     * 
+     * 【前置条件】
+     * - taskQueueLength 和 pendingTasksSize 必须已同步到 ScanState
+     * 
+     * 【示例】
+     * ```typescript
+     * // 当前做法（分散的逻辑）
+     * if (allWalkersCompleted && 
+     *     state.getActiveWorkerCount() === 0 && 
+     *     queueManager.getQueueLength() === 0 && 
+     *     workerPool.getPendingTasks().size === 0) {
+     *     cleanup();
+     * }
+     * 
+     * // 改进后（统一的逻辑）
+     * if (state.isScanComplete(allWalkersCompleted)) {
+     *     cleanup();
+     * }
+     * ```
+     * 
      * @param allWalkersCompleted 所有 Walker 是否已完成
+     * @returns 是否满足完成条件
      */
     isScanComplete(allWalkersCompleted: boolean): boolean {
         return (

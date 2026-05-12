@@ -1,6 +1,6 @@
 {
   "name": "DataGuardScanner",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "个人敏感信息扫描工具",
   "main": "dist/main.js",
   "scripts": {
@@ -137,7 +137,7 @@
     "exceljs": "^4.4.0",
     "fflate": "^0.8.2",
     "iconv-lite": "^0.7.2",
-    "pdfjs-dist": "3.11.174",
+    "pdfjs-dist": "^3.11.174",
     "process": "^0.11.10",
     "readable-stream": "^3.6.2",
     "sax": "^1.6.0",

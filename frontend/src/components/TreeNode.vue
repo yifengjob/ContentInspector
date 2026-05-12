@@ -73,19 +73,38 @@ watch(checkState, (newState) => {
   }
 }, { immediate: true })
 
+// 【新增】递归选中节点及其所有子孙节点
+const selectNodeAndDescendants = (node: DirectoryNode): void => {
+  appStore.selectedPaths.add(node.path)
+  if (node.children && node.children.length > 0) {
+    node.children.forEach(selectNodeAndDescendants)
+  }
+}
+
 // 加载子节点时构建映射表
 const loadChildren = async () => {
   if (!props.node.isDir || !props.node.hasChildren) return
   
   if (children.value.length === 0) {
     try {
+      // 【修复】在加载子节点之前，先保存父节点的选中状态
+      const parentWasChecked = appStore.selectedPaths.has(props.node.path)
+      
       children.value = await getDirectoryTree(props.node.path)
       // 将子节点添加到父组件的映射表
       children.value.forEach(child => {
         props.allNodesMap.set(child.path, child)
       })
+      
+      // 【修复】如果父节点之前是选中状态，自动选中所有新加载的子节点
+      // 注意：如果父节点是 indeterminate 状态（部分选中），新节点默认不选中
+      if (parentWasChecked) {
+        children.value.forEach(child => {
+          selectNodeAndDescendants(child)
+        })
+      }
     } catch (error) {
-      console.error('加载子目录失败:', error)
+      console.error('[TreeNode] 加载子目录失败:', props.node.path, error)
     }
   }
 }
