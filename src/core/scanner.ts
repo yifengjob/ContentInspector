@@ -15,7 +15,6 @@ import {Worker} from 'worker_threads';
 import {BrowserWindow} from 'electron';
 import {ScanConfig} from '../types';
 import {ScanState} from './scan-state';
-import {addAllowedPath, clearAllowedPaths, isPathAllowed} from '../services/file-operations';
 import {calculateActualConcurrency} from './config-manager';
 import {
     WORKER_MAX_OLD_GENERATION_MB,
@@ -65,17 +64,6 @@ export async function startScan(
 
     // 1. 创建日志记录器
     const log = getScannerLogger();
-
-    // 清除旧的允许路径，添加新的扫描路径
-    clearAllowedPaths();
-    
-    // 【安全增强】验证所有扫描路径的合法性
-    for (const scanPath of config.selectedPaths) {
-        if (!isPathAllowed(scanPath)) {
-            throw new Error(`不允许访问的路径: ${scanPath}`);
-        }
-        addAllowedPath(scanPath);
-    }
 
     log.info('开始扫描...');
     log.info(`扫描路径数: ${config.selectedPaths.length}`);

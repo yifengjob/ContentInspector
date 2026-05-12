@@ -7,24 +7,6 @@ import {
 } from '../utils/error-utils';
 import {fileLogger} from "../logger/logger";
 
-// 【移除】不再需要 allowedPaths，支持全盘扫描
-// const allowedPaths = new Set<string>();
-
-/**
- * 【已废弃】添加允许访问的路径 - 支持全盘扫描，不再需要此函数
- * @deprecated 全盘扫描模式下不需要维护允许路径列表
- */
-export function addAllowedPath(allowedPath: string): void {
-    // 空实现，保持向后兼容
-}
-
-/**
- * 【已废弃】清除所有允许的路径 - 支持全盘扫描，不再需要此函数
- * @deprecated 全盘扫描模式下不需要维护允许路径列表
- */
-export function clearAllowedPaths(): void {
-    // 空实现，保持向后兼容
-}
 
 /**
  * 检查文件路径是否安全
