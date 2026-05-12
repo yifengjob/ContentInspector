@@ -39,7 +39,7 @@ const PDF_DOCUMENT_OPTIONS = {
 let workerPdfJsLib: any = null;
 
 /**
- * 为每个 Worker 初始化独立的 pdf.js 实例（模块级别初始化，只执行一次）
+ * 为每个 Worker 初始化独立的 pdf.js 实例（懒加载，只在首次使用时初始化）
  */
 function getWorkerPdfJsLib() {
     if (workerPdfJsLib) {
@@ -80,9 +80,6 @@ function getWorkerPdfJsLib() {
         throw error;
     }
 }
-
-// 模块级别初始化（只执行一次）
-getWorkerPdfJsLib();
 
 // PDF 文件大小限制（MB）
 const MAX_PDF_SIZE_MB = DEFAULT_MAX_PDF_SIZE_MB;
