@@ -84,7 +84,14 @@ export function isPathAllowed(filePath: string): boolean {
         }
     }
 
-    fileLogger.warn(`isPathAllowed: 拒绝访问：路径不在允许范围内: ${filePath}`);
+    // 【优化】系统目录被拒绝是正常的，使用 debug 级别而非 warn
+    const isSystemDir = filePath.startsWith('/dev/') || filePath.startsWith('/proc/') || 
+                        filePath.startsWith('/sys/') || filePath.startsWith('/System/');
+    if (isSystemDir) {
+        fileLogger.debug(`isPathAllowed: 系统目录被拒绝（正常）: ${filePath}`);
+    } else {
+        fileLogger.warn(`isPathAllowed: 拒绝访问：路径不在允许范围内: ${filePath}`);
+    }
     return false;
 }
 
