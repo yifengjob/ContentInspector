@@ -331,11 +331,8 @@ function setupIpcHandlers() {
         mainLogger.info('[scan-cancel] IPC handler 被调用');
         mainLogger.info(`[scan-cancel] scanState.isScanning: ${scanState.isScanning}`);
         
-        if (!scanState.isScanning) {
-            mainLogger.info('[scan-cancel] 扫描未在进行中，直接返回');
-            return {success: true};
-        }
-
+        // 【修复】不再检查 isScanning，始终调用 cancelScan
+        // 即使 isScanning 为 false，也要确保清理所有资源
         mainLogger.info('[scan-cancel] 调用 cancelScan 函数');
         cancelScan(scanState);
         mainLogger.info('[scan-cancel] cancelScan 函数调用完成');
