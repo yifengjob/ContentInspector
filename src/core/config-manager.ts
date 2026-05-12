@@ -127,7 +127,7 @@ export function getDefaultConfig(): AppConfig {
         // 构建和缓存
         // 'dist', 'build', '.next', 'out', '.cache', '__pycache__',
         // 包管理器
-        '.npm', '.yarn', '.pnpm-store', 'bower_components',
+        '.npm', '.yarn', '.pnpm-store', 'bower_components', '.m2',
         // 操作系统隐藏文件和目录
         'System Volume Information',
         // '$RECYCLE.BIN', 'Recycle.Bin',

@@ -279,10 +279,10 @@ export const PROGRESS_THROTTLE_INTERVAL = 500; // 500ms
 // --- 8.1 日志级别配置 ---
 
 /** 输出到文件的日志级别 */
-export const LOG_FILE_LEVEL: LogLevel = LogLevel.DEBUG;
+export const LOG_FILE_LEVEL: LogLevel = LogLevel.INFO;
 
 /** 输出到前端的日志级别 */
-export const LOG_FRONTEND_LEVEL: LogLevel = LogLevel.WARN;
+export const LOG_FRONTEND_LEVEL: LogLevel = LogLevel.INFO;
 
 // --- 8.2 日志输出开关配置 ---
 
