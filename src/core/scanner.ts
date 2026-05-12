@@ -102,6 +102,11 @@ export async function startScan(
 
     // 3. 创建任务队列管理器
     const queueManager = new TaskQueueManager(eventBus);
+    
+    // 【状态同步】监听队列长度变化并更新 ScanState
+    eventBus.on('task-queue-length-changed', (length: number) => {
+        state.setTaskQueueLength(length);
+    });
 
     // 4. 统计信息 - 【重构】使用 ScanState 统一管理
     // 注意：walkerTotalCount, walkerFilteredCount, walkerSkippedCount, consumerProcessedCount,
@@ -279,6 +284,11 @@ export async function startScan(
         dynamicYoungGenMB,
         workerPoolCallbacks  // 【重构】传递回调接口
     );
+    
+    // 【状态同步】监听待处理任务数变化并更新 ScanState
+    eventBus.on('pending-tasks-size-changed', (size: number) => {
+        state.setPendingTasksSize(size);
+    });
 
     // 10. 创建智能调度器（统一管理调度状态）
     const scheduler = new SmartScheduler(
@@ -380,7 +390,7 @@ export async function startScan(
                 log.info(`[Walker] 已完成 ${walkerCompletedCount}/${totalWalkerTasks} 个任务`);
 
                 // 【A1 优化】Walker 完成后，根据实际文件大小重新计算内存限制
-                if (queueManager.getQueueLength() > 0) {
+                if (state.getTaskQueueLength() > 0) {
                     // 【关键修复】从 queueManager 获取所有任务来计算平均大小
                     const stats = queueManager.getAllTasksStats();
                     const avgFileSizeMB = stats.totalCount > 0
@@ -452,8 +462,8 @@ export async function startScan(
         skipped: state.getWalkerSkippedCount(),
         results: state.getResultCount(),
         sensitiveItems: state.getTotalSensitiveItems(),
-        taskQueueLength: queueManager.getQueueLength(),
-        pendingTasksSize: workerPool.getPendingTasks().size,
+        taskQueueLength: state.getTaskQueueLength(),
+        pendingTasksSize: state.getPendingTasksSize(),
         activeWorkers: state.getActiveWorkerCount(),
         lastEnqueueTime: Date.now()
     };
@@ -465,27 +475,19 @@ export async function startScan(
             return;
         }
 
-        const hasPendingTasks = workerPool.getPendingTasks().size > 0;
         const allWalkersCompleted = walkerCompletedCount >= totalWalkerTasks;
 
-        if (allWalkersCompleted && (workerPool.getActiveWorkerCount() > 0 || queueManager.getQueueLength() > 0 || hasPendingTasks)) {
-            log.debug(`[checkAndComplete] Walker已完成，但仍在等待: activeWorkers=${state.getActiveWorkerCount()}, taskQueue=${queueManager.getQueueLength()}, pendingTasks=${workerPool.getPendingTasks().size}`);
-        }
-
-        if (queueManager.getQueueLength() === 0) {
-            queueManager.cleanupEmptyQueues();
-        }
-
-        if (allWalkersCompleted && state.getActiveWorkerCount() === 0 && queueManager.getQueueLength() === 0 && !hasPendingTasks) {
-            log.debug(`[调试] 满足完成条件: allWalkersCompleted=${allWalkersCompleted}, activeWorkers=${state.getActiveWorkerCount()}, queueLength=${queueManager.getQueueLength()}, hasPendingTasks=${hasPendingTasks}`);
+        // 【重构】使用 state.isScanComplete 统一完成条件判断
+        if (state.isScanComplete(allWalkersCompleted)) {
+            log.debug(`[调试] 满足完成条件: allWalkersCompleted=${allWalkersCompleted}, activeWorkers=${state.getActiveWorkerCount()}, queueLength=${state.getTaskQueueLength()}, pendingTasks=${state.getPendingTasksSize()}`);
             log.info(`扫描完成: 遍历 ${state.getWalkerTotalCount()} 个文件, 处理 ${state.getConsumerProcessedCount()} 个, 跳过 ${state.getWalkerSkippedCount()} 个, 发现 ${state.getResultCount()} 个敏感文件`);
             cleanup();
             return;
         }
-
+        
         // 【调试】记录未满足的完成条件
-        if (allWalkersCompleted) {
-            log.debug(`[调试] 未完成检查: Walker已完成, activeWorkers=${state.getActiveWorkerCount()}, queueLength=${queueManager.getQueueLength()}, pendingTasks=${workerPool.getPendingTasks().size}`);
+        if (allWalkersCompleted && !state.isScanComplete(allWalkersCompleted)) {
+            log.debug(`[调试] 未完成检查: Walker已完成, activeWorkers=${state.getActiveWorkerCount()}, queueLength=${state.getTaskQueueLength()}, pendingTasks=${state.getPendingTasksSize()}`);
         }
 
         lastActivityTime = Date.now();
@@ -506,8 +508,8 @@ export async function startScan(
             state.getWalkerSkippedCount() !== lastStagnationCheckState.skipped ||
             state.getResultCount() !== lastStagnationCheckState.results ||
             state.getTotalSensitiveItems() !== lastStagnationCheckState.sensitiveItems ||
-            queueManager.getQueueLength() !== lastStagnationCheckState.taskQueueLength ||
-            workerPool.getPendingTasks().size !== lastStagnationCheckState.pendingTasksSize ||
+            state.getTaskQueueLength() !== lastStagnationCheckState.taskQueueLength ||
+            state.getPendingTasksSize() !== lastStagnationCheckState.pendingTasksSize ||
             state.getActiveWorkerCount() !== lastStagnationCheckState.activeWorkers ||
             lastTaskEnqueueTime !== lastStagnationCheckState.lastEnqueueTime;
 
@@ -519,8 +521,8 @@ export async function startScan(
                 skipped: state.getWalkerSkippedCount(),
                 results: state.getResultCount(),
                 sensitiveItems: state.getTotalSensitiveItems(),
-                taskQueueLength: queueManager.getQueueLength(),
-                pendingTasksSize: workerPool.getPendingTasks().size,
+                taskQueueLength: state.getTaskQueueLength(),
+                pendingTasksSize: state.getPendingTasksSize(),
                 activeWorkers: state.getActiveWorkerCount(),
                 lastEnqueueTime: lastTaskEnqueueTime
             };
@@ -529,13 +531,13 @@ export async function startScan(
             const idleTime = now - lastStagnationCheckTime;
 
             if (idleTime > STAGNATION_THRESHOLD && idleTime <= MAX_IDLE_TIME) {
-                log.warn(`提示: ${idleTime / 1000}秒内无任何进展（活跃Worker:${state.getActiveWorkerCount()}, 队列:${queueManager.getQueueLength()}, 待处理:${workerPool.getPendingTasks().size}），但仍在等待可能的恢复...`);
+                log.warn(`提示: ${idleTime / 1000}秒内无任何进展（活跃Worker:${state.getActiveWorkerCount()}, 队列:${state.getTaskQueueLength()}, 待处理:${state.getPendingTasksSize()}），但仍在等待可能的恢复...`);
             }
 
             if (idleTime > MAX_IDLE_TIME
                 || (idleTime > STAGNATION_THRESHOLD
-                    && queueManager.getQueueLength() <= 0
-                    && workerPool.getPendingTasks().size <= 0
+                    && state.getTaskQueueLength() <= 0
+                    && state.getPendingTasksSize() <= 0
                     && state.getActiveWorkerCount() <= 0
                     && (state.getConsumerProcessedCount() + state.getWalkerFilteredCount() + state.getWalkerSkippedCount()) >= state.getWalkerTotalCount())
             ) {

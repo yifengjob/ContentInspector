@@ -19,7 +19,9 @@ export type WorkerEventType =
     | 'task.enqueued'       // 任务入队
     | 'task.completed'      // 任务完成（预留）
     | 'walker.batch-ready'  // Walker 批量文件就绪
-    | 'log:message';        // 【新增】日志消息事件
+    | 'log:message'         // 【新增】日志消息事件
+    | 'task-queue-length-changed'      // 【状态同步】队列长度变化
+    | 'pending-tasks-size-changed';    // 【状态同步】待处理任务数变化
 
 
 /**

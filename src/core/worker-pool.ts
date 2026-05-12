@@ -305,6 +305,9 @@ export class WorkerPool {
             // 清除超时定时器
             clearTimeout(pending.timeoutId);
             this.pendingTasks.delete(taskId);
+            
+            // 【状态同步】通知待处理任务数变化
+            this.eventBus.emit('pending-tasks-size-changed', this.pendingTasks.size);
 
             // 标记 Worker 为空闲
             markConsumerIdle(consumer);
@@ -490,6 +493,9 @@ export class WorkerPool {
             },
             timeoutId
         });
+        
+        // 【状态同步】通知待处理任务数变化
+        this.eventBus.emit('pending-tasks-size-changed', this.pendingTasks.size);
 
         // 发送任务给 Worker
         consumer.worker.postMessage({
@@ -520,6 +526,10 @@ export class WorkerPool {
         const pending = this.pendingTasks.get(consumer.taskId!);
         if (pending) {
             this.pendingTasks.delete(consumer.taskId!);
+            
+            // 【状态同步】通知待处理任务数变化
+            this.eventBus.emit('pending-tasks-size-changed', this.pendingTasks.size);
+            
             // 【重构】使用 scanState 管理 activeWorkerCount
             this.scanState.decrementActiveWorkers();
             this.callbacks.onUpdateConsumerCount(consumer.taskId);
