@@ -120,9 +120,8 @@ export async function startScan(
 
     // ==================== 【启动扫描】====================
 
-    // 【修复】定义取消函数，可以访问局部变量
-    // 将取消函数挂载到 ScanState，供外部调用
-    (state as any).doCancelScan = () => {
+    // 【关键修复】创建取消函数并保存到局部变量（避免使用 any 类型断言）
+    const doCancelScan = () => {
         if (state.cancelFlag) {
             log.info('[取消扫描] 已经在取消过程中，忽略重复请求');
             return;
@@ -139,6 +138,9 @@ export async function startScan(
         performCleanup();
         log.info('[取消扫描] cleanup 调用完成');
     };
+
+    // 将取消函数挂载到 ScanState，供外部 cancelScan() 调用
+    (state as any)._cancelScan = doCancelScan;
 
     const totalPaths = config.selectedPaths.length;
     let currentPathIndex = 0;
@@ -202,12 +204,12 @@ export async function startScan(
 export function cancelScan(scanState?: ScanState): void {
     const state = scanState || ScanState.getInstance();
     
-    // 【修复】如果存在内部的取消函数，调用它以真正停止扫描
-    if ((state as any).doCancelScan) {
-        (state as any).doCancelScan();
+    // 【关键修复】调用内部挂载的取消函数
+    if ((state as any)._cancelScan) {
+        (state as any)._cancelScan();
     } else {
         // 后备方案：仅设置标志（适用于未通过 startScan 启动的情况）
-        // 注意：正常情况下不应该走到这里，因为 doCancelScan 应该在 startScan 中挂载
+        // 注意：正常情况下不应该走到这里，因为 _cancelScan 应该在 startScan 中挂载
         state.cancelFlag = true;
     }
 }

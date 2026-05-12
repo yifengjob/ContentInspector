@@ -18,7 +18,7 @@ import {
     WORKER_MAX_OLD_GENERATION_MB,
     WORKER_MAX_YOUNG_GENERATION_MB
 } from './scan-config';
-import {configureBatchSender, createProgressUpdater, resultBatchSender} from '../utils/scanner-helpers';
+import {configureBatchSender, createProgressUpdater, resultBatchSender, calculateTimeout} from '../utils/scanner-helpers';
 import {EventBus} from './event-bus';
 import {TaskQueueManager} from './task-queue';
 import {Consumer, WorkerPool} from './worker-pool';
@@ -182,12 +182,6 @@ export async function initializeScanner(
         500 // PROGRESS_THROTTLE_INTERVAL
     );
 
-    const calculateTimeout = (fileSize: number) => {
-        // 从 scanner-helpers 导入
-        const {calculateTimeout: calcTimeout} = require('../utils/scanner-helpers');
-        return calcTimeout(fileSize);
-    };
-
     // 创建 Worker 池回调接口
     const workerPoolCallbacks = {
         onUpdateConsumerCount: (taskId?: number) => {
@@ -197,7 +191,7 @@ export async function initializeScanner(
             state.decrementActiveWorkers();
         },
         onCleanupConsumerState: (consumer: Consumer) => {
-            // 临时空实现，稍后由 scheduler 提供
+            // 临时占位，将在 scheduler 创建后替换为实际实现
             if (consumer) {
                 consumer.currentFileType = undefined;
                 consumer.currentFileSize = undefined;
@@ -263,7 +257,7 @@ export async function initializeScanner(
         }
     );
 
-    // 替换 cleanupConsumerState 的实现为 scheduler 的版本
+    // 【关键】更新 cleanupConsumerState 回调为 scheduler 的实际实现
     workerPoolCallbacks.onCleanupConsumerState = scheduler.cleanupConsumerState.bind(scheduler);
 
     // 初始化调度器和 Worker 池

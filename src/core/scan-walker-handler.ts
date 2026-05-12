@@ -117,8 +117,9 @@ export class WalkerHandler {
 
         this.options.walkerCompletedCountRef.value++;
 
+        // 【防御性检查】正常情况下不应该发生，如果发生说明有严重 bug
         if (this.options.walkerCompletedCountRef.value > this.options.totalWalkerTasks) {
-            log.warn(`[Walker] 警告: 完成计数 (${this.options.walkerCompletedCountRef.value}) 超过总任务数 (${this.options.totalWalkerTasks})`);
+            log.error(`[Walker] 错误: 完成计数 (${this.options.walkerCompletedCountRef.value}) 超过总任务数 (${this.options.totalWalkerTasks})，这不应该发生！`);
             this.options.walkerCompletedCountRef.value = this.options.totalWalkerTasks;
         }
 
