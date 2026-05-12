@@ -303,6 +303,10 @@ export class WorkerPool {
             if (!pending) {
                 // Worker 返回空结果
                 markConsumerIdle(consumer);
+                // 【关键修复】减少 WorkerPool 内部的 activeWorkerCount
+                if (this.activeWorkerCount > 0) {
+                    this.activeWorkerCount--;
+                }
                 this.onUpdateConsumerCount(taskId);
                 this.onCleanupConsumerState(consumer);
 
@@ -317,6 +321,10 @@ export class WorkerPool {
 
             // 标记 Worker 为空闲
             markConsumerIdle(consumer);
+            // 【关键修复】减少 WorkerPool 内部的 activeWorkerCount
+            if (this.activeWorkerCount > 0) {
+                this.activeWorkerCount--;
+            }
             this.onUpdateConsumerCount(taskId);
             this.onCleanupConsumerState(consumer);
 
@@ -366,6 +374,10 @@ export class WorkerPool {
     private setupWorkerErrorListener(consumer: Consumer): void {
         consumer.worker.on('error', (error: any) => {
             this.log.error(`[Consumer ${consumer.id}] Worker 错误: ${error.message}`);
+            // 【关键修复】减少 WorkerPool 内部的 activeWorkerCount
+            if (this.activeWorkerCount > 0) {
+                this.activeWorkerCount--;
+            }
             this.onUpdateConsumerCount(consumer.taskId);
         });
     }
@@ -398,6 +410,10 @@ export class WorkerPool {
                     this.log.error(`[Consumer ${consumer.id}] ⚠️ 检测到 Worker OOM！将重启 Worker 并跳过当前文件`);
                 }
 
+                // 【关键修复】减少 WorkerPool 内部的 activeWorkerCount
+                if (this.activeWorkerCount > 0) {
+                    this.activeWorkerCount--;
+                }
                 this.onUpdateConsumerCount(consumer.taskId);
                 this.onCleanupConsumerState(consumer);
                 markConsumerIdle(consumer);
@@ -522,6 +538,10 @@ export class WorkerPool {
         const pending = this.pendingTasks.get(consumer.taskId!);
         if (pending) {
             this.pendingTasks.delete(consumer.taskId!);
+            // 【关键修复】减少 WorkerPool 内部的 activeWorkerCount
+            if (this.activeWorkerCount > 0) {
+                this.activeWorkerCount--;
+            }
             this.onUpdateConsumerCount(consumer.taskId);
             this.onSendProgressUpdate(task.filePath);
             pending.reject(new Error(`文件处理超时`));

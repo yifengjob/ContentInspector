@@ -47,15 +47,21 @@ import {getScannerLogger} from "../logger/logger";
 export async function startScan(
     config: ScanConfig,
     mainWindow: BrowserWindow,
-    scanState: ScanState
+    scanState?: ScanState  // 【优化】可选参数，默认使用单例
 ): Promise<void> {
-    if (scanState.isScanning) {
+    // 【优化】如果没有传入 scanState，则使用单例
+    const state = scanState || ScanState.getInstance();
+    
+    if (state.isScanning) {
         throw new Error('扫描正在进行中');
     }
 
-    scanState.isScanning = true;
-    scanState.cancelFlag = false;
-    scanState.logs = [];
+    state.isScanning = true;
+    state.cancelFlag = false;
+    state.logs = [];
+    
+    // 【重构】重置扫描状态管理器
+    state.reset();
 
     // 1. 创建日志记录器
     const log = getScannerLogger();
@@ -90,14 +96,10 @@ export async function startScan(
     // 3. 创建任务队列管理器
     const queueManager = new TaskQueueManager(eventBus);
 
-    // 4. 统计信息
-    let walkerTotalCount = 0;
-    let walkerFilteredCount = 0;
-    let walkerSkippedCount = 0;
-    let consumerProcessedCount = 0;
-    let resultCount = 0;
-    let totalSensitiveItems = 0;
-    const countedTaskIds = new Set<number>();
+    // 4. 统计信息 - 【重构】使用 ScanState 统一管理
+    // 注意：walkerTotalCount, walkerFilteredCount, walkerSkippedCount, consumerProcessedCount,
+    //       resultCount, totalSensitiveItems, activeWorkerCount 等都已移到 scanState 中管理
+    const countedTaskIds = new Set<number>();  // 【保留】本地集合，用于快速查找
 
     // 5. 日志抑制
     let errorLogCount = 0;
@@ -188,33 +190,15 @@ export async function startScan(
     // 初始日志
     log.info(`【内存优化】可用内存: ${freeMemoryMB.toFixed(0)}MB, 初始每 Worker 限制: ${dynamicOldGenMB + dynamicYoungGenMB}MB`);
 
-    // 8. 辅助函数
+    // 8. 辅助函数 - 【重构】使用 ScanState 统一管理状态
     const sendProgressUpdate = createProgressUpdater(
         mainWindow,
-        () => consumerProcessedCount,
-        () => walkerTotalCount,
-        () => walkerFilteredCount,
-        () => walkerSkippedCount,
+        () => state.getConsumerProcessedCount(),
+        () => state.getWalkerTotalCount(),
+        () => state.getWalkerFilteredCount(),
+        () => state.getWalkerSkippedCount(),
         PROGRESS_THROTTLE_INTERVAL
     );
-
-    function incrementConsumerCount(taskId: number): void {
-        if (!countedTaskIds.has(taskId)) {
-            countedTaskIds.add(taskId);
-            consumerProcessedCount++;
-        }
-    }
-
-    function updateConsumerCount(taskId?: number): void {
-        // 【关键修复】防止 activeWorkerCount 变成负数
-        if (activeWorkerCount > 0) {
-            activeWorkerCount--;
-        }
-        log.debug(`[调试] updateConsumerCount: taskId=${taskId}, activeWorkerCount=${activeWorkerCount}`);
-        if (taskId !== undefined) {
-            incrementConsumerCount(taskId);
-        }
-    }
 
     const calculateTimeout = (fileSize: number) => calcTimeout(fileSize);
 
@@ -236,7 +220,7 @@ export async function startScan(
     };
 
     // 9. 回调函数（供 WorkerPool 和 SmartScheduler 使用）
-    let activeWorkerCount = 0;
+    // 【重构】不再需要本地的 activeWorkerCount，统一使用 scanState
 
     function onErrorLog(error: string): void {
         errorLogCount++;
@@ -248,10 +232,10 @@ export async function startScan(
     }
 
     function onResultLog(total: number, result: any): void {
-        resultCount++;
-        totalSensitiveItems += total;
-        if (resultLogThrottler.shouldLog(resultCount)) {
-            log.info(`发现敏感文件 [${resultCount}]: ${result.filePath} (总计: ${total} 个敏感项)`);
+        state.incrementResultCount();
+        state.addTotalSensitiveItems(total);
+        if (resultLogThrottler.shouldLog(state.getResultCount())) {
+            log.info(`发现敏感文件 [${state.getResultCount()}]: ${result.filePath} (总计: ${total} 个敏感项)`);
         }
     }
 
@@ -263,12 +247,18 @@ export async function startScan(
     const workerPool = new WorkerPool(
         poolSize,
         eventBus,
-        scanState,
+        state,
         mainWindow,
         config,
         dynamicOldGenMB,
         dynamicYoungGenMB,
-        updateConsumerCount,
+        (taskId?: number) => {
+            // 【重构】使用 state 管理 activeWorkerCount
+            if (taskId !== undefined) {
+                state.incrementConsumerProcessedCount(taskId);
+            }
+            state.decrementActiveWorkers();
+        },
         cleanupConsumerState,
         sendProgressUpdate,
         checkAndComplete,
@@ -298,7 +288,8 @@ export async function startScan(
             if (task.isLargeFile) {
                 largeFilesProcessing = scheduler.getLargeFilesProcessing();
             }
-            activeWorkerCount++;
+            // 【重构】使用 state 管理 activeWorkerCount
+            state.incrementActiveWorkers();
             workerPool.incrementNextTaskId();
         }
     );
@@ -335,9 +326,9 @@ export async function startScan(
                 }
 
                 for (const file of files) {
-                    walkerTotalCount++;  // 【恢复】累加实际找到的文件
+                    state.incrementWalkerTotalCount();  // 【重构】使用 state
 
-                    if (walkerTotalCount % 100 === 0 || Date.now() - lastProgressUpdateTime > 1000) {
+                    if (state.getWalkerTotalCount() % 100 === 0 || Date.now() - lastProgressUpdateTime > 1000) {
                         sendProgressUpdate(file.filePath);
                         lastProgressUpdateTime = Date.now();
                     }
@@ -365,9 +356,9 @@ export async function startScan(
 
                 // 【Bug2修复】walkerTotalCount 应该包含所有文件（找到+过滤+跳过）
                 // 遍历过程中只累加了 fileCount，需要补充 filteredCount 和 skippedCount
-                walkerTotalCount += (message.filteredCount || 0) + message.skippedCount;
-                walkerFilteredCount += message.filteredCount || 0;
-                walkerSkippedCount += message.skippedCount;
+                state.addWalkerTotalCount((message.filteredCount || 0) + message.skippedCount);
+                state.addWalkerFilteredCount(message.filteredCount || 0);
+                state.addWalkerSkippedCount(message.skippedCount);
 
                 // 【关键修复】Walker 完成后立即发送进度更新，确保前端 totalCount 包含所有文件
                 sendProgressUpdate();
@@ -448,21 +439,21 @@ export async function startScan(
     const totalWalkerTasks = config.selectedPaths.length;
 
     let lastStagnationCheckState = {
-        processed: consumerProcessedCount,
-        total: walkerTotalCount,
-        filtered: walkerFilteredCount,
-        skipped: walkerSkippedCount,
-        results: resultCount,
-        sensitiveItems: totalSensitiveItems,
+        processed: state.getConsumerProcessedCount(),
+        total: state.getWalkerTotalCount(),
+        filtered: state.getWalkerFilteredCount(),
+        skipped: state.getWalkerSkippedCount(),
+        results: state.getResultCount(),
+        sensitiveItems: state.getTotalSensitiveItems(),
         taskQueueLength: queueManager.getQueueLength(),
         pendingTasksSize: workerPool.getPendingTasks().size,
-        activeWorkers: activeWorkerCount,
+        activeWorkers: state.getActiveWorkerCount(),
         lastEnqueueTime: Date.now()
     };
     let lastStagnationCheckTime = Date.now();
 
     function checkAndComplete() {
-        if (scanState.cancelFlag) {
+        if (state.cancelFlag) {
             cleanup();
             return;
         }
@@ -471,23 +462,23 @@ export async function startScan(
         const allWalkersCompleted = walkerCompletedCount >= totalWalkerTasks;
 
         if (allWalkersCompleted && (workerPool.getActiveWorkerCount() > 0 || queueManager.getQueueLength() > 0 || hasPendingTasks)) {
-            log.debug(`[checkAndComplete] Walker已完成，但仍在等待: activeWorkers=${workerPool.getActiveWorkerCount()}, taskQueue=${queueManager.getQueueLength()}, pendingTasks=${workerPool.getPendingTasks().size}`);
+            log.debug(`[checkAndComplete] Walker已完成，但仍在等待: activeWorkers=${state.getActiveWorkerCount()}, taskQueue=${queueManager.getQueueLength()}, pendingTasks=${workerPool.getPendingTasks().size}`);
         }
 
         if (queueManager.getQueueLength() === 0) {
             queueManager.cleanupEmptyQueues();
         }
 
-        if (allWalkersCompleted && workerPool.getActiveWorkerCount() === 0 && queueManager.getQueueLength() === 0 && !hasPendingTasks) {
-            log.debug(`[调试] 满足完成条件: allWalkersCompleted=${allWalkersCompleted}, activeWorkers=${workerPool.getActiveWorkerCount()}, queueLength=${queueManager.getQueueLength()}, hasPendingTasks=${hasPendingTasks}`);
-            log.info(`扫描完成: 遍历 ${walkerTotalCount} 个文件, 处理 ${consumerProcessedCount} 个, 跳过 ${walkerSkippedCount} 个, 发现 ${resultCount} 个敏感文件`);
+        if (allWalkersCompleted && state.getActiveWorkerCount() === 0 && queueManager.getQueueLength() === 0 && !hasPendingTasks) {
+            log.debug(`[调试] 满足完成条件: allWalkersCompleted=${allWalkersCompleted}, activeWorkers=${state.getActiveWorkerCount()}, queueLength=${queueManager.getQueueLength()}, hasPendingTasks=${hasPendingTasks}`);
+            log.info(`扫描完成: 遍历 ${state.getWalkerTotalCount()} 个文件, 处理 ${state.getConsumerProcessedCount()} 个, 跳过 ${state.getWalkerSkippedCount()} 个, 发现 ${state.getResultCount()} 个敏感文件`);
             cleanup();
             return;
         }
 
         // 【调试】记录未满足的完成条件
         if (allWalkersCompleted) {
-            log.debug(`[调试] 未完成检查: Walker已完成, activeWorkers=${workerPool.getActiveWorkerCount()}, queueLength=${queueManager.getQueueLength()}, pendingTasks=${workerPool.getPendingTasks().size}`);
+            log.debug(`[调试] 未完成检查: Walker已完成, activeWorkers=${state.getActiveWorkerCount()}, queueLength=${queueManager.getQueueLength()}, pendingTasks=${workerPool.getPendingTasks().size}`);
         }
 
         lastActivityTime = Date.now();
@@ -502,28 +493,28 @@ export async function startScan(
         const now = Date.now();
 
         const hasRealProgress =
-            consumerProcessedCount !== lastStagnationCheckState.processed ||
-            walkerTotalCount !== lastStagnationCheckState.total ||
-            walkerFilteredCount !== lastStagnationCheckState.filtered ||
-            walkerSkippedCount !== lastStagnationCheckState.skipped ||
-            resultCount !== lastStagnationCheckState.results ||
-            totalSensitiveItems !== lastStagnationCheckState.sensitiveItems ||
+            state.getConsumerProcessedCount() !== lastStagnationCheckState.processed ||
+            state.getWalkerTotalCount() !== lastStagnationCheckState.total ||
+            state.getWalkerFilteredCount() !== lastStagnationCheckState.filtered ||
+            state.getWalkerSkippedCount() !== lastStagnationCheckState.skipped ||
+            state.getResultCount() !== lastStagnationCheckState.results ||
+            state.getTotalSensitiveItems() !== lastStagnationCheckState.sensitiveItems ||
             queueManager.getQueueLength() !== lastStagnationCheckState.taskQueueLength ||
             workerPool.getPendingTasks().size !== lastStagnationCheckState.pendingTasksSize ||
-            activeWorkerCount !== lastStagnationCheckState.activeWorkers ||
+            state.getActiveWorkerCount() !== lastStagnationCheckState.activeWorkers ||
             lastTaskEnqueueTime !== lastStagnationCheckState.lastEnqueueTime;
 
         if (hasRealProgress) {
             lastStagnationCheckState = {
-                processed: consumerProcessedCount,
-                total: walkerTotalCount,
-                filtered: walkerFilteredCount,
-                skipped: walkerSkippedCount,
-                results: resultCount,
-                sensitiveItems: totalSensitiveItems,
+                processed: state.getConsumerProcessedCount(),
+                total: state.getWalkerTotalCount(),
+                filtered: state.getWalkerFilteredCount(),
+                skipped: state.getWalkerSkippedCount(),
+                results: state.getResultCount(),
+                sensitiveItems: state.getTotalSensitiveItems(),
                 taskQueueLength: queueManager.getQueueLength(),
                 pendingTasksSize: workerPool.getPendingTasks().size,
-                activeWorkers: activeWorkerCount,
+                activeWorkers: state.getActiveWorkerCount(),
                 lastEnqueueTime: lastTaskEnqueueTime
             };
             lastStagnationCheckTime = now;
@@ -531,15 +522,15 @@ export async function startScan(
             const idleTime = now - lastStagnationCheckTime;
 
             if (idleTime > STAGNATION_THRESHOLD && idleTime <= MAX_IDLE_TIME) {
-                log.warn(`提示: ${idleTime / 1000}秒内无任何进展（活跃Worker:${activeWorkerCount}, 队列:${queueManager.getQueueLength()}, 待处理:${workerPool.getPendingTasks().size}），但仍在等待可能的恢复...`);
+                log.warn(`提示: ${idleTime / 1000}秒内无任何进展（活跃Worker:${state.getActiveWorkerCount()}, 队列:${queueManager.getQueueLength()}, 待处理:${workerPool.getPendingTasks().size}），但仍在等待可能的恢复...`);
             }
 
             if (idleTime > MAX_IDLE_TIME
                 || (idleTime > STAGNATION_THRESHOLD
                     && queueManager.getQueueLength() <= 0
                     && workerPool.getPendingTasks().size <= 0
-                    && activeWorkerCount <= 0
-                    && (consumerProcessedCount + walkerFilteredCount + walkerSkippedCount) >= walkerTotalCount)
+                    && state.getActiveWorkerCount() <= 0
+                    && (state.getConsumerProcessedCount() + state.getWalkerFilteredCount() + state.getWalkerSkippedCount()) >= state.getWalkerTotalCount())
             ) {
                 log.error(`警告: ${idleTime / 1000}秒内无任何进展，强制结束`);
 
@@ -591,10 +582,25 @@ export async function startScan(
             errorLogCount = 0;
             resultLogThrottler.reset();
 
-            // 销毁批量发送器
-            resultBatchSender.destroy();
+            // 销毁批量发送器 - 【关键修复】先 flush 剩余数据
+            resultBatchSender.flushAndDestroy(mainWindow, 'scan-result');
 
-            scanState.isScanning = false;
+            // 【关键修复】发送最终进度更新，确保前端显示正确的已处理/总数
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                const finalScanned = state.getConsumerProcessedCount();
+                const finalTotal = state.getWalkerTotalCount();
+                const safeTotal = Math.max(finalTotal, finalScanned);
+                
+                mainWindow.webContents.send('scan-progress', {
+                    currentFile: '',
+                    scannedCount: finalScanned,
+                    totalCount: safeTotal,
+                    filteredCount: state.getWalkerFilteredCount(),
+                    skippedCount: state.getWalkerSkippedCount()
+                });
+            }
+
+            state.isScanning = false;
             log.info('扫描完成');
 
             sendToMainWindow(mainWindow, 'scan-finished', null);
@@ -610,7 +616,7 @@ export async function startScan(
             eventBus.clearAll();
         } catch (error) {
             log('[cleanup] 清理过程中出错: ' + error);
-            scanState.isScanning = false;
+            state.isScanning = false;
         }
     }
 
@@ -622,7 +628,7 @@ export async function startScan(
     for (const rootPath of config.selectedPaths) {
         currentPathIndex++;
 
-        if (scanState.cancelFlag) {
+        if (state.cancelFlag) {
             log.info('扫描已取消');
             break;
         }
@@ -666,6 +672,7 @@ export async function startScan(
     }
 }
 
-export function cancelScan(scanState: ScanState): void {
-    scanState.cancelFlag = true;
+export function cancelScan(scanState?: ScanState): void {
+    const state = scanState || ScanState.getInstance();
+    state.cancelFlag = true;
 }

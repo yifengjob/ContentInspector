@@ -16,6 +16,7 @@ app.commandLine.appendSwitch('js-flags', '--expose-gc');
 
 // 【修复】初始化 PDF.js 所需的 polyfill（包括 Promise.withResolvers、DOMMatrix、浏览器环境模拟）
 import {setupAllPdfPolyfills} from './utils/pdf-polyfills';
+
 setupAllPdfPolyfills();
 
 import {ScanState} from './core/scan-state';
@@ -78,13 +79,14 @@ app.on('before-quit', async () => {
         // 使用 process.stderr 避免循环依赖
         process.stderr.write(`[应用退出] 日志 flush 失败: ${error}\n`);
     }
-    
+
     // 【新增】清理 LogManager
     logManager?.destroy();
 });
 
 let mainWindow: BrowserWindow | null = null;
-const scanState = new ScanState();
+// 【重构】使用 ScanState 单例，类似 Pinia 的 useStore
+const scanState = ScanState.getInstance();
 let logManager: LogManager | null = null;  // 【新增】日志管理器实例
 
 // 【新增】电源阻止器 ID（用于防止锁屏时扫描中断）
@@ -312,7 +314,7 @@ function setupIpcHandlers() {
             }
 
             // 不 await，让扫描在后台进行
-            startScan(config, mainWindow, scanState).catch(error => {
+            startScan(config, mainWindow).catch(error => {
                 mainLogger.error('扫描异常:', error);
                 if (mainWindow) {
                     mainWindow.webContents.send('scan-error', error.message);

@@ -218,6 +218,19 @@ export class BatchSender {
         }
         this.buffer = [];
     }
+    
+    /**
+     * 【关键修复】flush 剩余数据并销毁
+     * 用于扫描结束时，确保最后一批数据被发送
+     */
+    flushAndDestroy(mainWindow: BrowserWindow | null, channel: string): void {
+        // 先 flush 剩余数据
+        if (this.buffer.length > 0 && mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send(channel, this.buffer);
+        }
+        // 然后销毁
+        this.destroy();
+    }
 }
 
 // 导出单例（用于扫描结果批量发送）
