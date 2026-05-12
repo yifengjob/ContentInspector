@@ -373,12 +373,12 @@ export async function startScan(
 
                 walkerCompletedCount++;
 
-                if (walkerCompletedCount > totalWalkerTasks) {
-                    log.warn(`[Walker] 警告: 完成计数 (${walkerCompletedCount}) 超过总任务数 (${totalWalkerTasks})`);
-                    walkerCompletedCount = totalWalkerTasks;
+                if (walkerCompletedCount > actualWalkerTasks) {
+                    log.warn(`[Walker] 警告: 完成计数 (${walkerCompletedCount}) 超过总任务数 (${actualWalkerTasks})`);
+                    walkerCompletedCount = actualWalkerTasks;
                 }
 
-                log.info(`[Walker] 已完成 ${walkerCompletedCount}/${totalWalkerTasks} 个任务`);
+                log.info(`[Walker] 已完成 ${walkerCompletedCount}/${actualWalkerTasks} 个任务`);
 
                 // 【A1 优化】Walker 完成后，根据实际文件大小重新计算内存限制
                 if (state.getTaskQueueLength() > 0) {
@@ -444,7 +444,8 @@ export async function startScan(
     let completionCheckTimer: NodeJS.Timeout | null = null;
     let isCleaningUp = false;
     let walkerCompletedCount = 0;
-    const totalWalkerTasks = config.selectedPaths.length;
+    const totalPathsForWalker = config.selectedPaths.length;  // 总路径数
+    let actualWalkerTasks = 0;  // 【修复】实际发送的任务数，动态计算
 
     let lastStagnationCheckState = {
         processed: state.getConsumerProcessedCount(),
@@ -466,7 +467,7 @@ export async function startScan(
             return;
         }
 
-        const allWalkersCompleted = walkerCompletedCount >= totalWalkerTasks;
+        const allWalkersCompleted = walkerCompletedCount >= actualWalkerTasks;
 
         // 【重构】使用 state.isScanComplete 统一完成条件判断
         if (state.isScanComplete(allWalkersCompleted)) {
@@ -675,6 +676,9 @@ export async function startScan(
             continue;
         }
 
+        // 【修复】只有成功发送的任务才计入总数
+        actualWalkerTasks++;
+
         walkerWorker.postMessage({
             type: 'start-walking',
             config: {
@@ -687,6 +691,9 @@ export async function startScan(
             }
         });
     }
+    
+    // 【修复】输出实际发送的任务数
+    log.info(`[Walker] 实际发送任务数: ${actualWalkerTasks}/${totalPathsForWalker}`);
 }
 
 export function cancelScan(scanState?: ScanState): void {
