@@ -8,7 +8,11 @@ import {
     BYTES_TO_MB,
     WORKER_BASE_TIMEOUT,
     WORKER_TIMEOUT_PER_MB,
-    WORKER_MAX_TIMEOUT
+    WORKER_MAX_TIMEOUT,
+    PROGRESS_THROTTLE_MIN_INTERVAL,
+    PROGRESS_THROTTLE_MAX_INTERVAL,
+    PROGRESS_FAST_SPEED_THRESHOLD,
+    PROGRESS_SLOW_SPEED_THRESHOLD
 } from '../core/scan-config';
 
 /**
@@ -32,11 +36,11 @@ export function createProgressUpdater(
     let lastProgressTime = 0;
     let lastScannedCount = 0;
 
-    // 【B3 优化】自适应节流参数
-    const MIN_THROTTLE = 200;   // 最小间隔 200ms（快速更新）
-    const MAX_THROTTLE = 1000;  // 最大间隔 1000ms（慢速更新）
-    const FAST_THRESHOLD = 50;  // 每秒处理 > 50 个文件视为快速
-    const SLOW_THRESHOLD = 10;  // 每秒处理 < 10 个文件视为慢速
+    // 【B3 优化】自适应节流参数（从 scan-config.ts 导入）
+    const MIN_THROTTLE = PROGRESS_THROTTLE_MIN_INTERVAL;   // 最小间隔 200ms（快速更新）
+    const MAX_THROTTLE = PROGRESS_THROTTLE_MAX_INTERVAL;  // 最大间隔 1000ms（慢速更新）
+    const FAST_THRESHOLD = PROGRESS_FAST_SPEED_THRESHOLD;  // 每秒处理 > 50 个文件视为快速
+    const SLOW_THRESHOLD = PROGRESS_SLOW_SPEED_THRESHOLD;  // 每秒处理 < 10 个文件视为慢速
 
     return (currentFile: string = '') => {
         const now = Date.now();

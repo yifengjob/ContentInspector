@@ -120,8 +120,9 @@ export class ScanState extends EventEmitter {
     decrementActiveWorkers(): number {
         if (this.state.activeWorkerCount > 0) {
             this.state.activeWorkerCount--;
+            // 【优化】只有真正减少时才触发事件，避免不必要的通知
+            this.emit('active-workers-changed', this.state.activeWorkerCount);
         }
-        this.emit('active-workers-changed', this.state.activeWorkerCount);
         return this.state.activeWorkerCount;
     }
     
