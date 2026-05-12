@@ -34,6 +34,7 @@ import {
     sendToMainWindow,
     calculateTimeout as calcTimeout,
     resultBatchSender,
+    configureBatchSender,
     LogThrottler
 } from '../utils/scanner-helpers';
 import {getFileType} from '../utils/file-types';
@@ -82,6 +83,12 @@ export async function startScan(
     }
 
     log.info(`使用 ${poolSize} 个 Consumer Workers (CPU: ${concurrencyInfo.cpuCount}核, 可用内存: ${concurrencyInfo.freeMemoryGB.toFixed(1)}GB)`);
+
+    // 【优化】根据扫描路径数智能配置 BatchSender
+    // 粗略估计：每个路径平均 1000 个文件
+    const estimatedTotalFiles = config.selectedPaths.length * 1000;
+    configureBatchSender(estimatedTotalFiles);
+    log.info(`【BatchSender】已根据扫描规模配置（预估文件数: ${estimatedTotalFiles}）`);
 
     // ==================== 【初始化模块】====================
 

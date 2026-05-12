@@ -252,7 +252,28 @@ export class BatchSender {
 }
 
 // 导出单例（用于扫描结果批量发送）
+// 【优化】使用默认配置，可根据扫描规模动态调整
 export const resultBatchSender = new BatchSender(100, 500);
+
+/**
+ * 【新增】根据扫描规模智能配置 BatchSender
+ * @param estimatedTotalFiles 预估的文件总数
+ */
+export function configureBatchSender(estimatedTotalFiles: number): void {
+    if (estimatedTotalFiles < 100) {
+        // 小扫描：立即发送，无延迟
+        resultBatchSender.configure(1, 0);
+    } else if (estimatedTotalFiles < 1000) {
+        // 中等扫描：小批量，短延迟
+        resultBatchSender.configure(20, 200);
+    } else if (estimatedTotalFiles < 10000) {
+        // 大扫描：中批量，中等延迟
+        resultBatchSender.configure(50, 300);
+    } else {
+        // 超大扫描：大批量，长延迟
+        resultBatchSender.configure(100, 500);
+    }
+}
 
 /**
  * 【P3优化】日志抑制器 - 基于数量和时间的双重触发机制
