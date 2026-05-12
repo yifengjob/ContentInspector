@@ -303,14 +303,10 @@ export async function startScan(
     cleanupConsumerStateRef.fn = scheduler.cleanupConsumerState.bind(scheduler);
 
     // 11. 初始化调度器
-    log.debug('[调试] 开始初始化调度器...');
     scheduler.initialize();
-    log.debug('[调试] 调度器初始化完成');
 
     // 12. 初始化 Worker 池
-    log.debug('[调试] 开始初始化 Worker 池...');
     await workerPool.initialize();
-    log.debug('[调试] Worker 池初始化完成');
 
     // ==================== 【Walker Worker】====================
 
@@ -467,15 +463,9 @@ export async function startScan(
 
         // 【重构】使用 state.isScanComplete 统一完成条件判断
         if (state.isScanComplete(allWalkersCompleted)) {
-            log.debug(`[调试] 满足完成条件: allWalkersCompleted=${allWalkersCompleted}, activeWorkers=${state.getActiveWorkerCount()}, queueLength=${state.getTaskQueueLength()}, pendingTasks=${state.getPendingTasksSize()}`);
             log.info(`扫描完成: 遍历 ${state.getWalkerTotalCount()} 个文件, 处理 ${state.getConsumerProcessedCount()} 个, 跳过 ${state.getWalkerSkippedCount()} 个, 发现 ${state.getResultCount()} 个敏感文件`);
             cleanup();
             return;
-        }
-        
-        // 【调试】记录未满足的完成条件
-        if (allWalkersCompleted && !state.isScanComplete(allWalkersCompleted)) {
-            log.debug(`[调试] 未完成检查: Walker已完成, activeWorkers=${state.getActiveWorkerCount()}, queueLength=${state.getTaskQueueLength()}, pendingTasks=${state.getPendingTasksSize()}`);
         }
 
         lastActivityTime = Date.now();
