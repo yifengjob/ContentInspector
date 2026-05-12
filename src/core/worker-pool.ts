@@ -14,7 +14,7 @@ import {EventBus} from './event-bus';
 import type {ScanState} from './scan-state';
 import type {BrowserWindow} from 'electron';
 import {markConsumerIdle, safelyTerminateWorker} from '../utils/scanner-helpers';
-import {WORKER_RESTART_DELAY} from './scan-config';
+import {WORKER_RESTART_DELAY, WORKER_RESTART_SCHEDULE_DELAY} from './scan-config';
 import type {Task} from './task-queue';
 import {createLogger, Logger} from '../logger/logger';
 
@@ -200,8 +200,8 @@ export class WorkerPool {
 
             try {
                 this.createConsumer(consumerId, oldGen, youngGen);
-                // 【关键】每个 Worker 创建后延迟 100ms，避免资源竞争
-                await new Promise(resolve => setTimeout(resolve, 100));
+                // 【关键】每个 Worker 创建后延迟，避免资源竞争
+                await new Promise(resolve => setTimeout(resolve, WORKER_RESTART_DELAY));
                 // 成功后清除重试计数
                 retryCounts.delete(consumerId);
             } catch (error: any) {
@@ -458,7 +458,7 @@ export class WorkerPool {
         // 延迟调度新任务
         setTimeout(() => {
             this.callbacks.onTryDispatch();
-        }, 150);
+        }, WORKER_RESTART_SCHEDULE_DELAY);
     }
 
     /**

@@ -11,7 +11,7 @@ import {Worker} from 'worker_threads';
 import {ScanState} from './scan-state';
 import {ScannerContext} from './scan-initializer';
 import {getFileType} from '../utils/file-types';
-import {LARGE_FILE_THRESHOLD_MB, BYTES_TO_MB} from './scan-config';
+import {LARGE_FILE_THRESHOLD_MB, BYTES_TO_MB, WORKER_RESTART_DELAY} from './scan-config';
 import {EventBus} from './event-bus';
 
 export interface WalkerHandlerOptions {
@@ -182,7 +182,7 @@ export class WalkerHandler {
                                 }
                             }
                         }
-                    }, 100);
+                    }, WORKER_RESTART_DELAY);
                 }
             } else {
                 context.log.info(`【智能内存调整】平均文件大小: ${avgFileSizeMB.toFixed(2)}MB`);

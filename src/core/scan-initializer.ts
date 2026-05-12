@@ -19,13 +19,13 @@ import {
     WORKER_MAX_YOUNG_GENERATION_MB
 } from './scan-config';
 import {configureBatchSender, createProgressUpdater, resultBatchSender, calculateTimeout} from '../utils/scanner-helpers';
+import {RESULT_LOG_COUNT_INTERVAL, RESULT_LOG_TIME_INTERVAL, PROGRESS_THROTTLE_INTERVAL} from './scan-config';
 import {EventBus} from './event-bus';
 import {TaskQueueManager} from './task-queue';
 import {Consumer, WorkerPool} from './worker-pool';
 import {SmartScheduler} from './smart-scheduler';
 import {getScannerLogger} from "../logger/logger";
 import {LogThrottler} from '../utils/scanner-helpers';
-import {RESULT_LOG_COUNT_INTERVAL, RESULT_LOG_TIME_INTERVAL} from './scan-config';
 
 export interface ScannerContext {
     state: ScanState;
@@ -179,7 +179,7 @@ export async function initializeScanner(
         () => state.getWalkerTotalCount(),
         () => state.getWalkerFilteredCount(),
         () => state.getWalkerSkippedCount(),
-        500 // PROGRESS_THROTTLE_INTERVAL
+        PROGRESS_THROTTLE_INTERVAL
     );
 
     // 创建 Worker 池回调接口

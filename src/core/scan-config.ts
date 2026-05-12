@@ -62,6 +62,9 @@ export const DEFAULT_CONCURRENCY_MIN = 2;
 /** Worker 异常退出后重启延迟（毫秒） */
 export const WORKER_RESTART_DELAY = 100; // 100ms
 
+/** Worker 重启后调度延迟（毫秒）- 给系统时间完成资源清理 */
+export const WORKER_RESTART_SCHEDULE_DELAY = 150; // 150ms
+
 // ==================== 3. 超时配置 ====================
 
 // --- 3.1 Worker 超时配置（主进程用于监控 Worker 任务）---
