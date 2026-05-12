@@ -328,11 +328,17 @@ function setupIpcHandlers() {
 
     // 取消扫描
     ipcMain.handle('scan-cancel', async () => {
+        mainLogger.info('[scan-cancel] IPC handler 被调用');
+        mainLogger.info(`[scan-cancel] scanState.isScanning: ${scanState.isScanning}`);
+        
         if (!scanState.isScanning) {
+            mainLogger.info('[scan-cancel] 扫描未在进行中，直接返回');
             return {success: true};
         }
 
+        mainLogger.info('[scan-cancel] 调用 cancelScan 函数');
         cancelScan(scanState);
+        mainLogger.info('[scan-cancel] cancelScan 函数调用完成');
 
         // 【优化】改为异步通知机制，不阻塞 IPC
         return new Promise((resolve) => {
