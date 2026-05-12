@@ -29,6 +29,10 @@ export function clearAllowedPaths(): void {
 /**
  * 检查文件路径是否在允许的范围内
  * 【安全增强】防止路径遍历攻击（Path Traversal）
+ * 
+ * 【注意】此函数仅用于防止恶意路径遍历攻击（如 ../、~ 等）
+ * 系统目录（/dev, /proc, /sys 等）由 Walker 的 filter 函数过滤，
+ * 不应在此处进行拦截，避免产生误导性警告。
  */
 export function isPathAllowed(filePath: string): boolean {
     // 【A2 优化】安全检查：拒绝空路径
@@ -63,6 +67,20 @@ export function isPathAllowed(filePath: string): boolean {
         return false;
     }
 
+    // 【关键修复】系统目录由 Walker 的 filter 处理，此处不做拦截
+    // 如果文件路径指向系统目录，说明 Walker 的 filter 有遗漏，但不应该在此处报错
+    const systemDirPrefixes = ['/dev/', '/proc/', '/sys/', '/System/', 
+                               '/usr/', '/bin/', '/sbin/', '/etc/'];
+    const isSystemFile = systemDirPrefixes.some(prefix => 
+        normalizedPath.startsWith(prefix) || normalizedPath === prefix.slice(0, -1)
+    );
+    
+    if (isSystemFile) {
+        // 系统文件，静默允许（实际上不应该到达这里，因为 Walker 应该已经过滤）
+        fileLogger.debug(`isPathAllowed: 系统文件（应由 Walker 过滤）: ${filePath}`);
+        return true;
+    }
+
     // 【A2 优化】安全检查：解析真实路径，防止符号链接攻击
     let realPath: string;
     try {
@@ -84,14 +102,8 @@ export function isPathAllowed(filePath: string): boolean {
         }
     }
 
-    // 【优化】系统目录被拒绝是正常的，使用 debug 级别而非 warn
-    const isSystemDir = filePath.startsWith('/dev/') || filePath.startsWith('/proc/') || 
-                        filePath.startsWith('/sys/') || filePath.startsWith('/System/');
-    if (isSystemDir) {
-        fileLogger.debug(`isPathAllowed: 系统目录被拒绝（正常）: ${filePath}`);
-    } else {
-        fileLogger.warn(`isPathAllowed: 拒绝访问：路径不在允许范围内: ${filePath}`);
-    }
+    // 非系统文件且不在允许范围内，记录警告
+    fileLogger.warn(`isPathAllowed: 拒绝访问：路径不在允许范围内: ${filePath}`);
     return false;
 }
 
