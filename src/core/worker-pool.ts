@@ -129,6 +129,19 @@ export class WorkerPool {
     }
 
     /**
+     * 更新回调函数
+     * 
+     * @param key 回调函数名称
+     * @param callback 新的回调函数实现
+     */
+    public updateCallback<K extends keyof WorkerPoolCallbacks>(
+        key: K,
+        callback: WorkerPoolCallbacks[K]
+    ): void {
+        (this.callbacks as any)[key] = callback;
+    }
+
+    /**
      * 初始化 Worker 池
      */
     async initialize(): Promise<void> {
