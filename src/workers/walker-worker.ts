@@ -174,16 +174,8 @@ async function startWalking(config: WalkerConfig) {
       // 【新增】去重集合，防止同一文件被多次报告
       const seenFiles = new Set<string>();
       
-      // 【调试】输出 walker 配置
-      workerLogger.info(`[Walker] 开始遍历: ${rootPath}`);
-      workerLogger.info(`[Walker] 扩展名过滤: ${selectedExtensions.join(', ')}`);
-      workerLogger.info(`[Walker] 忽略目录: ${config.ignoreDirNames.slice(0, 5).join(', ')}... (${config.ignoreDirNames.length}个)`);
-      workerLogger.info(`[Walker] 系统目录: ${systemDirs.slice(0, 3).join(', ')}... (${systemDirs.length}个)`);
-      
       // 【新增】超时保护 - 如果 60 秒内没有完成，强制 resolve（防止卡死）
       timeoutId = setTimeout(() => {  // ✅ 使用赋值而非重新声明
-        workerLogger.warn(`[Walker] 遍历超时（60秒），强制结束。已找到 ${fileCount} 个文件, 过滤 ${filteredCount} 个, 跳过 ${skippedCount} 个`);
-        
         // 【批量优化】发送剩余批次
         flushBatch();
         
@@ -305,8 +297,6 @@ async function startWalking(config: WalkerConfig) {
     walker.on('end', () => {
       clearTimeout(timeoutId); // 【新增】清除超时定时器
       
-      workerLogger.info(`[Walker] 遍历完成: ${rootPath} - 找到 ${fileCount} 个文件, 过滤 ${filteredCount} 个, 跳过 ${skippedCount} 个`);
-      
       // 【批量优化】发送剩余不足批次的文件
       flushBatch();
       
@@ -321,7 +311,6 @@ async function startWalking(config: WalkerConfig) {
 
     walker.on('error', (err: any) => {
       clearTimeout(timeoutId); // 【新增】清除超时定时器
-      workerLogger.error(`[Walker] 遍历错误: ${rootPath} - ${err.message}`);
       parentPort?.postMessage({
         type: 'walking-error',
         error: err.message
