@@ -688,11 +688,19 @@ export async function startScan(
 export function cancelScan(scanState?: ScanState): void {
     const state = scanState || ScanState.getInstance();
     
+    // 【调试】记录取消请求
+    console.log('[cancelScan] 收到取消请求');
+    console.log('[cancelScan] state.isScanning:', state.isScanning);
+    console.log('[cancelScan] state.cancelFlag:', state.cancelFlag);
+    console.log('[cancelScan] state.doCancelScan exists:', !!(state as any).doCancelScan);
+    
     // 【修复】如果存在内部的取消函数，调用它以真正停止扫描
     if ((state as any).doCancelScan) {
+        console.log('[cancelScan] 调用 doCancelScan');
         (state as any).doCancelScan();
     } else {
         // 后备方案：仅设置标志（适用于未通过 startScan 启动的情况）
+        console.log('[cancelScan] doCancelScan 不存在，使用后备方案');
         state.cancelFlag = true;
     }
 }
