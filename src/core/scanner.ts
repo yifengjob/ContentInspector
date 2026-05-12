@@ -692,14 +692,7 @@ export function cancelScan(scanState?: ScanState): void {
         (state as any).doCancelScan();
     } else {
         // 后备方案：仅设置标志（适用于未通过 startScan 启动的情况）
+        // 注意：正常情况下不应该走到这里，因为 doCancelScan 应该在 startScan 中挂载
         state.cancelFlag = true;
-        
-        // 【新增】通过 EventBus 发布取消事件
-        try {
-            const eventBus = require('./event-bus').EventBus.getInstance();
-            eventBus.emit('scan-cancelled', null);
-        } catch (error) {
-            console.error('[取消扫描] 发布事件失败:', error);
-        }
     }
 }
