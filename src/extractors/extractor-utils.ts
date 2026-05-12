@@ -10,7 +10,7 @@
 
 import * as fs from 'fs';
 import {createReadStream} from 'fs';
-import {calculateParserTimeout, MAX_TEXT_CONTENT_SIZE_MB, BYTES_TO_MB} from '../core/scan-config';
+import {calculateParserTimeout, BYTES_TO_MB} from '../core/scan-config';
 import {convertNodeError} from '../utils/error-utils';
 import {extractorLogger} from '../logger/logger';
 import type {ExtractorResult} from './types';
@@ -62,7 +62,7 @@ export interface StreamReadOptions {
  * @param options 读取配置
  * @returns Promise<ExtractorResult>
  */
-export function streamReadWithTimeout(options: StreamReadOptions): Promise<ExtractorResult> {
+export async function streamReadWithTimeout(options: StreamReadOptions): Promise<ExtractorResult> {
     const {
         filePath,
         onData,
@@ -75,76 +75,75 @@ export function streamReadWithTimeout(options: StreamReadOptions): Promise<Extra
 
     let isResolved = false;
 
-    // 获取文件大小并计算智能超时
-    return fs.promises.stat(filePath)
-        .then(stat => {
-            const timeoutMs = calculateParserTimeout(stat.size);
+    try {
+        // 获取文件大小并计算智能超时
+        const stat = await fs.promises.stat(filePath);
+        const timeoutMs = calculateParserTimeout(stat.size);
 
-            return new Promise<ExtractorResult>((resolve, reject) => {
-                const timeoutId = setTimeout(() => {
+        return new Promise<ExtractorResult>((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+                if (!isResolved) {
+                    isResolved = true;
+                    stream.destroy();
+                    extractorLogger.warn(`${logPrefix}: 读取超时 (${timeoutMs / 1000}秒)`);
+                    resolve({text: '', unsupportedPreview: true});
+                }
+            }, timeoutMs);
+
+            const stream = createReadStream(filePath, {
+                encoding: encoding as BufferEncoding,
+                highWaterMark
+            });
+
+            let totalSize = 0;
+
+            stream.on('data', (chunk: string | Buffer) => {
+                if (isResolved) return;
+
+                const shouldContinue = onData(chunk, totalSize);
+                
+                // 如果回调返回 false，停止读取
+                if (shouldContinue === false) {
+                    stream.destroy();
+                    clearTimeout(timeoutId);
                     if (!isResolved) {
                         isResolved = true;
-                        stream.destroy();
-                        extractorLogger.warn(`${logPrefix}: 读取超时 (${timeoutMs / 1000}秒)`);
                         resolve({text: '', unsupportedPreview: true});
                     }
-                }, timeoutMs);
-
-                const stream = createReadStream(filePath, {
-                    encoding: encoding as BufferEncoding,
-                    highWaterMark
-                });
-
-                let totalSize = 0;
-
-                stream.on('data', (chunk: string | Buffer) => {
-                    if (isResolved) return;
-
-                    const shouldContinue = onData(chunk, totalSize);
-                    
-                    // 如果回调返回 false，停止读取
-                    if (shouldContinue === false) {
-                        stream.destroy();
-                        clearTimeout(timeoutId);
-                        if (!isResolved) {
-                            isResolved = true;
-                            resolve({text: '', unsupportedPreview: true});
-                        }
-                    }
-                });
-
-                stream.on('end', () => {
-                    if (!isResolved) {
-                        isResolved = true;
-                        clearTimeout(timeoutId);
-                        try {
-                            onEnd();
-                        } catch (error: any) {
-                            extractorLogger.error(`${logPrefix}: ${error.message}`);
-                            resolve({text: '', unsupportedPreview: true});
-                        }
-                    }
-                });
-
-                stream.on('error', (error: any) => {
-                    if (!isResolved) {
-                        isResolved = true;
-                        clearTimeout(timeoutId);
-                        
-                        if (onError) {
-                            onError(convertNodeError(error, filePath, `${logPrefix} 失败`));
-                        } else {
-                            extractorLogger.error(`${logPrefix}: ${error.message}`);
-                            reject(convertNodeError(error, filePath, `${logPrefix} 失败`));
-                        }
-                    }
-                });
+                }
             });
-        })
-        .catch((error: any) => {
-            extractorLogger.error(`${logPrefix}: ${error.message}`);
-            return {text: '', unsupportedPreview: true};
+
+            stream.on('end', () => {
+                if (!isResolved) {
+                    isResolved = true;
+                    clearTimeout(timeoutId);
+                    try {
+                        onEnd();
+                    } catch (error: any) {
+                        extractorLogger.error(`${logPrefix}: ${error.message}`);
+                        resolve({text: '', unsupportedPreview: true});
+                    }
+                }
+            });
+
+            stream.on('error', (error: any) => {
+                if (!isResolved) {
+                    isResolved = true;
+                    clearTimeout(timeoutId);
+                    
+                    if (onError) {
+                        onError(convertNodeError(error, filePath, `${logPrefix} 失败`));
+                    } else {
+                        extractorLogger.error(`${logPrefix}: ${error.message}`);
+                        reject(convertNodeError(error, filePath, `${logPrefix} 失败`));
+                    }
+                }
+            });
         });
+    } catch (error: any) {
+        extractorLogger.error(`${logPrefix}: ${error.message}`);
+        return {text: '', unsupportedPreview: true};
+    }
 }
 
 /**
