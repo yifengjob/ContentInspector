@@ -610,8 +610,19 @@ export async function startScan(
 
     // 【修复】定义取消函数，可以访问局部变量
     const doCancelScan = () => {
+        if (state.cancelFlag) {
+            log.info('[取消] 已经在取消过程中，忽略重复请求');
+            return;
+        }
+        
         log.info('[取消] 收到取消请求，正在停止扫描...');
         state.cancelFlag = true;
+        
+        // 清除停滞检测定时器，防止干扰
+        if (completionCheckTimer) {
+            clearInterval(completionCheckTimer);
+            completionCheckTimer = null;
+        }
         
         // 立即清理资源，停止所有 Worker
         cleanup();
