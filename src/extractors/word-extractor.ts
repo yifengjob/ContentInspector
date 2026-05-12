@@ -3,87 +3,83 @@
  * 支持: doc, docx, wps
  */
 
-import * as fs from 'fs';
 import * as path from 'path';
 import WordExtractor from 'word-extractor';
-import {calculateParserTimeout, FILE_READ_TIMEOUT_FAST_MS} from '../core/scan-config';  // 【新增】导入超时配置
-import {extractorLogger} from '../logger/logger';
+import {FILE_READ_TIMEOUT_FAST_MS} from '../core/scan-config';
 import type {ExtractorResult} from './types';
+import {BaseExtractor} from './base-extractor';
 import {extractTextFromBinary} from './binary-extractor';
 import {readFileWithTimeout} from '../utils/file-utils';
+import {withTimeout, withLogging, composeDecorators} from './extractor-decorators';
 
-export async function extractWithWordExtractor(filePath: string): Promise<ExtractorResult> {
-    // 【关键修复】添加智能超时保护，防止 word-extractor 卡死
-    let isResolved = false;
-
-    // 先获取文件大小，然后计算智能超时
-    let stat: fs.Stats;
-    try {
-        stat = await fs.promises.stat(filePath);
-    } catch (error: any) {
-        extractorLogger.error(`extractWithWordExtractor: ${error.message}`);
-        return {text: '', unsupportedPreview: true};
+/**
+ * Word 文件提取器类
+ */
+class WordExtractorClass extends BaseExtractor {
+    constructor() {
+        super({ 
+            name: 'WordExtractor',
+            verboseLogging: false
+        });
     }
 
-    const timeoutMs = calculateParserTimeout(stat.size);
+    protected async doExtract(filePath: string): Promise<ExtractorResult> {
+        try {
+            // 创建 extractor 实例
+            const extractor = new WordExtractor();
 
-    return new Promise((resolve) => {
-        const timeoutId = setTimeout(() => {
-            if (!isResolved) {
-                isResolved = true;
-                extractorLogger.warn(`extractWithWordExtractor: 解析超时 (${timeoutMs / 1000}秒)`);
-                resolve({text: '', unsupportedPreview: true});
+            // 提取文本
+            const extracted = await extractor.extract(filePath);
+            const text = extracted.getBody();
+
+            const hasContent = text && text.trim().length > 0;
+
+            if (!hasContent) {
+                this.logger.warn(`[${this.config.name}] 未提取到内容: ${path.basename(filePath)}`);
             }
-        }, timeoutMs);
 
-        (async () => {
+            return this.buildResult(text, 'WordExtractor');
+        } catch (error: any) {
+            this.logger.error(`[${this.config.name}] 解析失败: ${error.message}`);
+            
+            // 降级到二进制提取
             try {
-                // 创建 extractor 实例
-                const extractor = new WordExtractor();
-
-                // 提取文本
-                const extracted = await extractor.extract(filePath);
-                const text = extracted.getBody();
-
-                clearTimeout(timeoutId);
-                if (!isResolved) {
-                    isResolved = true;
-
-                    const hasContent = text && text.trim().length > 0;
-
-                    // 【优化】只在解析失败时输出日志
-                    if (!hasContent) {
-                        extractorLogger.warn(`extractWithWordExtractor: [word-extractor] 未提取到内容: ${path.basename(filePath)}`);
-                    }
-
-                    resolve({
-                        text: hasContent ? text : '',
-                        unsupportedPreview: !hasContent
-                    });
+                const data = await readFileWithTimeout(filePath, FILE_READ_TIMEOUT_FAST_MS);
+                const text = extractTextFromBinary(data);
+                if (text.trim()) {
+                    return this.buildResult(text, 'WordExtractor-Fallback');
                 }
-
-            } catch (error: any) {
-                clearTimeout(timeoutId);
-                if (!isResolved) {
-                    isResolved = true;
-                    extractorLogger.error(`extractWithWordExtractor: ${error.message}`);
-
-                    // 降级到二进制提取
-                    try {
-                        // 【新增】使用带超时的文件读取（快速失败）
-                        const data = await readFileWithTimeout(filePath, FILE_READ_TIMEOUT_FAST_MS);
-                        const text = extractTextFromBinary(data);
-                        if (text.trim()) {
-                            resolve({text, unsupportedPreview: false});
-                            return;
-                        }
-                    } catch (e: any) {
-                        extractorLogger.error(`extractWithWordExtractor-fallback: ${e.message}`);
-                    }
-
-                    resolve({text: '', unsupportedPreview: true});
-                }
+            } catch (e: any) {
+                this.logger.error(`[${this.config.name}] 降级提取失败: ${e.message}`);
             }
-        })();
-    });
+
+            return this.handleError(error, filePath);
+        }
+    }
+}
+
+// 创建基础实例
+const baseExtractor = new WordExtractorClass();
+
+// 应用装饰器：超时 + 日志
+const enhancedExtract = composeDecorators(
+    baseExtractor.extract.bind(baseExtractor),
+    [
+        (fn) => withTimeout(fn, { timeoutMs: 30000 }),
+        (fn) => withLogging(fn, { 
+            logStart: false,
+            logEnd: false,
+            logError: true,
+            prefix: 'WordExtractor'
+        })
+    ]
+);
+
+/**
+ * 提取 Word 文件内容（兼容旧接口）
+ * @param filePath 文件路径
+ * @returns 提取结果
+ */
+export async function extractWithWordExtractor(filePath: string): Promise<ExtractorResult> {
+    return await enhancedExtract(filePath);
 }

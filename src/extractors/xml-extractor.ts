@@ -5,18 +5,17 @@
 
 import {createReadStream} from 'fs';
 import * as sax from 'sax';
-import {MAX_TEXT_CONTENT_SIZE_MB, BYTES_TO_MB, calculateParserTimeout} from '../core/scan-config';  // 【新增】导入超时配置
-import {convertNodeError} from '../utils/error-utils';
+import {MAX_TEXT_CONTENT_SIZE_MB, BYTES_TO_MB, calculateParserTimeout} from '../core/scan-config';
 import type {ExtractorResult} from './types';
 import {extractTextFile} from './text-extractor';
+import {buildExtractorResult} from './extractor-utils';
 import {extractorLogger} from "../logger/logger";
 import * as fs from 'fs';
 
 export async function extractXmlFile(filePath: string): Promise<ExtractorResult> {
-    // 【关键修复】添加智能超时保护，防止流式解析卡死
     let isResolved = false;
 
-    // 先获取文件大小，然后计算智能超时
+    // 获取文件大小并计算智能超时
     let stat: fs.Stats;
     try {
         stat = await fs.promises.stat(filePath);
@@ -39,7 +38,7 @@ export async function extractXmlFile(filePath: string): Promise<ExtractorResult>
         }, timeoutMs);
 
         const stream = createReadStream(filePath, {
-            highWaterMark: 64 * 1024 // 64KB 缓冲区
+            highWaterMark: 64 * 1024
         });
 
         // 创建严格模式的 sax 解析器
@@ -78,11 +77,7 @@ export async function extractXmlFile(filePath: string): Promise<ExtractorResult>
                 isResolved = true;
                 clearTimeout(timeoutId);
                 const textContent = textChunks.join(' ');
-                const hasContent = textContent.trim().length > 0;
-                resolve({
-                    text: hasContent ? textContent : '',
-                    unsupportedPreview: !hasContent
-                });
+                resolve(buildExtractorResult(textContent, 'XmlExtractor'));
             }
         });
 
@@ -103,7 +98,7 @@ export async function extractXmlFile(filePath: string): Promise<ExtractorResult>
                 isResolved = true;
                 clearTimeout(timeoutId);
                 extractorLogger.error(`extractXmlFile-stream: ${error}`);
-                reject(convertNodeError(error, filePath, '读取 XML 文件失败'));
+                reject(error);
             }
         });
     });
