@@ -24,7 +24,6 @@ import {
     WINDOW_TARGET_RATIO
 } from '../config/constants';
 import {PowerSaveManager} from './power-save-manager';
-import {PRELOAD_TS_PATH} from "../../preload";
 
 /**
  * 窗口管理器接口
@@ -142,7 +141,7 @@ export function createWindowManager(log: Logger): WindowManager {
                 webPreferences: {
                     nodeIntegration: false,
                     contextIsolation: true,
-                    preload: PRELOAD_TS_PATH
+                    preload: path.join(__dirname, '..', 'preload.js')
                 },
                 title: 'DataGuard Scanner - 敏感数据扫描工具',
                 icon: icon

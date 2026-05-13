@@ -172,5 +172,3 @@ declare global {
         };
     }
 }
-
-export const PRELOAD_TS_PATH = __filename;
