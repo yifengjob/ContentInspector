@@ -12,11 +12,9 @@ import {Worker} from 'worker_threads';
 import * as path from 'path';
 import * as fs from 'fs';
 import {BrowserWindow} from 'electron';
-import {Logger} from '../../logger/logger';
 import {mainLogger} from '../../logger/logger';
 import {calculatePreviewTimeout, PREVIEW_CHUNK_SIZE, WORKER_MAX_OLD_GENERATION_MB, WORKER_MAX_YOUNG_GENERATION_MB, PREVIEW_BASE_TIMEOUT} from '../config/constants';
 import {loadConfig} from '../config/manager';
-import {FILE_WORKER_PATH} from '../../workers/file-worker';
 
 /**
  * 预览 Worker 管理器接口
