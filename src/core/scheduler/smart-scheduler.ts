@@ -49,7 +49,7 @@ export class SmartScheduler {
     private eventBus: EventBus;
     private queueManager: TaskQueueManager;
     private workerPool: WorkerPool;
-    private scanState?: ScanState;  // 【新增】ScanState 引用，用于状态同步
+    private readonly scanState?: ScanState;  // 【新增】ScanState 引用，用于状态同步
     private readonly assignTaskToConsumer: (consumer: Consumer, task: Task) => void;
 
     // 【智能调度】状态跟踪
