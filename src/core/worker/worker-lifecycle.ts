@@ -11,7 +11,7 @@
 import {Worker} from 'worker_threads';
 import type {Consumer} from './worker-pool-types';
 import {safelyTerminateWorker} from './worker-utils';
-import {WORKER_RESTART_DELAY, WORKER_RESTART_SCHEDULE_DELAY, WORKER_CREATE_MAX_RETRY} from '../config/constants';
+import {WORKER_RESTART_DELAY, WORKER_CREATE_MAX_RETRY} from '../config/constants';
 import {FILE_WORKER_PATH} from "../../workers/file-worker";
 import {Logger} from '../../logger/logger';
 import type {EventBus} from '../infra/event-bus';
