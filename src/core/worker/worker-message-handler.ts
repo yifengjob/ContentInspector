@@ -192,8 +192,7 @@ export class WorkerMessageHandler {
      */
     handleTaskTimeout(
         consumer: Consumer,
-        task: any,  // Task type from task-queue
-        calculateTimeout: (fileSize: number) => number
+        task: any  // Task type from task-queue
     ): void {
         this.log.warn(`[TaskQueue] 任务 ${consumer.taskId} 超时: ${task.filePath}`);
 

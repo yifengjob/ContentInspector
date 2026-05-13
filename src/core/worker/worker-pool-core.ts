@@ -255,8 +255,7 @@ export class WorkerPool {
         const task = { filePath, fileSize: 0 }; // 简化版本，实际应该从 pendingTasks 获取
         this.messageHandler.handleTaskTimeout(
             consumer,
-            task,
-            this.callbacks.calculateTimeout
+            task
         );
         
         // 【修复】调用 worker-pool-core 自己的 restartWorker，而不是 lifecycleManager 的
