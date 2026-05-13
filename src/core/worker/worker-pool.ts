@@ -181,7 +181,7 @@ export class WorkerPool {
         // 【优化】智能计算最大迭代次数：poolSize × 最大重试次数
         const MAX_ITERATIONS = this.poolSize * MAX_RETRY_PER_WORKER;
         
-        const retryCounts = new Map<number, number>(); // consumerId -> retry count
+        const retryCounts = new Map<number, number>(); // consumerId -> 重试次数
         const failedWorkers: number[] = []; // 【新增】收集失败的 Worker ID
 
         while (this.workerCreateQueue.length > 0) {

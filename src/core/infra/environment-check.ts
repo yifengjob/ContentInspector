@@ -35,7 +35,7 @@ export function checkEnvironment(): EnvironmentCheck {
   // macOS特定检查
   if (platform === 'darwin') {
     const macVersion = parseFloat(release);
-    if (macVersion < 19.0) { // macOS 10.15 Catalina
+    if (macVersion < 19.0) { // macOS 10.15 Catalina（卡特琳娜）
       issues.push({
         title: 'macOS版本过低',
         description: '需要macOS 10.15 (Catalina)或更高版本',
