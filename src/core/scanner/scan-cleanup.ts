@@ -9,6 +9,7 @@
  */
 
 import {BrowserWindow} from 'electron';
+import {Worker} from 'worker_threads';
 import {ScanState} from '../state';
 import {WorkerPool} from '../worker';
 import {TaskQueueManager} from '../queue';
@@ -27,7 +28,7 @@ export interface CleanupOptions {
     scheduler: SmartScheduler;  // 【新增】智能调度器
     resultLogThrottler: LogThrottler;
     log: Logger;  // 【修复】使用明确的 Logger 类型，替代 any
-    walkerWorker: any; // Walker Worker 实例
+    walkerWorker: Worker;  // 【修复】使用明确的 Worker 类型，替代 any
     stagnationDetector?: StagnationDetector; // 停滞检测器
 }
 
