@@ -48,4 +48,6 @@ export interface WorkerPoolCallbacks {
     onResultLog: (resultCount: number, result: any) => void;
     onResultBatchSend: (mainWindow: BrowserWindow, resultItem: any) => void;
     calculateTimeout: (fileSize: number) => number;
+    // 【新增】重启 Worker 回调
+    onRestartWorker: (consumer: Consumer) => void;
 }

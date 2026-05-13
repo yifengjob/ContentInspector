@@ -215,7 +215,9 @@ export async function initializeScanner(
         onResultBatchSend: (mainWindow: BrowserWindow, resultItem: any) => {
             resultBatchSender.send(mainWindow, 'scan-result', resultItem);
         },
-        calculateTimeout: calculateTimeout
+        calculateTimeout: calculateTimeout,
+        // 【新增】重启 Worker 回调 - 稍后设置
+        onRestartWorker: (consumer: Consumer) => {} // 临时占位
     };
 
     // 创建 Worker 池
@@ -229,6 +231,11 @@ export async function initializeScanner(
         dynamicYoungGenMB,
         workerPoolCallbacks
     );
+
+    // 【关键】更新 onRestartWorker 回调为实际实现
+    workerPoolCallbacks.onRestartWorker = (consumer: Consumer) => {
+        workerPool.restartWorker(consumer);
+    };
 
     // 【修复】状态同步监听器已移至 SmartScheduler 中管理，此处不再需要
 

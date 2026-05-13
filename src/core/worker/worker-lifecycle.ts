@@ -178,6 +178,15 @@ export class WorkerLifecycleManager {
     }
 
     /**
+     * 终止单个 Consumer（不重启）
+     */
+    terminateConsumer(consumer: Consumer): void {
+        safelyTerminateWorker(consumer.worker, consumer, (msg) => this.log.info(msg));
+        // 从 Map 中删除
+        this.consumers.delete(consumer.id);
+    }
+
+    /**
      * 重启单个 Worker
      */
     restartWorker(consumer: Consumer): void {

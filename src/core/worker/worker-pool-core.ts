@@ -17,6 +17,7 @@ import {WorkerMessageHandler} from './worker-message-handler';
 import type {Consumer, PendingTask, WorkerPoolCallbacks} from './worker-pool-types';
 import type {Task} from '../queue/task-queue';
 import {markConsumerIdle} from './worker-utils';
+import {WORKER_RESTART_SCHEDULE_DELAY} from '../config/constants';
 
 export type {Consumer, PendingTask, WorkerPoolCallbacks};
 
@@ -217,7 +218,34 @@ export class WorkerPool {
      * 重启单个 Worker
      */
     restartWorker(consumer: Consumer): void {
-        this.lifecycleManager.restartWorker(consumer);
+        // 【修复】完全对齐拆分前的逻辑
+        // 1. 标记为主动终止
+        consumer.isTerminating = true;
+
+        // 2. 安全终止 Worker
+        const consumerId = consumer.id;
+        this.lifecycleManager.terminateConsumer(consumer);
+
+        // 3. 将 Worker 创建请求加入队列
+        this.lifecycleManager.enqueueCreateTask({consumerId});
+
+        // 4. 异步处理队列
+        setImmediate(() => {
+            this.lifecycleManager.processWorkerCreateQueue().catch(error => {
+                this.log.error(`[Worker重启] 处理创建队列失败: ${error.message}`);
+            });
+        });
+
+        // 5. 强制 GC
+        if ((global as any).gc) {
+            this.log.info(`[Worker重启] 执行强制垃圾回收...`);
+            (global as any).gc();
+        }
+
+        // 6. 延迟调度新任务
+        setTimeout(() => {
+            this.callbacks.onTryDispatch();
+        }, WORKER_RESTART_SCHEDULE_DELAY);
     }
 
     /**

@@ -177,8 +177,8 @@ export class WorkerMessageHandler {
                 // 延迟重启 Worker
                 setTimeout(() => {
                     if (!this.scanState.cancelFlag) {
-                        // 注意：这里需要调用 lifecycleManager.restartWorker
-                        // 但由于循环依赖问题，我们通过事件或直接调用来实现
+                        // 【修复】通过回调通知 worker-pool-core 进行重启
+                        this.callbacks.onRestartWorker(consumer);
                     }
                 }, WORKER_RESTART_DELAY);
             } else {
@@ -217,7 +217,7 @@ export class WorkerMessageHandler {
         // 标记为空闲
         markConsumerIdle(consumer);
 
-        // 重启 Worker - 注意：这里需要通过 worker-pool-core 调用 lifecycleManager
-        // 由于循环依赖问题，暂时留空，需要在 worker-pool-core 中实现
+        // 【修复】重启 Worker - 通过回调通知 worker-pool-core
+        this.callbacks.onRestartWorker(consumer);
     }
 }
