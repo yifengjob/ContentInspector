@@ -177,14 +177,30 @@ export class WorkerPool {
         this.isCreatingWorker = true;
         
         let iterationCount = 0;
-        const MAX_ITERATIONS = 50; // 【关键】防止无限循环，降低到 50 次
-        const retryCounts = new Map<number, number>(); // consumerId -> retry count
         const MAX_RETRY_PER_WORKER = 3; // 每个 Worker 最多重试 3 次
+        // 【优化】智能计算最大迭代次数：poolSize × 最大重试次数
+        const MAX_ITERATIONS = this.poolSize * MAX_RETRY_PER_WORKER;
+        
+        const retryCounts = new Map<number, number>(); // consumerId -> retry count
+        const failedWorkers: number[] = []; // 【新增】收集失败的 Worker ID
 
         while (this.workerCreateQueue.length > 0) {
             iterationCount++;
+            
+            // 【优化】使用动态计算的 MAX_ITERATIONS
             if (iterationCount > MAX_ITERATIONS) {
                 this.log.error(`[致命错误] processWorkerCreateQueue 迭代次数过多（${iterationCount}/${MAX_ITERATIONS}），强制退出以防止卡死`);
+                break;
+            }
+            
+            // 【新增】检查是否所有剩余 Worker 都已达到重试上限
+            const allRemainingFailed = this.workerCreateQueue.every(item => {
+                const retry = retryCounts.get(item.consumerId) || 0;
+                return retry >= MAX_RETRY_PER_WORKER;
+            });
+            
+            if (allRemainingFailed) {
+                this.log.error(`[致命错误] 所有 Worker 创建均失败，放弃继续尝试`);
                 break;
             }
             
@@ -194,6 +210,7 @@ export class WorkerPool {
             const currentRetry = retryCounts.get(consumerId) || 0;
             if (currentRetry >= MAX_RETRY_PER_WORKER) {
                 this.log.error(`[Worker创建] Worker ${consumerId} 重试次数过多（${currentRetry}/${MAX_RETRY_PER_WORKER}），放弃创建`);
+                failedWorkers.push(consumerId); // 【新增】记录失败的 Worker
                 continue; // 跳过这个 Worker，继续处理其他 Worker
             }
             
@@ -217,6 +234,18 @@ export class WorkerPool {
                 const waitTime = 500 * newRetryCount; // 第一次 500ms，第二次 1000ms，第三次 1500ms
                 this.log.warn(`[Worker创建] 等待 ${waitTime}ms 后重试...`);
                 await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
+        }
+
+        // 【新增】报告 Worker 创建失败情况
+        if (failedWorkers.length > 0) {
+            this.log.warn(`[Worker创建] 以下 Worker 创建失败: ${failedWorkers.join(', ')}`);
+            this.log.warn(`[Worker创建] 实际可用 Worker 数量: ${this.consumers.size}/${this.poolSize}`);
+            
+            // 【降级策略】如果所有 Worker 都失败，抛出错误
+            if (this.consumers.size === 0) {
+                this.isCreatingWorker = false;
+                throw new Error(`所有 Worker 创建失败，无法启动扫描`);
             }
         }
 
