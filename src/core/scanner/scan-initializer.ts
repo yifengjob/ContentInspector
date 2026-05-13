@@ -9,23 +9,22 @@
 
 import * as os from 'os';
 import {BrowserWindow} from 'electron';
-import {ScanConfig} from '../types';
-import {ScanState} from './scan-state';
-import {calculateActualConcurrency} from './config-manager';
+import {ScanConfig} from '../../types';
+import {ScanState} from '../state';
 import {
     BYTES_TO_MB,
-    ERROR_LOG_INTERVAL,
+    ERROR_LOG_INTERVAL, PROGRESS_THROTTLE_INTERVAL, RESULT_LOG_COUNT_INTERVAL, RESULT_LOG_TIME_INTERVAL,
     WORKER_MAX_OLD_GENERATION_MB,
     WORKER_MAX_YOUNG_GENERATION_MB
-} from './scan-config';
-import {configureBatchSender, createProgressUpdater, resultBatchSender, calculateTimeout} from '../utils/scanner-helpers';
-import {RESULT_LOG_COUNT_INTERVAL, RESULT_LOG_TIME_INTERVAL, PROGRESS_THROTTLE_INTERVAL} from './scan-config';
-import {EventBus} from './event-bus';
-import {TaskQueueManager} from './task-queue';
-import {Consumer, WorkerPool} from './worker-pool';
-import {SmartScheduler} from './smart-scheduler';
-import {getScannerLogger} from "../logger/logger";
-import {LogThrottler} from '../utils/scanner-helpers';
+} from '../config';
+import {configureBatchSender, createProgressUpdater, resultBatchSender, calculateTimeout} from './helpers/scanner-helpers';
+import {EventBus} from '../infra';
+import {TaskQueueManager} from '../queue';
+import {Consumer, WorkerPool} from '../worker';
+import {SmartScheduler} from '../scheduler';
+import {getScannerLogger} from "../../logger/logger";
+import {LogThrottler} from './helpers/scanner-helpers';
+import {calculateActualConcurrency} from "../config/manager";
 
 export interface ScannerContext {
     state: ScanState;
@@ -151,10 +150,7 @@ export async function initializeScanner(
     // 创建任务队列管理器
     const queueManager = new TaskQueueManager(eventBus);
 
-    // 状态同步：监听队列长度变化并更新 ScanState
-    eventBus.on('task-queue-length-changed', (length: number) => {
-        state.setTaskQueueLength(length);
-    });
+    // 【修复】状态同步监听器已移至 SmartScheduler 中管理，此处不再需要
 
     // 日志抑制
     const resultLogThrottler = new LogThrottler({
@@ -234,10 +230,7 @@ export async function initializeScanner(
         workerPoolCallbacks
     );
 
-    // 状态同步：监听待处理任务数变化并更新 ScanState
-    eventBus.on('pending-tasks-size-changed', (size: number) => {
-        state.setPendingTasksSize(size);
-    });
+    // 【修复】状态同步监听器已移至 SmartScheduler 中管理，此处不再需要
 
     // 创建智能调度器
     const scheduler = new SmartScheduler(
@@ -254,7 +247,8 @@ export async function initializeScanner(
             );
             state.incrementActiveWorkers();
             workerPool.incrementNextTaskId();
-        }
+        },
+        state  // 【新增】传递 scanState，用于状态同步
     );
 
     // 【关键】更新 cleanupConsumerState 回调为 scheduler 的实际实现

@@ -9,12 +9,15 @@
  */
 
 import {BrowserWindow} from 'electron';
-import {ScanState} from './scan-state';
-import {WorkerPool} from './worker-pool';
-import {TaskQueueManager} from './task-queue';
-import {EventBus} from './event-bus';
-import {LogThrottler, resultBatchSender, sendToMainWindow} from '../utils/scanner-helpers';
+import {Worker} from 'worker_threads';
+import {ScanState} from '../state';
+import {WorkerPool} from '../worker';
+import {TaskQueueManager} from '../queue';
+import {EventBus} from '../infra';
+import {SmartScheduler} from '../scheduler';
+import {LogThrottler, resultBatchSender, sendToMainWindow} from './helpers/scanner-helpers';
 import {StagnationDetector} from './scan-stagnation-detector';
+import {Logger} from '../../logger/logger';
 
 export interface CleanupOptions {
     state: ScanState;
@@ -22,9 +25,10 @@ export interface CleanupOptions {
     workerPool: WorkerPool;
     queueManager: TaskQueueManager;
     eventBus: EventBus;
+    scheduler: SmartScheduler;  // 【新增】智能调度器
     resultLogThrottler: LogThrottler;
-    log: any;
-    walkerWorker: any; // Walker Worker 实例
+    log: Logger;  // 【修复】使用明确的 Logger 类型，替代 any
+    walkerWorker: Worker;  // 【修复】使用明确的 Worker 类型，替代 any
     stagnationDetector?: StagnationDetector; // 停滞检测器
 }
 
@@ -79,11 +83,14 @@ export class ScanCleanup {
 
             this.options.log.info('[cleanup] 资源清理完成');
 
-            // 10. 触发垃圾回收
-            this.triggerGC();
+            // 10. 【修复】销毁调度器，清除扫描相关的事件监听器（保留日志监听器）
+            this.options.scheduler.destroy();
 
-            // 11. 清空事件总线
-            this.options.eventBus.clearAll();
+            // 11. 【监控】验证监听器状态
+            this.verifyListenerCleanup();
+
+            // 12. 触发垃圾回收（在所有资源清理完成后）
+            this.triggerGC();
         } catch (error) {
             this.options.log('[cleanup] 清理过程中出错: ' + error);
             this.options.state.isScanning = false;
@@ -108,7 +115,8 @@ export class ScanCleanup {
             if (walkerWorker) {
                 walkerWorker.postMessage({type: 'cancel-all'});
                 walkerWorker.removeAllListeners();
-                walkerWorker.terminate();
+                // 【修复】正确处理 terminate 返回的 Promise
+                void walkerWorker.terminate();
             }
         } catch (error) {
             this.options.log.info(`终止 Walker Worker 失败: ${error}`);
@@ -143,6 +151,38 @@ export class ScanCleanup {
         if ((global as any).gc) {
             this.options.log.info('[cleanup] 触发垃圾回收...');
             (global as any).gc();
+        }
+    }
+
+    /**
+     * 【监控】验证监听器清理状态
+     * 
+     * 职责：
+     * - 输出所有事件的监听器数量
+     * - 检测非预期的监听器（内存泄漏风险）
+     * - 检查日志监听器是否存在
+     */
+    private verifyListenerCleanup(): void {
+        const {eventBus, log} = this.options;
+        
+        // 1. 输出所有事件的监听器状态
+        const allStats = eventBus.getAllListenerStats();
+        const statsArray = Array.from(allStats.entries())
+            .map(([event, count]) => `${event}=${count}`)
+            .join(', ');
+        log.info(`[cleanup] 事件监听器状态: ${statsArray || '无监听器'}`);
+        
+        // 2. 检查是否有非预期的监听器（期望只有 log:message）
+        const unexpectedListeners = eventBus.checkUnexpectedListeners(['log:message']);
+        if (unexpectedListeners.length > 0) {
+            const details = unexpectedListeners.map(({ event, count }) => `${event}(${count})`).join(', ');
+            log.warn(`[cleanup] ⚠️ 检测到非预期监听器: ${details}，可能存在内存泄漏风险！`);
+        }
+        
+        // 3. 检查日志监听器是否存在
+        const logMessageCount = eventBus.getListenerCount('log:message');
+        if (logMessageCount === 0) {
+            log.warn('[cleanup] ⚠️ 日志监听器也被清除了，第二次扫描时将无法显示日志！');
         }
     }
 }

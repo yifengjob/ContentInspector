@@ -8,11 +8,10 @@
  */
 
 import {Worker} from 'worker_threads';
-import {ScanState} from './scan-state';
+import {ScanState} from '../state';
 import {ScannerContext} from './scan-initializer';
-import {getFileType} from '../utils/file-types';
-import {LARGE_FILE_THRESHOLD_MB, BYTES_TO_MB, WORKER_RESTART_DELAY} from './scan-config';
-import {EventBus} from './event-bus';
+import {getFileType} from '../../utils/file-types';
+import {LARGE_FILE_THRESHOLD_MB, BYTES_TO_MB, WORKER_RESTART_DELAY} from '../config';
 
 export interface WalkerHandlerOptions {
     state: ScanState;
@@ -24,7 +23,7 @@ export interface WalkerHandlerOptions {
 
 export class WalkerHandler {
     private worker: Worker;
-    private options: WalkerHandlerOptions;
+    private readonly options: WalkerHandlerOptions;
     private lastProgressUpdateTime = 0;
     private lastTaskEnqueueTime = Date.now();
 
@@ -197,7 +196,8 @@ export class WalkerHandler {
         try {
             this.worker.postMessage({type: 'cancel-all'});
             this.worker.removeAllListeners();
-            this.worker.terminate();
+            // 【修复】正确处理 terminate 返回的 Promise
+            void this.worker.terminate();
         } catch (error) {
             this.options.context.log.info(`终止 Walker Worker 失败: ${error}`);
         }

@@ -5,7 +5,7 @@
 
 import {createReadStream} from 'fs';
 import * as sax from 'sax';
-import {MAX_TEXT_CONTENT_SIZE_MB, BYTES_TO_MB} from '../core/scan-config';
+import {MAX_TEXT_CONTENT_SIZE_MB, BYTES_TO_MB} from '../core/config/constants';
 import type {ExtractorResult} from './types';
 import {BaseExtractor} from './base-extractor';
 import {extractTextFile} from './text-extractor';

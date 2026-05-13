@@ -19,33 +19,23 @@ import {setupAllPdfPolyfills} from './utils/pdf-polyfills';
 
 setupAllPdfPolyfills();
 
-import {ScanState} from './core/scan-state';
-import {LogManager} from './core/log-manager';  // 【新增】导入日志管理器
+import {
+    BYTES_TO_MB,
+    calculatePreviewTimeout,
+    calculateRecommendedConcurrency, CANCEL_SCAN_CHECK_INTERVAL, CANCEL_SCAN_MAX_WAIT,
+    cancelScan, checkEnvironment,
+    loadConfig, LOG_RETENTION_DAYS,
+    LogManager, MS_TO_DAYS, PREVIEW_BASE_TIMEOUT, PREVIEW_CHUNK_SIZE,
+    saveConfig,
+    ScanState,
+    startScan, WINDOW_DEFAULT_HEIGHT, WINDOW_DEFAULT_WIDTH, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH, WINDOW_TARGET_RATIO,
+    WORKER_MAX_OLD_GENERATION_MB, WORKER_MAX_YOUNG_GENERATION_MB,
+} from './core';
 import {getDirectoryTree} from './services/directory-tree';
-import {cancelScan, startScan} from './core/scanner';
 import {deleteFile, openFile, openFileLocation} from './services/file-operations';
 import {exportReport} from './services/report-exporter';
-import {loadConfig, saveConfig, calculateRecommendedConcurrency} from './core/config-manager';
-import {checkEnvironment} from './core/environment-check';
 import {getSensitiveRules} from './detection/sensitive-detector';
-// 【优化】导入配置常量
-import {
-    CANCEL_SCAN_MAX_WAIT,
-    CANCEL_SCAN_CHECK_INTERVAL,
-    WORKER_MAX_OLD_GENERATION_MB,
-    WORKER_MAX_YOUNG_GENERATION_MB,
-    PREVIEW_CHUNK_SIZE,  // 【方案 D3】预览流式传输块大小
-    calculatePreviewTimeout,  // 【重构】智能预览超时计算
-    PREVIEW_BASE_TIMEOUT,  // 【重构】预览基础超时
-    WINDOW_MIN_WIDTH,
-    WINDOW_MIN_HEIGHT,
-    WINDOW_DEFAULT_WIDTH,
-    WINDOW_DEFAULT_HEIGHT,
-    WINDOW_TARGET_RATIO,
-    MS_TO_DAYS,
-    BYTES_TO_MB,
-    LOG_RETENTION_DAYS// 【方案 C】预览文件大小限制
-} from './core/scan-config';
+
 
 // 【修复】添加全局未处理异常处理器，防止 Windows 闪退
 process.on('unhandledRejection', (reason, _promise) => {
@@ -329,7 +319,7 @@ function setupIpcHandlers() {
     // 取消扫描
     ipcMain.handle('scan-cancel', async () => {
         mainLogger.info('[取消扫描] 收到取消请求');
-        
+
         // 【修复】不再检查 isScanning，始终调用 cancelScan
         // 即使 isScanning 为 false，也要确保清理所有资源
         cancelScan(scanState);

@@ -48,6 +48,9 @@ export class ScanState extends EventEmitter {
     // 【新增】已计数的任务 ID 集合（用于防止重复计数）
     private countedTaskIds: Set<number> = new Set();
     
+    // 【新增】取消扫描函数（内部使用，避免 any 类型断言）
+    private cancelHandler?: () => void;
+    
     /**
      * 私有构造函数，防止外部直接实例化
      */
@@ -96,6 +99,9 @@ export class ScanState extends EventEmitter {
             pendingTasksSize: 0
         };
         this.countedTaskIds.clear();
+        
+        // 【新增】清除取消处理器
+        this.cancelHandler = undefined;
         
         // 通知监听器状态已重置
         this.emit('state-reset');
@@ -392,5 +398,58 @@ export class ScanState extends EventEmitter {
             this.state.taskQueueLength === 0 &&
             this.state.pendingTasksSize === 0
         );
+    }
+    
+    // ==================== Cancel Handler ====================
+    
+    /**
+     * 设置取消扫描处理器
+     * 
+     * 【使用场景】
+     * - 在 startScan 中注册取消逻辑
+     * - 避免使用 any 类型断言
+     * 
+     * 【示例】
+     * ```typescript
+     * state.setCancelHandler(() => {
+     *     if (state.cancelFlag) {
+     *         log.info('[取消扫描] 已经在取消过程中，忽略重复请求');
+     *         return;
+     *     }
+     *     log.info('[取消扫描] 收到取消请求，正在停止扫描...');
+     *     state.cancelFlag = true;
+     *     // ... 清理资源
+     * });
+     * ```
+     * 
+     * @param handler 取消处理函数
+     */
+    setCancelHandler(handler: () => void): void {
+        this.cancelHandler = handler;
+    }
+    
+    /**
+     * 执行取消扫描
+     * 
+     * 【使用场景】
+     * - 外部调用 cancelScan() 时触发
+     * - 提供类型安全的取消机制
+     * 
+     * 【示例】
+     * ```typescript
+     * // 在 cancelScan 函数中
+     * export function cancelScan(scanState?: ScanState): void {
+     *     const state = scanState || ScanState.getInstance();
+     *     state.executeCancel();
+     * }
+     * ```
+     */
+    executeCancel(): void {
+        if (this.cancelHandler) {
+            this.cancelHandler();
+        } else {
+            // 后备方案：仅设置标志（适用于未通过 startScan 启动的情况）
+            this.cancelFlag = true;
+        }
     }
 }

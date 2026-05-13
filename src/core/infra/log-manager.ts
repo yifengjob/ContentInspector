@@ -11,7 +11,7 @@
 import {BrowserWindow} from 'electron';
 import {EventBus} from './event-bus';
 import {LogEventData} from "./event-types";
-import {logManagerLogger} from "../logger/logger";
+import {logManagerLogger} from "../../logger/logger";
 
 /**
  * 日志管理器类

@@ -5,7 +5,7 @@
 
 import * as path from 'path';
 // 【修复】导入 UI 显示配置常量
-import { FILE_SIZE_DECIMAL_PLACES } from '../core/scan-config';
+import { FILE_SIZE_DECIMAL_PLACES } from '../core/config/constants';
 
 /**
  * 应用错误类

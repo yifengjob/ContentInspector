@@ -9,14 +9,14 @@
  */
 
 import {Worker} from 'worker_threads';
-import * as path from 'path';
-import {EventBus} from './event-bus';
-import type {ScanState} from './scan-state';
+import {EventBus} from '../infra/event-bus';
+import type {ScanState} from '../state/scan-state';
 import type {BrowserWindow} from 'electron';
-import {markConsumerIdle, safelyTerminateWorker} from '../utils/scanner-helpers';
-import {WORKER_RESTART_DELAY, WORKER_RESTART_SCHEDULE_DELAY} from './scan-config';
-import type {Task} from './task-queue';
-import {createLogger, Logger} from '../logger/logger';
+import {markConsumerIdle, safelyTerminateWorker} from './worker-utils';  // 【修复】从本地导入，避免循环依赖
+import {WORKER_RESTART_DELAY, WORKER_RESTART_SCHEDULE_DELAY, WORKER_CREATE_MAX_RETRY} from '../config/constants';
+import type {Task} from '../queue/task-queue';
+import {createLogger, Logger} from '../../logger/logger';
+import {FILE_WORKER_PATH} from "../../workers/file-worker";
 
 /**
  * Consumer Worker 接口
@@ -176,14 +176,31 @@ export class WorkerPool {
         this.isCreatingWorker = true;
         
         let iterationCount = 0;
-        const MAX_ITERATIONS = 50; // 【关键】防止无限循环，降低到 50 次
-        const retryCounts = new Map<number, number>(); // consumerId -> retry count
-        const MAX_RETRY_PER_WORKER = 3; // 每个 Worker 最多重试 3 次
+        // 【优化】使用配置文件中的常量，提高可维护性
+        const MAX_RETRY_PER_WORKER = WORKER_CREATE_MAX_RETRY;
+        // 【优化】智能计算最大迭代次数：poolSize × 最大重试次数
+        const MAX_ITERATIONS = this.poolSize * MAX_RETRY_PER_WORKER;
+        
+        const retryCounts = new Map<number, number>(); // consumerId -> 重试次数
+        const failedWorkers: number[] = []; // 【新增】收集失败的 Worker ID
 
         while (this.workerCreateQueue.length > 0) {
             iterationCount++;
+            
+            // 【优化】使用动态计算的 MAX_ITERATIONS
             if (iterationCount > MAX_ITERATIONS) {
                 this.log.error(`[致命错误] processWorkerCreateQueue 迭代次数过多（${iterationCount}/${MAX_ITERATIONS}），强制退出以防止卡死`);
+                break;
+            }
+            
+            // 【新增】检查是否所有剩余 Worker 都已达到重试上限
+            const allRemainingFailed = this.workerCreateQueue.every(item => {
+                const retry = retryCounts.get(item.consumerId) || 0;
+                return retry >= MAX_RETRY_PER_WORKER;
+            });
+            
+            if (allRemainingFailed) {
+                this.log.error(`[致命错误] 所有 Worker 创建均失败，放弃继续尝试`);
                 break;
             }
             
@@ -193,6 +210,7 @@ export class WorkerPool {
             const currentRetry = retryCounts.get(consumerId) || 0;
             if (currentRetry >= MAX_RETRY_PER_WORKER) {
                 this.log.error(`[Worker创建] Worker ${consumerId} 重试次数过多（${currentRetry}/${MAX_RETRY_PER_WORKER}），放弃创建`);
+                failedWorkers.push(consumerId); // 【新增】记录失败的 Worker
                 continue; // 跳过这个 Worker，继续处理其他 Worker
             }
             
@@ -219,6 +237,18 @@ export class WorkerPool {
             }
         }
 
+        // 【新增】报告 Worker 创建失败情况
+        if (failedWorkers.length > 0) {
+            this.log.warn(`[Worker创建] 以下 Worker 创建失败: ${failedWorkers.join(', ')}`);
+            this.log.warn(`[Worker创建] 实际可用 Worker 数量: ${this.consumers.size}/${this.poolSize}`);
+            
+            // 【降级策略】如果所有 Worker 都失败，抛出错误
+            if (this.consumers.size === 0) {
+                this.isCreatingWorker = false;
+                throw new Error(`所有 Worker 创建失败，无法启动扫描`);
+            }
+        }
+
         this.isCreatingWorker = false;
     }
 
@@ -226,7 +256,8 @@ export class WorkerPool {
      * 创建 Consumer Worker
      */
     private createConsumer(id: number, customOldGen?: number, customYoungGen?: number): void {
-        const workerPath = path.join(__dirname, '..', 'workers', 'file-worker.js');
+        // 【优化】使用统一的常量路径，便于维护和 IDE 跟踪
+        const workerPath = FILE_WORKER_PATH;
 
         // 使用自定义内存限制或默认值
         const oldGenLimit = customOldGen || this.dynamicOldGenMB;

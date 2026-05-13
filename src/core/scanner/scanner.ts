@@ -11,13 +11,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {Worker} from 'worker_threads';
 import {BrowserWindow} from 'electron';
-import {ScanConfig} from '../types';
-import {ScanState} from './scan-state';
+import {ScanConfig} from '../../types';
+import {ScanState} from '../state';
 import {initializeScanner} from './scan-initializer';
 import {WalkerHandler} from './scan-walker-handler';
 import {StagnationDetector} from './scan-stagnation-detector';
 import {ScanCleanup} from './scan-cleanup';
-import {getScannerLogger} from "../logger/logger";
+import {getScannerLogger} from "../../logger/logger";
+import {WALKER_WORKER_PATH} from "../../workers/walker-worker";
 
 export async function startScan(
     config: ScanConfig,
@@ -51,7 +52,8 @@ export async function startScan(
     const context = await initializeScanner(config, mainWindow, state);
 
     // ==================== 【Walker Worker】====================
-    const walkerWorker = new Worker(path.join(__dirname, '..', 'workers', 'walker-worker.js'));
+    // 【优化】使用统一的常量路径，便于维护和 IDE 跟踪
+    const walkerWorker = new Worker(WALKER_WORKER_PATH);
 
     // Walker 完成计数
     const walkerCompletedCountRef = {value: 0};
@@ -110,6 +112,7 @@ export async function startScan(
             workerPool: context.workerPool,
             queueManager: context.queueManager,
             eventBus: context.eventBus,
+            scheduler: context.scheduler,  // 【新增】传递调度器
             resultLogThrottler: context.resultLogThrottler,
             log,
             walkerWorker,
@@ -120,8 +123,8 @@ export async function startScan(
 
     // ==================== 【启动扫描】====================
 
-    // 【关键修复】创建取消函数并保存到局部变量（避免使用 any 类型断言）
-    const doCancelScan = () => {
+    // 【关键修复】设置取消处理器（类型安全，避免 any 断言）
+    state.setCancelHandler(() => {
         if (state.cancelFlag) {
             log.info('[取消扫描] 已经在取消过程中，忽略重复请求');
             return;
@@ -137,10 +140,7 @@ export async function startScan(
         log.info('[取消扫描] 开始调用 cleanup...');
         performCleanup();
         log.info('[取消扫描] cleanup 调用完成');
-    };
-
-    // 将取消函数挂载到 ScanState，供外部 cancelScan() 调用
-    (state as any)._cancelScan = doCancelScan;
+    });
 
     const totalPaths = config.selectedPaths.length;
     let currentPathIndex = 0;
@@ -204,12 +204,6 @@ export async function startScan(
 export function cancelScan(scanState?: ScanState): void {
     const state = scanState || ScanState.getInstance();
     
-    // 【关键修复】调用内部挂载的取消函数
-    if ((state as any)._cancelScan) {
-        (state as any)._cancelScan();
-    } else {
-        // 后备方案：仅设置标志（适用于未通过 startScan 启动的情况）
-        // 注意：正常情况下不应该走到这里，因为 _cancelScan 应该在 startScan 中挂载
-        state.cancelFlag = true;
-    }
+    // 【类型安全】调用 executeCancel 方法，避免 any 断言
+    state.executeCancel();
 }

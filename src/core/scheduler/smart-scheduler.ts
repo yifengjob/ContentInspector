@@ -1,6 +1,6 @@
 /**
  * 智能调度器模块
- * 
+ *
  * 职责：
  * - 实现4层智能调度策略
  * - 类型互斥和超时检测
@@ -8,26 +8,30 @@
  * - 事件驱动的 Worker 任务分配
  */
 
-import {EventBus} from './event-bus';
-import type {TaskQueueManager, Task} from './task-queue';
-import type {WorkerPool, Consumer} from './worker-pool';
+import {EventBus} from '../infra';
+import type {TaskQueueManager, Task} from '../queue';
+import type {WorkerPool, Consumer} from '../worker';
+import type {ScanState} from '../state';
 import {
     ENABLE_SMART_SCHEDULING,
     LARGE_FILE_THRESHOLD_MB,
     MAX_LARGE_FILES_CONCURRENT,
     TYPE_MUTEX_TIMEOUT_MS,
     BYTES_TO_MB
-} from './scan-config';
+} from '../config';
+import {createLogger, Logger} from '../../logger/logger';
 
 /**
  * 智能调度器
- * 
+ *
+ * 【重要】创建后必须立即调用 initialize() 方法
+ *
  * 调度策略优先级：
  * 1. 优先处理大文件（如果未达上限且类型不冲突）
  * 2. 选择不同类型的小文件（确保 Worker 不闲置）
  * 3. 类型超时后允许同类型（防止死锁）
  * 4. 兜底：违反类型互斥，但遵守大文件限制（确保 Worker 不闲置）
- * 
+ *
  * 使用示例：
  * ```typescript
  * const scheduler = new SmartScheduler(
@@ -36,35 +40,64 @@ import {
  *     workerPool,
  *     assignTaskToConsumerCallback
  * );
- * 
- * scheduler.initialize();
+ *
+ * scheduler.initialize(); // ← 必须调用
  * ```
  */
 export class SmartScheduler {
+    private readonly log: Logger;
     private eventBus: EventBus;
     private queueManager: TaskQueueManager;
     private workerPool: WorkerPool;
+    private readonly scanState?: ScanState;  // 【新增】ScanState 引用，用于状态同步
     private readonly assignTaskToConsumer: (consumer: Consumer, task: Task) => void;
-    
+
     // 【智能调度】状态跟踪
     private processingTypeCount = new Map<string, number>();
     private largeFilesProcessing = 0;
     private lastTypeScheduleTime = new Map<string, number>();
-    
+
     // 【新架构】轮询索引
     private nextTypeIndex = 0;
     private typeOrder: string[] = [];
+
+    // 【新增】保存事件处理器引用，用于清理
+    // 【防御性编程】初始化为带警告的空函数，如果忘记调用 initialize() 会输出警告日志
+    private initializationWarningShown = false;
+    
+    private onWorkerCreated: (consumer: Consumer) => void = (consumer) => {
+        this.showInitializationWarning('onWorkerCreated', `Consumer ID: ${consumer.id}`);
+    };
+    
+    private onWorkerIdle: (consumer: Consumer) => void = (consumer) => {
+        this.showInitializationWarning('onWorkerIdle', `Consumer ID: ${consumer.id}`);
+    };
+    
+    private onTaskEnqueued: () => void = () => {
+        this.showInitializationWarning('onTaskEnqueued');
+    };
+    
+    private onWalkerBatchReady: () => void = () => {
+        this.showInitializationWarning('onWalkerBatchReady');
+    };
+    
+    // 【新增】状态同步监听器（用于清理）
+    private onQueueLengthChanged?: (length: number) => void;
+    private onPendingTasksSizeChanged?: (size: number) => void;
 
     constructor(
         eventBus: EventBus,
         queueManager: TaskQueueManager,
         workerPool: WorkerPool,
-        assignTaskToConsumer: (consumer: Consumer, task: Task) => void
+        assignTaskToConsumer: (consumer: Consumer, task: Task) => void,
+        scanState?: ScanState  // 【新增】ScanState 引用，用于状态同步
     ) {
+        this.log = createLogger('SmartScheduler');
         this.eventBus = eventBus;
         this.queueManager = queueManager;
         this.workerPool = workerPool;
         this.assignTaskToConsumer = assignTaskToConsumer;
+        this.scanState = scanState;
     }
 
     /**
@@ -76,34 +109,63 @@ export class SmartScheduler {
             return;
         }
 
-        // 订阅 Worker 创建事件
-        this.eventBus.on('worker.created', (consumer: Consumer) => {
+        // 【防御性编程】重置警告标志
+        // 注意：虽然下面的赋值会覆盖默认的事件处理器，
+        // 但重置标志是为了支持“销毁后重新初始化”的场景
+        this.initializationWarningShown = false;
+
+        // 【关键】这里的事件处理器赋值会覆盖构造函数中的默认实现
+        // 因此 initialize() 之后，不会再触发初始化警告
+        // 【新增】创建并保存事件处理器引用
+        this.onWorkerCreated = (consumer: Consumer) => {
             this.assignTaskToIdleConsumer(consumer);
-        });
-        
-        // 订阅 Worker 空闲事件
-        this.eventBus.on('worker.idle', (consumer: Consumer) => {
+        };
+
+        this.onWorkerIdle = (consumer: Consumer) => {
             this.assignTaskToIdleConsumer(consumer);
-        });
-        
-        // 订阅任务入队事件
-        this.eventBus.on('task.enqueued', () => {
+        };
+
+        this.onTaskEnqueued = () => {
             // 为第一个空闲 Worker 分配任务
             const idleConsumer = this.workerPool.getIdleConsumer();
             if (idleConsumer) {
                 this.assignTaskToIdleConsumer(idleConsumer);
             }
-        });
-        
-        // 订阅 Walker 批量文件就绪事件
-        this.eventBus.on('walker.batch-ready', () => {
+        };
+
+        this.onWalkerBatchReady = () => {
             // 为所有空闲 Worker 分配任务
             for (const consumer of this.workerPool.getConsumers().values()) {
                 if (!consumer.busy) {
                     this.assignTaskToIdleConsumer(consumer);
                 }
             }
-        });
+        };
+
+        // 订阅 Worker 创建事件
+        this.eventBus.on('worker.created', this.onWorkerCreated);
+
+        // 订阅 Worker 空闲事件
+        this.eventBus.on('worker.idle', this.onWorkerIdle);
+
+        // 订阅任务入队事件
+        this.eventBus.on('task.enqueued', this.onTaskEnqueued);
+
+        // 订阅 Walker 批量文件就绪事件
+        this.eventBus.on('walker.batch-ready', this.onWalkerBatchReady);
+        
+        // 【新增】注册状态同步监听器（如果提供了 scanState）
+        if (this.scanState) {
+            this.onQueueLengthChanged = (length: number) => {
+                this.scanState!.setTaskQueueLength(length);
+            };
+            this.onPendingTasksSizeChanged = (size: number) => {
+                this.scanState!.setPendingTasksSize(size);
+            };
+            
+            this.eventBus.on('task-queue-length-changed', this.onQueueLengthChanged);
+            this.eventBus.on('pending-tasks-size-changed', this.onPendingTasksSizeChanged);
+        }
     }
 
     /**
@@ -151,7 +213,7 @@ export class SmartScheduler {
 
     /**
      * 为指定 Worker 选择最优任务
-     * 
+     *
      * @returns 选中的任务，如果没有可用任务则返回 null
      */
     selectOptimalTask(): Task | null {
@@ -245,11 +307,11 @@ export class SmartScheduler {
     assignTaskToIdleConsumer(requestingConsumer: Consumer): void {
         // 【关键】只为这个特定的 Worker 选择任务，不遍历其他 Worker
         const selectedTask = this.selectOptimalTask();
-        
+
         if (selectedTask) {
             // 分配任务
             this.assignTaskToConsumer(requestingConsumer, selectedTask);
-            
+
             // 更新调度状态
             this.processingTypeCount.set(
                 selectedTask.fileType,
@@ -316,5 +378,52 @@ export class SmartScheduler {
      */
     getLastTypeScheduleTime(): Map<string, number> {
         return this.lastTypeScheduleTime;
+    }
+
+    /**
+     * 【防御性编程】显示初始化警告（只输出一次）
+     * 
+     * 如果忘记调用 initialize()，事件处理器被调用时会输出此警告
+     * 帮助开发者快速定位问题
+     * 
+     * @param methodName 被调用的方法名
+     * @param context 上下文信息（可选）
+     */
+    private showInitializationWarning(methodName: string, context?: string): void {
+        if (!this.initializationWarningShown) {
+            this.log.warn(
+                `⚠️ ${methodName} 被调用，但 SmartScheduler 尚未初始化！\n` +
+                `  ${context ? context + '\n' : ''}` +
+                `  请确保在创建 SmartScheduler 后立即调用 initialize()`
+            );
+            this.initializationWarningShown = true;
+        }
+    }
+
+    /**
+     * 【新增】销毁调度器，清理事件监听器
+     * 防止内存泄漏：每次扫描结束后必须调用
+     */
+    destroy(): void {
+        // 移除所有事件监听器
+        this.eventBus.off('worker.created', this.onWorkerCreated);
+        this.eventBus.off('worker.idle', this.onWorkerIdle);
+        this.eventBus.off('task.enqueued', this.onTaskEnqueued);
+        this.eventBus.off('walker.batch-ready', this.onWalkerBatchReady);
+        
+        // 【新增】移除状态同步监听器
+        if (this.onQueueLengthChanged) {
+            this.eventBus.off('task-queue-length-changed', this.onQueueLengthChanged);
+        }
+        if (this.onPendingTasksSizeChanged) {
+            this.eventBus.off('pending-tasks-size-changed', this.onPendingTasksSizeChanged);
+        }
+
+        // 清空状态
+        this.processingTypeCount.clear();
+        this.lastTypeScheduleTime.clear();
+        this.largeFilesProcessing = 0;
+        this.typeOrder = [];
+        this.nextTypeIndex = 0;
     }
 }

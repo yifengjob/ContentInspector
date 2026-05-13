@@ -1,4 +1,4 @@
-import { EnvironmentCheck } from '../types';
+import { EnvironmentCheck } from '../../types';
 import * as os from 'os';
 
 export function checkEnvironment(): EnvironmentCheck {

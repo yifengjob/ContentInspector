@@ -17,7 +17,7 @@ import {
     LOG_FRONTEND_LEVEL,
     LOG_ENABLE_FILE,
     LOG_ENABLE_FRONTEND
-} from '../core/scan-config';
+} from '../core/config/constants';
 
 // 【配置】日志保留天数
 const LOG_RETENTION_DAYS = 30;
@@ -298,7 +298,7 @@ function bridgeWorkerLogToMain(level: LogLevel, message: string, context: string
 function emitLogToEventBus(level: LogLevel, message: string, context: string): void {
     try {
         // 【修复】直接使用 EventBus 单例，不依赖全局变量
-        const {EventBus} = require('../core/event-bus');
+        const {EventBus} = require('../core/infra/event-bus');
         const eventBus = EventBus.getInstance();
         if (eventBus) {
             eventBus.emit('log:message', {

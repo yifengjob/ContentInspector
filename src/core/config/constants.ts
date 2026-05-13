@@ -14,7 +14,7 @@
  * 9. UI 配置（窗口、显示）
  */
 
-import {LogLevel} from "../types";
+import {LogLevel} from "../../types";
 
 // ==================== 1. 单位转换常量 ====================
 
@@ -64,6 +64,14 @@ export const WORKER_RESTART_DELAY = 100; // 100ms
 
 /** Worker 重启后调度延迟（毫秒）- 给系统时间完成资源清理 */
 export const WORKER_RESTART_SCHEDULE_DELAY = 150; // 150ms
+
+// --- 2.4 Worker 创建配置 ---
+
+/** Worker 创建最大重试次数 - 每个 Worker 最多重试几次 */
+export const WORKER_CREATE_MAX_RETRY = 3;
+
+/** Worker 创建队列处理超时保护系数 - 用于动态计算最大迭代次数 */
+export const WORKER_CREATE_ITERATION_MULTIPLIER = 1; // poolSize × MAX_RETRY × MULTIPLIER
 
 // ==================== 3. 超时配置 ====================
 
