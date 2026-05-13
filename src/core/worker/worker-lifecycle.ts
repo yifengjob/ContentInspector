@@ -85,7 +85,7 @@ export class WorkerLifecycleManager {
             });
 
             if (allRemainingFailed) {
-                this.log.warn('[Worker创建] 所有剩余 Worker 都已达到重试上限，停止创建');
+                this.log.error(`[致命错误] 所有 Worker 创建均失败，放弃继续尝试`);
                 break;
             }
 
@@ -93,9 +93,12 @@ export class WorkerLifecycleManager {
             const currentRetry = retryCounts.get(task.consumerId) || 0;
 
             if (currentRetry >= MAX_RETRY_PER_WORKER) {
+                this.log.error(`[Worker创建] Worker ${task.consumerId} 重试次数过多（${currentRetry}/${MAX_RETRY_PER_WORKER}），放弃创建`);
                 failedWorkers.push(task.consumerId);
                 continue;
             }
+
+            this.log.info(`[Worker创建] 尝试创建 Worker ${task.consumerId} (第${iterationCount}次迭代, 重试${currentRetry + 1}/${MAX_RETRY_PER_WORKER})`);
 
             try {
                 this.createConsumer(
@@ -112,7 +115,7 @@ export class WorkerLifecycleManager {
             } catch (error: any) {
                 const newRetryCount = currentRetry + 1;
                 retryCounts.set(task.consumerId, newRetryCount);
-                this.log.error(`[Worker创建] Consumer ${task.consumerId} 创建失败 (尝试 ${newRetryCount}/${MAX_RETRY_PER_WORKER}): ${error.message}`);
+                this.log.error(`[Worker创建] 创建 Worker ${task.consumerId} 失败 (${newRetryCount}/${MAX_RETRY_PER_WORKER}): ${error.message}`);
                 
                 // 【修复】如果是因为资源不足（EAGAIN），记录警告
                 if (error.code === 'EAGAIN') {
@@ -137,7 +140,7 @@ export class WorkerLifecycleManager {
             
             // 【降级策略】如果所有 Worker 都失败，抛出错误
             if (this.consumers.size === 0) {
-                throw new Error('所有 Worker 创建失败，无法启动扫描');
+                throw new Error(`所有 Worker 创建失败，无法启动扫描`);
             }
         }
     }
@@ -149,12 +152,24 @@ export class WorkerLifecycleManager {
         const oldGenMB = customOldGen ?? this.defaultOldGenMB;
         const youngGenMB = customYoungGen ?? this.defaultYoungGenMB;
 
-        const worker = new Worker(FILE_WORKER_PATH, {
-            resourceLimits: {
-                maxOldGenerationSizeMb: oldGenMB,
-                maxYoungGenerationSizeMb: youngGenMB
+        let worker: Worker;
+        try {
+            worker = new Worker(FILE_WORKER_PATH, {
+                resourceLimits: {
+                    maxOldGenerationSizeMb: oldGenMB,
+                    maxYoungGenerationSizeMb: youngGenMB
+                }
+            });
+        } catch (error: any) {
+            this.log.error(`无法创建 Worker ${id} - ${error.message}`);
+
+            // 【修复】如果是因为资源不足（EAGAIN），将创建请求放回队列重试
+            if (error.code === 'EAGAIN') {
+                this.log.warn(`[Worker创建] 系统资源不足，Worker ${id} 将在稍后重试创建`);
             }
-        });
+
+            throw error; // 抛出错误，让队列处理重试
+        }
 
         const consumer: Consumer = {
             id,
@@ -174,7 +189,7 @@ export class WorkerLifecycleManager {
         this.setupErrorListener(consumer);
         this.setupExitListener(consumer);
 
-        this.log.info(`[Worker创建] Consumer ${id} 已创建 (内存: ${oldGenMB}MB/${youngGenMB}MB)`);
+        this.log.info(`[Worker创建] Worker ${id} 创建成功`);
     }
 
     /**
@@ -192,33 +207,24 @@ export class WorkerLifecycleManager {
     restartIdleWorkers(newOldGenMB: number, newYoungGenMB: number): number {
         let restartedCount = 0;
 
-        // 【修复】先收集需要重启的 Worker ID，避免在遍历时修改 Map
-        const idleWorkerIds: number[] = [];
         for (const [consumerId, consumer] of this.consumers) {
             if (!consumer.busy) {
-                idleWorkerIds.push(consumerId);
+                // 终止旧的 Worker
+                try {
+                    // 【修复】正确处理 terminate 返回的 Promise
+                    void consumer.worker.terminate();
+                    consumer.worker.removeAllListeners();
+                } catch (e) {
+                    // 忽略终止错误
+                }
+
+                // 【关键】删除旧 Consumer，创建新的 Worker（使用新内存限制）
+                this.consumers.delete(consumerId);
+                this.createConsumer(consumerId, newOldGenMB, newYoungGenMB);
+                restartedCount++;
             }
         }
 
-        // 然后逐个重启
-        for (const consumerId of idleWorkerIds) {
-            const consumer = this.consumers.get(consumerId);
-            if (!consumer) continue;
-
-            // 终止旧的 Worker
-            try {
-                safelyTerminateWorker(consumer.worker, consumer, (msg) => this.log.info(msg));
-            } catch (e) {
-                // 忽略终止错误
-            }
-
-            // 删除旧 Consumer，创建新的 Worker（使用新内存限制）
-            this.consumers.delete(consumerId);
-            this.createConsumer(consumerId, newOldGenMB, newYoungGenMB);
-            restartedCount++;
-        }
-
-        this.log.info(`[Worker批量重启] 已重启 ${restartedCount} 个空闲 Worker`);
         return restartedCount;
     }
 
@@ -226,7 +232,7 @@ export class WorkerLifecycleManager {
      * 清理所有 Worker
      */
     cleanup(): void {
-        this.log.info('[Worker生命周期] 开始清理所有 Worker...');
+        this.log.info('[WorkerPool] 开始清理 Worker 池...');
 
         for (const [, consumer] of this.consumers) {
             try {
@@ -243,6 +249,6 @@ export class WorkerLifecycleManager {
         this.workerCreateQueue = [];
         this.isCreatingWorker = false;
 
-        this.log.info('[Worker生命周期] Worker 清理完成');
+        this.log.info('[WorkerPool] Worker 池清理完成');
     }
 }

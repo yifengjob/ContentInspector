@@ -48,7 +48,7 @@ export type {Consumer, PendingTask, WorkerPoolCallbacks};
 export class WorkerPool {
     private readonly consumers: Map<number, Consumer>;
     private readonly eventBus: EventBus;
-    private scanState: ScanState;
+    private readonly scanState: ScanState;
     private readonly mainWindow: BrowserWindow;
     private readonly log: Logger;
     private config: any;
@@ -151,7 +151,7 @@ export class WorkerPool {
      */
     getIdleConsumer(): Consumer | undefined {
         for (const [, consumer] of this.consumers) {
-            if (!consumer.busy && !consumer.isTerminating) {
+            if (!consumer.busy) {
                 return consumer;
             }
         }
@@ -250,8 +250,7 @@ export class WorkerPool {
     /**
      * 处理任务超时
      */
-    handleTaskTimeout(taskId: number, filePath: string, consumer: Consumer): void {
-        const task = { filePath, fileSize: 0 }; // 简化版本，实际应该从 pendingTasks 获取
+    handleTaskTimeout(consumer: Consumer, task: Task): void {
         this.messageHandler.handleTaskTimeout(
             consumer,
             task
@@ -294,7 +293,7 @@ export class WorkerPool {
         // 创建超时保护
         const timeoutMs = this.callbacks.calculateTimeout(task.fileSize);
         const timeoutId = setTimeout(() => {
-            this.handleTaskTimeout(this.nextTaskId, task.filePath, consumer);
+            this.handleTaskTimeout(consumer, task);
         }, timeoutMs);
 
         // 添加到待处理任务
