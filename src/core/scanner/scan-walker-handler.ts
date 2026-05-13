@@ -197,7 +197,8 @@ export class WalkerHandler {
         try {
             this.worker.postMessage({type: 'cancel-all'});
             this.worker.removeAllListeners();
-            this.worker.terminate();
+            // 【修复】正确处理 terminate 返回的 Promise
+            void this.worker.terminate();
         } catch (error) {
             this.options.context.log.info(`终止 Walker Worker 失败: ${error}`);
         }
