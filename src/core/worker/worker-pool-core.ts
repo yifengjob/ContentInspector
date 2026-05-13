@@ -16,7 +16,6 @@ import {WorkerLifecycleManager} from './worker-lifecycle';
 import {WorkerMessageHandler} from './worker-message-handler';
 import type {Consumer, PendingTask, WorkerPoolCallbacks} from './worker-pool-types';
 import type {Task} from '../queue/task-queue';
-import {markConsumerIdle} from './worker-utils';
 import {WORKER_RESTART_SCHEDULE_DELAY} from '../config/constants';
 
 export type {Consumer, PendingTask, WorkerPoolCallbacks};
