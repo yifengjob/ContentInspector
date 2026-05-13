@@ -70,9 +70,6 @@ export const WORKER_RESTART_SCHEDULE_DELAY = 150; // 150ms
 /** Worker 创建最大重试次数 - 每个 Worker 最多重试几次 */
 export const WORKER_CREATE_MAX_RETRY = 3;
 
-/** Worker 创建队列处理超时保护系数 - 用于动态计算最大迭代次数 */
-export const WORKER_CREATE_ITERATION_MULTIPLIER = 1; // poolSize × MAX_RETRY × MULTIPLIER
-
 // ==================== 3. 超时配置 ====================
 
 // --- 3.1 Worker 超时配置（主进程用于监控 Worker 任务）---
