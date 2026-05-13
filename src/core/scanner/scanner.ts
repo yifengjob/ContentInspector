@@ -19,6 +19,7 @@ import {StagnationDetector} from './scan-stagnation-detector';
 import {ScanCleanup} from './scan-cleanup';
 import {getScannerLogger} from "../../logger/logger";
 import {WALKER_WORKER_PATH} from "../../workers/walker-worker";
+import {getSupportedExtensions} from '../../utils/file-type-utils';
 
 export async function startScan(
     config: ScanConfig,
@@ -54,6 +55,12 @@ export async function startScan(
     // ==================== 【Walker Worker】====================
     // 【优化】使用统一的常量路径，便于维护和 IDE 跟踪
     const walkerWorker = new Worker(WALKER_WORKER_PATH);
+
+    // 【方案C】发送初始化配置（包含支持的扩展名列表）
+    walkerWorker.postMessage({
+        type: 'init-config',
+        supportedExtensions: getSupportedExtensions()
+    });
 
     // Walker 完成计数
     const walkerCompletedCountRef = {value: 0};

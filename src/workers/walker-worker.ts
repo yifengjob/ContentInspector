@@ -5,15 +5,13 @@
 import {parentPort} from 'worker_threads';
 import * as path from 'path';
 import * as fs from 'fs';
-// 【修复】从 file-type-utils 导入 getSupportedExtensions 函数
-import {getSupportedExtensions} from '../utils/file-type-utils';
-// 【关键】导入 extractors 模块以触发自动注册
-// 注意：Worker 线程有独立的内存空间，需要单独初始化注册中心
-// 这不是单例模式的失败，而是 Worker 线程架构的正常行为
-import '../extractors';
 // 【优化】导入配置常量
 import {BYTES_TO_MB} from '../core/config/constants';
 import {workerLogger} from "../logger/logger";
+import {getSupportedExtensions} from "../utils/file-type-utils";
+
+// 【方案C】缓存支持的扩展名列表（通过 init-config 消息接收）
+let cachedSupportedExtensions: string[] = [];
 
 // 动态导入 walkdir（避免顶层 import 导致的问题）
 let walkdir: any;
@@ -106,9 +104,8 @@ async function startWalking(config: WalkerConfig) {
             let isSkipped = false;   // 【新增】是否被跳过
 
             if (selectedExtensions.includes('*')) {
-                // 【修复】延迟获取支持的扩展名列表，确保注册已完成
-                const supportedExts = getSupportedExtensions();
-                shouldProcess = supportedExts.includes(ext);
+                // 【方案C】使用缓存的扩展名列表
+                shouldProcess = cachedSupportedExtensions.includes(ext);
             } else {
                 shouldProcess = selectedExtensions.includes(ext);
             }
@@ -232,9 +229,8 @@ async function startWalking(config: WalkerConfig) {
 
                 // 如果用户选择了 '*'，只扫描支持的文件类型
                 if (selectedExtensions.includes('*')) {
-                    // 【修复】延迟获取支持的扩展名列表，确保注册已完成
-                    const supportedExts = getSupportedExtensions();
-                    if (!supportedExts.includes(ext)) {
+                    // 【方案C】使用缓存的扩展名列表
+                    if (!cachedSupportedExtensions.includes(ext)) {
                         filteredCount++;  // 【修改】用户配置过滤
                         return;
                     }
@@ -372,7 +368,11 @@ async function processNextTask() {
 }
 
 parentPort?.on('message', (message: any) => {
-    if (message.type === 'start-walking') {
+    if (message.type === 'init-config') {
+        // 【方案C】接收并缓存支持的扩展名列表
+        cachedSupportedExtensions = message.supportedExtensions || [];
+        workerLogger.info(`[Walker] 已缓存 ${cachedSupportedExtensions.length} 个支持的扩展名`);
+    } else if (message.type === 'start-walking') {
         // 【修复】如果正在遍历，将任务加入队列
         if (isWalking) {
             taskQueue.push(message.config);
