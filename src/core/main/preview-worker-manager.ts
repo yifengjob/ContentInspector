@@ -15,6 +15,7 @@ import {BrowserWindow} from 'electron';
 import {mainLogger} from '../../logger/logger';
 import {calculatePreviewTimeout, PREVIEW_CHUNK_SIZE, WORKER_MAX_OLD_GENERATION_MB, WORKER_MAX_YOUNG_GENERATION_MB, PREVIEW_BASE_TIMEOUT} from '../config/constants';
 import {loadConfig} from '../config/manager';
+import {FILE_WORKER_PATH} from '../../workers/file-worker';
 
 /**
  * 预览 Worker 管理器接口
@@ -61,9 +62,8 @@ export function createPreviewWorkerManager(
                 const enabledTypes = config.enabledSensitiveTypes || [];
 
                 // 创建 Worker
-                const workerPath = path.join(__dirname, '..', '..', 'workers', 'file-worker.js');
                 const taskId = Date.now();
-                const worker = new Worker(workerPath, {
+                const worker = new Worker(FILE_WORKER_PATH, {
                     resourceLimits: {
                         maxOldGenerationSizeMb: WORKER_MAX_OLD_GENERATION_MB,
                         maxYoungGenerationSizeMb: WORKER_MAX_YOUNG_GENERATION_MB,
