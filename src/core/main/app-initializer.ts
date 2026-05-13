@@ -82,7 +82,7 @@ export function getAppLogger(): Logger {
  * 
  * 注意：这个函数应该在 app.whenReady() 之后调用
  */
-export function setupAppQuitHandler(): void {
+export function setupAppQuitHandler(getLogManager: () => any): void {
     app.on('before-quit', async () => {
         mainLogger.info('[应用退出] 正在 flush 日志...');
         try {
@@ -91,6 +91,12 @@ export function setupAppQuitHandler(): void {
         } catch (error) {
             // 使用 process.stderr 避免循环依赖
             process.stderr.write(`[应用退出] 日志 flush 失败: ${error}\n`);
+        }
+
+        // 【新增】清理 LogManager
+        const logManager = getLogManager();
+        if (logManager) {
+            logManager.destroy();
         }
     });
 }

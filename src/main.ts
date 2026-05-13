@@ -44,7 +44,6 @@ function createWindow() {
     require('./core/main/ipc-handlers').setupIpcHandlers(
         () => mainWindow,
         scanState,
-        wm.getLogManager(),
         powerSaveManager,
         previewWorkerManager
     );
@@ -64,7 +63,7 @@ app.whenReady().then(() => {
     createWindow();
     
     // 【新增】设置应用退出处理器（flush 日志）
-    setupAppQuitHandler();
+    setupAppQuitHandler(() => windowManager?.getLogManager());
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {

@@ -11,7 +11,6 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import {Logger} from '../../logger/logger';
-import {LogManager} from '../infra/log-manager';
 import {ScanState} from '../state/scan-state';
 import {startScan, cancelScan} from '../scanner';
 import {getDirectoryTree} from '../../services/directory-tree';
@@ -30,14 +29,12 @@ import {getDirectorySize} from './utils';
  * 
  * @param getMainWindow 获取主窗口的函数
  * @param scanState 扫描状态实例
- * @param logManager 日志管理器实例
  * @param powerSaveManager 电源阻止器管理器
  * @param previewWorkerManager 预览 Worker 管理器
  */
 export function setupIpcHandlers(
     getMainWindow: () => BrowserWindow | null,
     scanState: ScanState,
-    logManager: LogManager | null,
     powerSaveManager: PowerSaveManager,
     previewWorkerManager: PreviewWorkerManager
 ): void {
