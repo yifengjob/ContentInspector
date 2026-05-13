@@ -12,6 +12,7 @@ import type {BrowserWindow} from 'electron';
 import type {EventBus} from '../infra/event-bus';
 import type {ScanState} from '../state/scan-state';
 import {Logger} from '../../logger/logger';
+import {markConsumerIdle} from './worker-utils';
 
 /**
  * Worker 消息处理器
@@ -50,56 +51,62 @@ export class WorkerMessageHandler {
 
             // 查找对应的待处理任务
             const pending = this.pendingTasks.get(result.taskId);
+
             if (!pending) {
-                this.log.warn(`[Worker消息] 找不到 taskId=${result.taskId} 的待处理任务`);
+                // Worker 返回空结果
+                markConsumerIdle(consumer);
+                // 【重构】使用 scanState 管理 activeWorkerCount
+                this.scanState.decrementActiveWorkers();
+                this.callbacks.onUpdateConsumerCount(result.taskId);
+                this.callbacks.onCleanupConsumerState(consumer);
+
+                // 【事件总线】发布 Worker 空闲事件
+                this.eventBus.emit('worker.idle', consumer);
                 return;
             }
 
             // 清除超时定时器
             clearTimeout(pending.timeoutId);
-
-            // 处理错误
-            if (result.error) {
-                this.callbacks.onErrorLog(`Worker 处理失败: ${result.filePath} - ${result.error}`);
-                pending.reject(new Error(result.error));
-                this.pendingTasks.delete(result.taskId);
-                
-                // 标记 Worker 为空闲
-                consumer.busy = false;
-                consumer.taskId = undefined;
-                this.scanState.decrementActiveWorkers();
-                
-                // 尝试分发下一个任务
-                this.callbacks.onTryDispatch();
-                return;
-            }
-
-            // 处理成功结果
-            if (result.total && result.total > 0) {
-                this.callbacks.onResultLog(result.total, result);
-                
-                // 批量发送结果到前端
-                this.callbacks.onResultBatchSend(this.mainWindow, result);
-            }
-
-            // 解析完成，清理状态
-            this.callbacks.onCleanupConsumerState(consumer);
-            
-            // 【修复】减少活跃 Worker 计数
-            this.scanState.decrementActiveWorkers();
-            
-            // 更新进度
-            this.callbacks.onSendProgressUpdate(result.filePath);
-            
-            // 检查是否完成扫描
-            this.callbacks.onCheckAndComplete();
-
-            // 解决 Promise
-            pending.resolve(result);
             this.pendingTasks.delete(result.taskId);
+            
+            // 【状态同步】通知待处理任务数变化
+            this.eventBus.emit('pending-tasks-size-changed', this.pendingTasks.size);
 
-            // 尝试分发下一个任务
-            this.callbacks.onTryDispatch();
+            // 标记 Worker 为空闲
+            markConsumerIdle(consumer);
+            // 【重构】使用 scanState 管理 activeWorkerCount
+            this.scanState.decrementActiveWorkers();
+            this.callbacks.onUpdateConsumerCount(result.taskId);
+            this.callbacks.onCleanupConsumerState(consumer);
+
+            // 更新进度
+            this.callbacks.onSendProgressUpdate(result.filePath || '');
+
+            // 处理结果
+            if (result.error) {
+                this.callbacks.onErrorLog(result.error);
+                pending.reject(new Error(result.error));
+            } else {
+                if (result.total && result.total > 0) {
+                    this.callbacks.onResultLog(result.total, result);
+
+                    const resultItem = {
+                        filePath: result.filePath,
+                        fileSize: result.fileSize || 0,
+                        modifiedTime: result.modifiedTime || new Date().toISOString(),
+                        counts: result.counts || {},
+                        total: result.total,
+                        unsupportedPreview: false
+                    };
+
+                    // 【P3优化】使用批量发送
+                    this.callbacks.onResultBatchSend(this.mainWindow, resultItem);
+                }
+                pending.resolve(result);
+            }
+
+            // 【真正的事件驱动】Worker 完成任务后变为空闲
+            this.eventBus.emit('worker.idle', consumer);
         });
     }
 
