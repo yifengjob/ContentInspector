@@ -11,10 +11,6 @@ import {getSupportedExtensions} from '../utils/file-type-utils';
 // 注意：Worker 线程有独立的内存空间，需要单独初始化注册中心
 // 这不是单例模式的失败，而是 Worker 线程架构的正常行为
 import '../extractors';
-// 【调试】输出注册完成状态
-import {getRegistryStats} from '../extractors/registry';
-const stats = getRegistryStats();
-workerLogger.info(`[Walker Worker] 注册中心初始化完成: ${stats.totalExtensions} 个扩展名, ${stats.totalConfigs} 个配置`);
 // 【优化】导入配置常量
 import {BYTES_TO_MB} from '../core/config/constants';
 import {workerLogger} from "../logger/logger";

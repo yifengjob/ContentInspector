@@ -48,10 +48,6 @@ import {
 } from '../utils/file-type-utils';
 // 【关键】Worker线程需要单独初始化注册中心
 import '../extractors';
-// 【调试】输出注册完成状态
-import {getRegistryStats} from '../extractors/registry';
-const fileWorkerStats = getRegistryStats();
-workerLogger.info(`[File Worker TID:${threadId}] 注册中心初始化完成: ${fileWorkerStats.totalExtensions} 个扩展名, ${fileWorkerStats.totalConfigs} 个配置`);
 // 【优化】导入配置常量和智能超时计算函数
 import {calculateWorkerTimeout} from '../core/config/constants';
 import {workerLogger} from "../logger/logger";
