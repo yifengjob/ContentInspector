@@ -125,6 +125,25 @@ export function getFileType(filePath: string): string {
 }
 
 /**
- * 从注册中心自动生成支持的文件扩展名列表
+ * 获取所有支持的文件扩展名列表
+ * 
+ * 【重要】使用函数而非直接导出常量，确保在查询时注册已完成
+ * 
+ * @returns 扩展名数组（小写，不带点）
+ * 
+ * @example
+ * ```typescript
+ * const extensions = getSupportedExtensions();
+ * // ['pdf', 'txt', 'log', 'md', 'docx', ...]
+ * ```
  */
-export const SUPPORTED_EXTENSIONS = getAllSupportedExtensions();
+export function getSupportedExtensions(): string[] {
+    return getAllSupportedExtensions();
+}
+
+/**
+ * 【向后兼容】支持的文件扩展名列表
+ * 
+ * @deprecated 请在模块加载完成后使用 getSupportedExtensions() 函数
+ */
+export const SUPPORTED_EXTENSIONS: string[] = [];

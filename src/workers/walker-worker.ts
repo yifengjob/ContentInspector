@@ -5,8 +5,8 @@
 import {parentPort} from 'worker_threads';
 import * as path from 'path';
 import * as fs from 'fs';
-// 【修复】从 file-parser 导入 SUPPORTED_EXTENSIONS，保持单一数据源
-import {SUPPORTED_EXTENSIONS} from '../utils/file-type-utils';
+// 【修复】从 file-type-utils 导入 getSupportedExtensions 函数
+import {getSupportedExtensions} from '../utils/file-type-utils';
 // 【优化】导入配置常量
 import {BYTES_TO_MB} from '../core/config/constants';
 import {workerLogger} from "../logger/logger";
@@ -102,7 +102,9 @@ async function startWalking(config: WalkerConfig) {
             let isSkipped = false;   // 【新增】是否被跳过
 
             if (selectedExtensions.includes('*')) {
-                shouldProcess = SUPPORTED_EXTENSIONS.includes(ext);
+                // 【修复】延迟获取支持的扩展名列表，确保注册已完成
+                const supportedExts = getSupportedExtensions();
+                shouldProcess = supportedExts.includes(ext);
             } else {
                 shouldProcess = selectedExtensions.includes(ext);
             }
@@ -226,7 +228,9 @@ async function startWalking(config: WalkerConfig) {
 
                 // 如果用户选择了 '*'，只扫描支持的文件类型
                 if (selectedExtensions.includes('*')) {
-                    if (!SUPPORTED_EXTENSIONS.includes(ext)) {
+                    // 【修复】延迟获取支持的扩展名列表，确保注册已完成
+                    const supportedExts = getSupportedExtensions();
+                    if (!supportedExts.includes(ext)) {
                         filteredCount++;  // 【修改】用户配置过滤
                         return;
                     }
