@@ -13,7 +13,7 @@ import {EventBus} from '../infra/event-bus';
 import type {ScanState} from '../state/scan-state';
 import type {BrowserWindow} from 'electron';
 import {markConsumerIdle, safelyTerminateWorker} from './worker-utils';  // 【修复】从本地导入，避免循环依赖
-import {WORKER_RESTART_DELAY, WORKER_RESTART_SCHEDULE_DELAY} from '../config/constants';
+import {WORKER_RESTART_DELAY, WORKER_RESTART_SCHEDULE_DELAY, WORKER_CREATE_MAX_RETRY} from '../config/constants';
 import type {Task} from '../queue/task-queue';
 import {createLogger, Logger} from '../../logger/logger';
 import {FILE_WORKER_PATH} from "../../workers/file-worker";
@@ -176,7 +176,8 @@ export class WorkerPool {
         this.isCreatingWorker = true;
         
         let iterationCount = 0;
-        const MAX_RETRY_PER_WORKER = 3; // 每个 Worker 最多重试 3 次
+        // 【优化】使用配置文件中的常量，提高可维护性
+        const MAX_RETRY_PER_WORKER = WORKER_CREATE_MAX_RETRY;
         // 【优化】智能计算最大迭代次数：poolSize × 最大重试次数
         const MAX_ITERATIONS = this.poolSize * MAX_RETRY_PER_WORKER;
         
