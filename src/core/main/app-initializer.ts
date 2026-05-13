@@ -66,18 +66,6 @@ export function initializeApp(): void {
 }
 
 /**
- * 获取应用日志记录器
- * 
- * @returns 日志记录器实例
- */
-export function getAppLogger(): Logger {
-    if (!appLogger) {
-        throw new Error('应用未初始化，先调用 initializeApp（）。');
-    }
-    return appLogger;
-}
-
-/**
  * 监听应用即将退出，flush 日志确保完整性
  * 
  * 注意：这个函数应该在 app.whenReady() 之后调用

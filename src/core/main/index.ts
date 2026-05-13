@@ -6,7 +6,7 @@
  * - 导出主要功能
  */
 
-export {initializeApp, getAppLogger, setupAppQuitHandler} from './app-initializer';
+export {initializeApp, setupAppQuitHandler} from './app-initializer';
 export {createWindowManager, WindowManager} from './window-manager';
 export {createPowerSaveManager, PowerSaveManager} from './power-save-manager';
 export {createPreviewWorkerManager, PreviewWorkerManager} from './preview-worker-manager';

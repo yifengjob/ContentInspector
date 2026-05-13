@@ -89,7 +89,7 @@ export function createPreviewWorkerManager(): PreviewWorkerManager {
                         timeout = setTimeout(() => {
                             if (!messageReceived && !isResolved) {  // 【P0修复】防止重复处理
                                 isResolved = true;
-                                worker.terminate();
+                                void worker.terminate();
                                 previewWorkers.delete(taskId);
                                 resolve({error: '预览超时，文件可能太大或太复杂'});
                             }
@@ -124,7 +124,7 @@ export function createPreviewWorkerManager(): PreviewWorkerManager {
                             isResolved = true;  // 【P0修复】标记已解决
                             if (timeout) clearTimeout(timeout);
                             previewWorkers.delete(taskId);
-                            worker.terminate();
+                            void worker.terminate();
                             resolve({success: true, totalChunks: result.totalChunks});
                             return;
                         }
@@ -135,7 +135,7 @@ export function createPreviewWorkerManager(): PreviewWorkerManager {
                             isResolved = true;  // 【P0修复】标记已解决
                             if (timeout) clearTimeout(timeout);
                             previewWorkers.delete(taskId);
-                            worker.terminate();
+                            void worker.terminate();
                             resolve({error: result.error});
                             return;
                         }
@@ -187,7 +187,7 @@ export function createPreviewWorkerManager(): PreviewWorkerManager {
             const worker = previewWorkers.get(taskId);
             if (worker) {
                 mainLogger.info(`[预览取消] 终止 Worker (taskId: ${taskId})`);
-                worker.terminate();  // 强制终止
+                void worker.terminate();  // 强制终止（异步）
                 previewWorkers.delete(taskId);  // 清理
             }
         },
@@ -196,7 +196,7 @@ export function createPreviewWorkerManager(): PreviewWorkerManager {
             // 终止所有预览 Worker
             for (const [taskId, worker] of previewWorkers.entries()) {
                 try {
-                    worker.terminate();
+                    void worker.terminate();  // 异步终止
                     mainLogger.info(`[预览清理] 终止 Worker (taskId: ${taskId})`);
                 } catch (error) {
                     mainLogger.error(`[预览清理] 终止 Worker 失败 (taskId: ${taskId}):`, error);
