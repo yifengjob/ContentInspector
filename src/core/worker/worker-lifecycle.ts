@@ -136,10 +136,10 @@ export class WorkerLifecycleManager {
         const youngGenMB = customYoungGen ?? this.defaultYoungGenMB;
 
         const worker = new Worker(FILE_WORKER_PATH, {
-            execArgv: [
-                `--max-old-space-size=${oldGenMB}`,
-                `--max-semi-space-size=${youngGenMB}`
-            ]
+            resourceLimits: {
+                maxOldGenerationSizeMb: oldGenMB,
+                maxYoungGenerationSizeMb: youngGenMB
+            }
         });
 
         const consumer: Consumer = {
