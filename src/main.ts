@@ -27,9 +27,8 @@ let mainWindow: BrowserWindow | null = null;
 const scanState = ScanState.getInstance();
 
 // 【新增】创建管理器实例
-const powerSaveManager = createPowerSaveManager(log);
+const powerSaveManager = createPowerSaveManager();
 const previewWorkerManager = createPreviewWorkerManager(
-    log,
     () => mainWindow
 );
 

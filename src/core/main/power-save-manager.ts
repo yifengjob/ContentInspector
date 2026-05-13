@@ -7,7 +7,7 @@
  */
 
 import {powerSaveBlocker} from 'electron';
-import {Logger} from '../../logger/logger';
+import {mainLogger} from '../../logger/logger';
 
 /**
  * 电源阻止器管理器接口
@@ -32,24 +32,23 @@ export interface PowerSaveManager {
 /**
  * 创建电源阻止器管理器
  * 
- * @param log 日志记录器
  * @returns 电源阻止器管理器实例
  */
-export function createPowerSaveManager(log: Logger): PowerSaveManager {
+export function createPowerSaveManager(): PowerSaveManager {
     let powerSaveBlockerId: number | null = null;
 
     return {
         start(): void {
             if (powerSaveBlockerId === null && !powerSaveBlocker.isStarted(0)) {
                 powerSaveBlockerId = powerSaveBlocker.start('prevent-app-suspension');
-                log.info(`[电源管理] 已启动电源阻止器 (ID: ${powerSaveBlockerId})，防止系统休眠`);
+                mainLogger.info(`[电源管理] 已启动电源阻止器 (ID: ${powerSaveBlockerId})，防止系统休眠`);
             }
         },
 
         stop(): void {
             if (powerSaveBlockerId !== null) {
                 powerSaveBlocker.stop(powerSaveBlockerId);
-                log.info(`[电源管理] 已停止电源阻止器 (ID: ${powerSaveBlockerId})`);
+                mainLogger.info(`[电源管理] 已停止电源阻止器 (ID: ${powerSaveBlockerId})`);
                 powerSaveBlockerId = null;
             }
         },

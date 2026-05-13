@@ -13,6 +13,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import {BrowserWindow} from 'electron';
 import {Logger} from '../../logger/logger';
+import {mainLogger} from '../../logger/logger';
 import {calculatePreviewTimeout, PREVIEW_CHUNK_SIZE, WORKER_MAX_OLD_GENERATION_MB, WORKER_MAX_YOUNG_GENERATION_MB, PREVIEW_BASE_TIMEOUT} from '../config/constants';
 import {loadConfig} from '../config/manager';
 import {FILE_WORKER_PATH} from '../../workers/file-worker';
@@ -46,12 +47,10 @@ export interface PreviewWorkerManager {
 /**
  * 创建预览 Worker 管理器
  * 
- * @param log 日志记录器
  * @param getMainWindow 获取主窗口的函数
  * @returns 预览 Worker 管理器实例
  */
 export function createPreviewWorkerManager(
-    log: Logger,
     getMainWindow: () => BrowserWindow | null
 ): PreviewWorkerManager {
     const previewWorkers = new Map<number, Worker>();
@@ -87,7 +86,7 @@ export function createPreviewWorkerManager(
                             const stat = await fs.promises.stat(filePath);
                             return calculatePreviewTimeout(stat.size);
                         } catch (error) {
-                            log.warn('[预览] 无法获取文件大小，使用默认超时');
+                            mainLogger.warn('[预览] 无法获取文件大小，使用默认超时');
                             return PREVIEW_BASE_TIMEOUT; // 使用基础超时
                         }
                     };
@@ -193,7 +192,7 @@ export function createPreviewWorkerManager(
         cancelPreview(taskId: number): void {
             const worker = previewWorkers.get(taskId);
             if (worker) {
-                log.info(`[预览取消] 终止 Worker (taskId: ${taskId})`);
+                mainLogger.info(`[预览取消] 终止 Worker (taskId: ${taskId})`);
                 worker.terminate();  // 强制终止
                 previewWorkers.delete(taskId);  // 清理
             }
@@ -204,9 +203,9 @@ export function createPreviewWorkerManager(
             for (const [taskId, worker] of previewWorkers.entries()) {
                 try {
                     worker.terminate();
-                    log.info(`[预览清理] 终止 Worker (taskId: ${taskId})`);
+                    mainLogger.info(`[预览清理] 终止 Worker (taskId: ${taskId})`);
                 } catch (error) {
-                    log.error(`[预览清理] 终止 Worker 失败 (taskId: ${taskId}):`, error);
+                    mainLogger.error(`[预览清理] 终止 Worker 失败 (taskId: ${taskId}):`, error);
                 }
             }
             previewWorkers.clear();
