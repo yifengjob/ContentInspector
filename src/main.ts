@@ -34,12 +34,12 @@ const previewWorkerManager = createPreviewWorkerManager();
 let windowManager: any = null;
 
 function createWindow() {
-    const wm = require('./core/main/window-manager').createWindowManager(log);
+    const wm = createWindowManager(log);
     windowManager = wm;
     mainWindow = wm.createWindow(powerSaveManager);
     
     // 设置 IPC handlers
-    require('./core/main/ipc-handlers').setupIpcHandlers(
+    setupIpcHandlers(
         () => mainWindow,
         scanState,
         powerSaveManager,
