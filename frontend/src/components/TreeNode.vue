@@ -133,7 +133,6 @@ const handleCheck = () => {
   display: flex;
   align-items: center;
   padding: 4px 8px;
-  cursor: pointer;
   border-radius: 3px;
   min-width: max-content;  /* 确保内容不被压缩 */
 }
