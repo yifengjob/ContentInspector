@@ -205,24 +205,35 @@ export class WorkerLifecycleManager {
      * 批量重启空闲 Worker（用于应用新内存配置）
      */
     restartIdleWorkers(newOldGenMB: number, newYoungGenMB: number): number {
-        let restartedCount = 0;
-
+        // 【修复】先收集需要重启的空闲 Worker ID，避免遍历时修改 Map
+        const idleConsumerIds: number[] = [];
+        
         for (const [consumerId, consumer] of this.consumers) {
             if (!consumer.busy) {
-                // 终止旧的 Worker
-                try {
-                    // 【修复】正确处理 terminate 返回的 Promise
-                    void consumer.worker.terminate();
-                    consumer.worker.removeAllListeners();
-                } catch (e) {
-                    // 忽略终止错误
-                }
-
-                // 【关键】删除旧 Consumer，创建新的 Worker（使用新内存限制）
-                this.consumers.delete(consumerId);
-                this.createConsumer(consumerId, newOldGenMB, newYoungGenMB);
-                restartedCount++;
+                idleConsumerIds.push(consumerId);
             }
+        }
+
+        let restartedCount = 0;
+
+        // 【修复】遍历收集的 ID 列表，安全地重启 Worker
+        for (const consumerId of idleConsumerIds) {
+            const consumer = this.consumers.get(consumerId);
+            if (!consumer) continue;  // 可能已被其他操作删除
+
+            // 终止旧的 Worker
+            try {
+                // 【修复】正确处理 terminate 返回的 Promise
+                void consumer.worker.terminate();
+                consumer.worker.removeAllListeners();
+            } catch (e) {
+                // 忽略终止错误
+            }
+
+            // 【关键】删除旧 Consumer，创建新的 Worker（使用新内存限制）
+            this.consumers.delete(consumerId);
+            this.createConsumer(consumerId, newOldGenMB, newYoungGenMB);
+            restartedCount++;
         }
 
         return restartedCount;

@@ -332,6 +332,12 @@ export const WINDOW_DEFAULT_WIDTH = 1024;
 /** 窗口默认高度（像素） */
 export const WINDOW_DEFAULT_HEIGHT = 768;
 
+/** 窗口最大宽度（像素） */
+export const WINDOW_MAX_WIDTH = 1920;
+
+/** 窗口最大高度（像素） */
+export const WINDOW_MAX_HEIGHT = 1080;
+
 /** 窗口目标尺寸比例（屏幕的百分比） */
 export const WINDOW_TARGET_RATIO = 0.85;
 
