@@ -18,9 +18,12 @@ import {
     TYPE_MUTEX_TIMEOUT_MS,
     BYTES_TO_MB
 } from '../config';
+import {createLogger, Logger} from '../../logger/logger';
 
 /**
  * 智能调度器
+ *
+ * 【重要】创建后必须立即调用 initialize() 方法
  *
  * 调度策略优先级：
  * 1. 优先处理大文件（如果未达上限且类型不冲突）
@@ -37,10 +40,11 @@ import {
  *     assignTaskToConsumerCallback
  * );
  *
- * scheduler.initialize();
+ * scheduler.initialize(); // ← 必须调用
  * ```
  */
 export class SmartScheduler {
+    private readonly log: Logger;
     private eventBus: EventBus;
     private queueManager: TaskQueueManager;
     private workerPool: WorkerPool;
@@ -56,10 +60,24 @@ export class SmartScheduler {
     private typeOrder: string[] = [];
 
     // 【新增】保存事件处理器引用，用于清理
-    private onWorkerCreated: (consumer: Consumer) => void = () => {};
-    private onWorkerIdle: (consumer: Consumer) => void = () => {};
-    private onTaskEnqueued: () => void = () => {};
-    private onWalkerBatchReady: () => void = () => {};
+    // 【防御性编程】初始化为带警告的空函数，如果忘记调用 initialize() 会输出警告日志
+    private initializationWarningShown = false;
+    
+    private onWorkerCreated: (consumer: Consumer) => void = (consumer) => {
+        this.showInitializationWarning('onWorkerCreated', `Consumer ID: ${consumer.id}`);
+    };
+    
+    private onWorkerIdle: (consumer: Consumer) => void = (consumer) => {
+        this.showInitializationWarning('onWorkerIdle', `Consumer ID: ${consumer.id}`);
+    };
+    
+    private onTaskEnqueued: () => void = () => {
+        this.showInitializationWarning('onTaskEnqueued');
+    };
+    
+    private onWalkerBatchReady: () => void = () => {
+        this.showInitializationWarning('onWalkerBatchReady');
+    };
 
     constructor(
         eventBus: EventBus,
@@ -67,6 +85,7 @@ export class SmartScheduler {
         workerPool: WorkerPool,
         assignTaskToConsumer: (consumer: Consumer, task: Task) => void
     ) {
+        this.log = createLogger('SmartScheduler');
         this.eventBus = eventBus;
         this.queueManager = queueManager;
         this.workerPool = workerPool;
@@ -81,6 +100,9 @@ export class SmartScheduler {
         if (!ENABLE_SMART_SCHEDULING) {
             return;
         }
+
+        // 【防御性编程】重置警告标志（允许重新初始化）
+        this.initializationWarningShown = false;
 
         // 【新增】创建并保存事件处理器引用
         this.onWorkerCreated = (consumer: Consumer) => {
@@ -331,6 +353,26 @@ export class SmartScheduler {
      */
     getLastTypeScheduleTime(): Map<string, number> {
         return this.lastTypeScheduleTime;
+    }
+
+    /**
+     * 【防御性编程】显示初始化警告（只输出一次）
+     * 
+     * 如果忘记调用 initialize()，事件处理器被调用时会输出此警告
+     * 帮助开发者快速定位问题
+     * 
+     * @param methodName 被调用的方法名
+     * @param context 上下文信息（可选）
+     */
+    private showInitializationWarning(methodName: string, context?: string): void {
+        if (!this.initializationWarningShown) {
+            this.log.warn(
+                `⚠️ ${methodName} 被调用，但 SmartScheduler 尚未初始化！\n` +
+                `  ${context ? context + '\n' : ''}` +
+                `  请确保在创建 SmartScheduler 后立即调用 initialize()`
+            );
+            this.initializationWarningShown = true;
+        }
     }
 
     /**
