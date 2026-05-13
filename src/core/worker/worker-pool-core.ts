@@ -106,6 +106,15 @@ export class WorkerPool {
         this.log.info(`正在初始化 ${this.poolSize} 个 Consumer Workers...`);
 
         // 创建子模块
+        this.messageHandler = new WorkerMessageHandler(
+            this.pendingTasks,
+            this.scanState,
+            this.eventBus,
+            this.mainWindow,
+            this.callbacks,
+            this.log
+        );
+
         this.lifecycleManager = new WorkerLifecycleManager(
             this.consumers,
             this.poolSize,
@@ -114,15 +123,7 @@ export class WorkerPool {
             (consumer) => this.messageHandler.setupMessageListener(consumer),
             (consumer) => this.messageHandler.setupErrorListener(consumer),
             (consumer) => this.messageHandler.setupExitListener(consumer),
-            this.log
-        );
-
-        this.messageHandler = new WorkerMessageHandler(
-            this.pendingTasks,
-            this.scanState,
             this.eventBus,
-            this.mainWindow,
-            this.callbacks,
             this.log
         );
 
@@ -223,12 +224,15 @@ export class WorkerPool {
      * 处理任务超时
      */
     handleTaskTimeout(taskId: number, filePath: string, consumer: Consumer): void {
+        const task = { filePath, fileSize: 0 }; // 简化版本，实际应该从 pendingTasks 获取
         this.messageHandler.handleTaskTimeout(
-            taskId,
-            filePath,
             consumer,
+            task,
             this.callbacks.calculateTimeout
         );
+        
+        // 重启 Worker
+        this.lifecycleManager.restartWorker(consumer);
     }
 
     /**

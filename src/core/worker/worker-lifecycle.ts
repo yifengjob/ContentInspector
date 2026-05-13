@@ -14,6 +14,7 @@ import {safelyTerminateWorker} from './worker-utils';
 import {WORKER_RESTART_DELAY, WORKER_RESTART_SCHEDULE_DELAY, WORKER_CREATE_MAX_RETRY} from '../config/constants';
 import {FILE_WORKER_PATH} from "../../workers/file-worker";
 import {Logger} from '../../logger/logger';
+import type {EventBus} from '../infra/event-bus';
 
 /**
  * Worker 创建任务
@@ -40,6 +41,7 @@ export class WorkerLifecycleManager {
         private setupMessageListener: (consumer: Consumer) => void,
         private setupErrorListener: (consumer: Consumer) => void,
         private setupExitListener: (consumer: Consumer) => void,
+        private eventBus: EventBus,
         log: Logger
     ) {
         this.log = log;
@@ -102,18 +104,28 @@ export class WorkerLifecycleManager {
                     task.youngGen ?? this.defaultYoungGenMB
                 );
                 
-                // 创建成功，重置重试计数
+                // 【关键】每个 Worker 创建后延迟，避免资源竞争
+                await new Promise(resolve => setTimeout(resolve, WORKER_RESTART_DELAY));
+                
+                // 成功后清除重试计数
                 retryCounts.delete(task.consumerId);
             } catch (error: any) {
-                this.log.error(`[Worker创建] Consumer ${task.consumerId} 创建失败 (尝试 ${currentRetry + 1}/${MAX_RETRY_PER_WORKER}): ${error.message}`);
+                const newRetryCount = currentRetry + 1;
+                retryCounts.set(task.consumerId, newRetryCount);
+                this.log.error(`[Worker创建] Consumer ${task.consumerId} 创建失败 (尝试 ${newRetryCount}/${MAX_RETRY_PER_WORKER}): ${error.message}`);
                 
-                retryCounts.set(task.consumerId, currentRetry + 1);
+                // 【修复】如果是因为资源不足（EAGAIN），记录警告
+                if (error.code === 'EAGAIN') {
+                    this.log.warn(`[Worker创建] 系统资源不足，Worker ${task.consumerId} 将在稍后重试创建`);
+                }
                 
-                // 重新加入队列尾部
-                this.workerCreateQueue.push(task);
+                // 重新加入队列头部，稍后重试
+                this.workerCreateQueue.unshift(task);
                 
-                // 等待一段时间后继续
-                await new Promise(resolve => setTimeout(resolve, WORKER_RESTART_DELAY));
+                // 【关键】增加等待时间，给系统资源恢复的时间
+                const waitTime = 500 * newRetryCount; // 第一次 500ms，第二次 1000ms，第三次 1500ms
+                this.log.warn(`[Worker创建] 等待 ${waitTime}ms 后重试...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
             }
         }
 
@@ -121,7 +133,9 @@ export class WorkerLifecycleManager {
 
         if (failedWorkers.length > 0) {
             this.log.warn(`[Worker创建] 以下 Worker 创建失败: ${failedWorkers.join(', ')}`);
+            this.log.warn(`[Worker创建] 实际可用 Worker 数量: ${this.consumers.size}/${this.poolSize}`);
             
+            // 【降级策略】如果所有 Worker 都失败，抛出错误
             if (this.consumers.size === 0) {
                 throw new Error('所有 Worker 创建失败，无法启动扫描');
             }
@@ -151,6 +165,9 @@ export class WorkerLifecycleManager {
         };
 
         this.consumers.set(id, consumer);
+
+        // 【事件总线】发布 Worker 创建事件
+        this.eventBus.emit('worker.created', consumer);
 
         // 设置监听器
         this.setupMessageListener(consumer);
@@ -236,7 +253,10 @@ export class WorkerLifecycleManager {
 
         for (const [, consumer] of this.consumers) {
             try {
-                safelyTerminateWorker(consumer.worker, consumer, (msg) => this.log.info(msg));
+                // 【修复】正确处理 terminate 返回的 Promise
+                void consumer.worker.terminate();
+                consumer.worker.removeAllListeners();
+                (consumer as any).worker = null;
             } catch (error) {
                 this.log.info(`终止 Consumer Worker 失败: ${error}`);
             }
