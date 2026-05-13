@@ -72,7 +72,7 @@ export function initializeApp(): void {
  */
 export function getAppLogger(): Logger {
     if (!appLogger) {
-        throw new Error('App not initialized. Call initializeApp() first.');
+        throw new Error('应用未初始化，先调用 initializeApp（）。');
     }
     return appLogger;
 }

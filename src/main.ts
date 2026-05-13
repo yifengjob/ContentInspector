@@ -9,10 +9,9 @@
  */
 
 // 【关键】首先初始化应用（日志、GC、polyfills、错误处理）
-import {initializeApp, getAppLogger, setupAppQuitHandler} from './core/main';
+import {initializeApp, setupAppQuitHandler} from './core/main';
 
 initializeApp();
-const log = getAppLogger();
 
 // 导入必要的模块
 import {app, BrowserWindow, dialog} from 'electron';
@@ -34,7 +33,7 @@ const previewWorkerManager = createPreviewWorkerManager();
 let windowManager: any = null;
 
 function createWindow() {
-    const wm = createWindowManager(log);
+    const wm = createWindowManager();
     windowManager = wm;
     mainWindow = wm.createWindow(powerSaveManager);
     
