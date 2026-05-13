@@ -15,7 +15,7 @@ setupFileLogger(logDir);
 app.commandLine.appendSwitch('js-flags', '--expose-gc');
 
 // 【修复】初始化 PDF.js 所需的 polyfill（包括 Promise.withResolvers、DOMMatrix、浏览器环境模拟）
-import {setupAllPdfPolyfills} from './utils/pdf-polyfills';
+import {setupAllPdfPolyfills} from './extractors/pdf/polyfills/pdf-polyfills';
 
 setupAllPdfPolyfills();
 

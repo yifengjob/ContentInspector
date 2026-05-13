@@ -32,7 +32,7 @@ process.env.PDFJS_DISABLE_WARNINGS = '1';
 process.env.NODE_NO_WARNINGS = '1';
 
 // 【修复】初始化 PDF.js 所需的 polyfill
-import {setupAllPdfPolyfills} from '../utils/pdf-polyfills';
+import {setupAllPdfPolyfills} from '../extractors/pdf/polyfills/pdf-polyfills';
 
 setupAllPdfPolyfills();
 
@@ -40,7 +40,7 @@ import {parentPort, threadId} from 'worker_threads';
 
 import {extractTextFromFile} from '../extractors';
 // 【新增】导入流式处理器
-import {FileStreamProcessor} from '../utils/file-stream-processor';
+import {FileStreamProcessor} from '../extractors/stream/file-stream-processor';
 // 【新增】导入文件类型配置
 import {
     getFileTypeConfig,

@@ -5,7 +5,7 @@
  * 此模块提供完整的 polyfill，确保 pdf.js 能正常工作
  */
 
-import {logger} from "../logger/logger";
+import {logger} from "../../../logger/logger";
 
 /**
  * 为 pdf.js 设置浏览器环境 polyfill
