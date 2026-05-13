@@ -6,7 +6,7 @@
  * - 处理来自渲染进程的请求
  */
 
-import {ipcMain, dialog, BrowserWindow} from 'electron';
+import {ipcMain, dialog, BrowserWindow, app} from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -247,7 +247,7 @@ export function setupIpcHandlers(
     // 清理应用缓存
     ipcMain.handle('clear-cache', async () => {
         try {
-            const userDataPath = require('electron').app.getPath('userData');
+            const userDataPath = app.getPath('userData');
 
             let cleanedSize = 0;
             const cleanedFiles: string[] = [];
