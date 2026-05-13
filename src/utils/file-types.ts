@@ -8,7 +8,6 @@ import * as path from 'path';
 import { FILE_SIZE_LIMITS } from '../core/config/constants';
 import { 
     getExtractorByExtension,
-    getAllConfigs,
     getAllSupportedExtensions
 } from '../extractors/registry';
 import type { FileTypeConfig } from '../extractors/types';

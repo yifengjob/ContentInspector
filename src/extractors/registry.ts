@@ -12,7 +12,10 @@
  * 3. 通过 getAllConfigs() 获取所有配置（用于生成扩展名列表）
  */
 
+import { createLogger } from '../logger/logger';
 import type { FileTypeConfig } from './types';
+
+const log = createLogger('ExtractorRegistry');
 
 // 全局注册表：extension -> config
 const registry = new Map<string, FileTypeConfig>();
@@ -50,7 +53,7 @@ const registeredConfigs = new Set<FileTypeConfig>();
 export function registerExtractor(config: FileTypeConfig): void {
     // 防止重复注册同一个配置对象
     if (registeredConfigs.has(config)) {
-        console.warn(`⚠️ 配置已被注册，跳过: ${config.description}`);
+        log.warn(`⚠️ 配置已被注册，跳过: ${config.description}`);
         return;
     }
 
@@ -61,7 +64,7 @@ export function registerExtractor(config: FileTypeConfig): void {
         
         if (registry.has(normalizedExt)) {
             const existingConfig = registry.get(normalizedExt);
-            console.warn(
+            log.warn(
                 `⚠️ 扩展名 .${normalizedExt} 已被注册 ` +
                 `(现有: ${existingConfig?.description}, ` +
                 `新配置: ${config.description})，将被覆盖`
@@ -75,9 +78,9 @@ export function registerExtractor(config: FileTypeConfig): void {
     // 标记为已注册
     registeredConfigs.add(config);
 
-    // 日志输出（仅在有冲突或调试模式下）
+    // 日志输出（仅在调试模式下）
     if (process.env.NODE_ENV === 'development' && !hasConflict) {
-        console.log(
+        log.debug(
             `✅ 注册提取器: ${config.description} ` +
             `(${config.extensions.map(e => `.${e}`).join(', ')})`
         );
