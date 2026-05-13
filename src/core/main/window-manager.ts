@@ -19,6 +19,8 @@ import {cancelScan} from '../scanner';
 import {
     WINDOW_DEFAULT_HEIGHT,
     WINDOW_DEFAULT_WIDTH,
+    WINDOW_MAX_HEIGHT,
+    WINDOW_MAX_WIDTH,
     WINDOW_MIN_HEIGHT,
     WINDOW_MIN_WIDTH,
     WINDOW_TARGET_RATIO
@@ -72,8 +74,8 @@ function getWindowBounds(): { x?: number; y?: number; width: number; height: num
         const targetHeight = Math.floor(workArea.height * WINDOW_TARGET_RATIO);
 
         // 应用尺寸限制
-        const width = Math.max(WINDOW_MIN_WIDTH, Math.min(1920, targetWidth));
-        const height = Math.max(WINDOW_MIN_HEIGHT, Math.min(1080, targetHeight));
+        const width = Math.max(WINDOW_MIN_WIDTH, Math.min(WINDOW_MAX_WIDTH, targetWidth));
+        const height = Math.max(WINDOW_MIN_HEIGHT, Math.min(WINDOW_MAX_HEIGHT, targetHeight));
 
         // 居中计算
         const x = workArea.x + Math.floor((workArea.width - width) / 2);
