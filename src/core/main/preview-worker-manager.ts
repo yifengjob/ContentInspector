@@ -64,7 +64,7 @@ export function createPreviewWorkerManager(
                 const enabledTypes = config.enabledSensitiveTypes || [];
 
                 // 创建 Worker
-                const workerPath = path.join(__dirname, 'workers', 'file-worker.js');
+                const workerPath = path.join(__dirname, '..', '..', 'workers', 'file-worker.js');
                 const taskId = Date.now();
                 const worker = new Worker(workerPath, {
                     resourceLimits: {

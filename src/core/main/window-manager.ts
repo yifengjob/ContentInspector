@@ -1,6 +1,6 @@
 /**
  * 窗口管理模块
- * 
+ *
  * 职责：
  * - BrowserWindow 的创建和配置
  * - 窗口位置和尺寸计算
@@ -16,8 +16,15 @@ import {Logger} from '../../logger/logger';
 import {LogManager} from '../infra/log-manager';
 import {ScanState} from '../state/scan-state';
 import {cancelScan} from '../scanner';
-import {WINDOW_DEFAULT_HEIGHT, WINDOW_DEFAULT_WIDTH, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH, WINDOW_TARGET_RATIO} from '../config/constants';
+import {
+    WINDOW_DEFAULT_HEIGHT,
+    WINDOW_DEFAULT_WIDTH,
+    WINDOW_MIN_HEIGHT,
+    WINDOW_MIN_WIDTH,
+    WINDOW_TARGET_RATIO
+} from '../config/constants';
 import {PowerSaveManager} from './power-save-manager';
+import {PRELOAD_TS_PATH} from "../../preload";
 
 /**
  * 窗口管理器接口
@@ -25,7 +32,7 @@ import {PowerSaveManager} from './power-save-manager';
 export interface WindowManager {
     /**
      * 创建主窗口
-     * 
+     *
      * @param powerSaveManager 电源阻止器管理器
      * @returns BrowserWindow 实例
      */
@@ -49,7 +56,7 @@ export interface WindowManager {
 
 /**
  * 计算窗口位置和尺寸（屏幕的 85%，居中显示）
- * 
+ *
  * @param log 日志记录器
  * @returns 窗口位置和尺寸
  */
@@ -87,7 +94,7 @@ function getWindowBounds(log: Logger): { x?: number; y?: number; width: number; 
 
 /**
  * 创建窗口管理器
- * 
+ *
  * @param log 日志记录器
  * @returns 窗口管理器实例
  */
@@ -111,8 +118,8 @@ export function createWindowManager(log: Logger): WindowManager {
             try {
                 // macOS优先使用.icns，其他平台使用.png
                 const iconPath = process.platform === 'darwin'
-                    ? path.join(__dirname, '..', 'build', 'icons', 'icon.icns')
-                    : path.join(__dirname, '..', 'build', 'icons', 'icon.png');
+                    ? path.join(__dirname, '..', '..', 'build', 'icons', 'icon.icns')
+                    : path.join(__dirname, '..', '..', 'build', 'icons', 'icon.png');
 
                 log.info('尝试加载图标，路径:', iconPath);
                 if (fs.existsSync(iconPath)) {
@@ -135,7 +142,7 @@ export function createWindowManager(log: Logger): WindowManager {
                 webPreferences: {
                     nodeIntegration: false,
                     contextIsolation: true,
-                    preload: path.join(__dirname, '..', '..', 'preload.js')
+                    preload: PRELOAD_TS_PATH
                 },
                 title: 'DataGuard Scanner - 敏感数据扫描工具',
                 icon: icon
@@ -157,7 +164,7 @@ export function createWindowManager(log: Logger): WindowManager {
             // 优先使用环境变量，其次检查dist目录是否存在
             const isDev = process.env.NODE_ENV === 'development' ||
                 process.env.ELECTRON_IS_DEV === '1' ||
-                !require('fs').existsSync(path.join(__dirname, '..', 'dist', 'renderer', 'index.html'));
+                !require('fs').existsSync(path.join(__dirname, '..', 'renderer', 'index.html'));
 
             log.info('运行模式:', isDev ? '开发模式 (Vite)' : '生产模式 (文件)');
 
@@ -168,7 +175,7 @@ export function createWindowManager(log: Logger): WindowManager {
                     log.info('尝试加载本地文件...');
                     // 如果开发服务器不可用，尝试加载本地文件
                     if (mainWindow) {
-                        mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'renderer', 'index.html')).catch((fileErr) => {
+                        mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html')).catch((fileErr) => {
                             log.error('加载本地文件也失败:', fileErr);
                         });
                     }
@@ -176,7 +183,7 @@ export function createWindowManager(log: Logger): WindowManager {
                 mainWindow.webContents.openDevTools();
             } else {
                 // 生产模式：使用 __dirname 确保路径准确
-                const indexPath = path.join(__dirname, '..', 'dist', 'renderer', 'index.html');
+                const indexPath = path.join(__dirname, '..', 'renderer', 'index.html');
                 log.info('应用路径:', app.getAppPath());
                 log.info('加载本地文件:', indexPath);
 

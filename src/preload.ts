@@ -173,4 +173,4 @@ declare global {
     }
 }
 
-export const PRELOAD_JS_PATH = __filename;
+export const PRELOAD_TS_PATH = __filename;
