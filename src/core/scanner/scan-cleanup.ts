@@ -86,25 +86,8 @@ export class ScanCleanup {
             // 10. 【修复】销毁调度器，清除扫描相关的事件监听器（保留日志监听器）
             this.options.scheduler.destroy();
 
-            // 11. 【监控】验证监听器状态（优雅方式，自动适配所有事件）
-            const allStats = this.options.eventBus.getAllListenerStats();
-            const statsArray = Array.from(allStats.entries())
-                .map(([event, count]) => `${event}=${count}`)
-                .join(', ');
-            this.options.log.info(`[cleanup] 事件监听器状态: ${statsArray || '无监听器'}`);
-            
-            // 检查是否有非预期的监听器（期望只有 log:message）
-            const unexpectedListeners = this.options.eventBus.checkUnexpectedListeners(['log:message']);
-            if (unexpectedListeners.length > 0) {
-                const details = unexpectedListeners.map(({ event, count }) => `${event}(${count})`).join(', ');
-                this.options.log.warn(`[cleanup] ⚠️ 检测到非预期监听器: ${details}，可能存在内存泄漏风险！`);
-            }
-            
-            // 检查日志监听器是否存在
-            const logMessageCount = this.options.eventBus.getListenerCount('log:message');
-            if (logMessageCount === 0) {
-                this.options.log.warn('[cleanup] ⚠️ 日志监听器也被清除了，第二次扫描时将无法显示日志！');
-            }
+            // 11. 【监控】验证监听器状态
+            this.verifyListenerCleanup();
 
             // 12. 触发垃圾回收（在所有资源清理完成后）
             this.triggerGC();
@@ -168,6 +151,38 @@ export class ScanCleanup {
         if ((global as any).gc) {
             this.options.log.info('[cleanup] 触发垃圾回收...');
             (global as any).gc();
+        }
+    }
+
+    /**
+     * 【监控】验证监听器清理状态
+     * 
+     * 职责：
+     * - 输出所有事件的监听器数量
+     * - 检测非预期的监听器（内存泄漏风险）
+     * - 检查日志监听器是否存在
+     */
+    private verifyListenerCleanup(): void {
+        const {eventBus, log} = this.options;
+        
+        // 1. 输出所有事件的监听器状态
+        const allStats = eventBus.getAllListenerStats();
+        const statsArray = Array.from(allStats.entries())
+            .map(([event, count]) => `${event}=${count}`)
+            .join(', ');
+        log.info(`[cleanup] 事件监听器状态: ${statsArray || '无监听器'}`);
+        
+        // 2. 检查是否有非预期的监听器（期望只有 log:message）
+        const unexpectedListeners = eventBus.checkUnexpectedListeners(['log:message']);
+        if (unexpectedListeners.length > 0) {
+            const details = unexpectedListeners.map(({ event, count }) => `${event}(${count})`).join(', ');
+            log.warn(`[cleanup] ⚠️ 检测到非预期监听器: ${details}，可能存在内存泄漏风险！`);
+        }
+        
+        // 3. 检查日志监听器是否存在
+        const logMessageCount = eventBus.getListenerCount('log:message');
+        if (logMessageCount === 0) {
+            log.warn('[cleanup] ⚠️ 日志监听器也被清除了，第二次扫描时将无法显示日志！');
         }
     }
 }
