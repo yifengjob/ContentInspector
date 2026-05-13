@@ -2,8 +2,8 @@
 import '../utils/log-utils';
 
 import * as path from 'path';
-// 【重构】从 file-types.ts 导入配置和辅助函数
-import { getFileExtractor } from '../utils/file-types';
+// 【重构】从 file-type-utils.ts 导入配置和辅助函数
+import { getFileExtractor } from '../utils/file-type-utils';
 import {fileLogger} from "../logger/logger";
 
 /**
@@ -20,7 +20,7 @@ export async function extractTextFromFile(filePath: string): Promise<{ text: str
       return { text: '', unsupportedPreview: true };
     }
     
-    // 【重构】从 file-types.ts 获取解析器函数
+    // 【重构】从 file-type-utils.ts 获取解析器函数
     const extractor = getFileExtractor(filePath);
     if (extractor) {
       return await extractor(filePath);

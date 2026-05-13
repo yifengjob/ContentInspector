@@ -10,7 +10,7 @@
 import {Worker} from 'worker_threads';
 import {ScanState} from '../state';
 import {ScannerContext} from './scan-initializer';
-import {getFileType} from '../../utils/file-types';
+import {getFileType} from '../../utils/file-type-utils';
 import {LARGE_FILE_THRESHOLD_MB, BYTES_TO_MB, WORKER_RESTART_DELAY} from '../config';
 
 export interface WalkerHandlerOptions {

@@ -45,7 +45,7 @@ import {FileStreamProcessor} from '../extractors/stream/file-stream-processor';
 import {
     getFileTypeConfig,
     FileProcessorType
-} from '../utils/file-types';
+} from '../utils/file-type-utils';
 // 【优化】导入配置常量和智能超时计算函数
 import {calculateWorkerTimeout} from '../core/config/constants';
 import {workerLogger} from "../logger/logger";

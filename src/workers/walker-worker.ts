@@ -6,7 +6,7 @@ import {parentPort} from 'worker_threads';
 import * as path from 'path';
 import * as fs from 'fs';
 // 【修复】从 file-parser 导入 SUPPORTED_EXTENSIONS，保持单一数据源
-import {SUPPORTED_EXTENSIONS} from '../utils/file-types';
+import {SUPPORTED_EXTENSIONS} from '../utils/file-type-utils';
 // 【优化】导入配置常量
 import {BYTES_TO_MB} from '../core/config/constants';
 import {workerLogger} from "../logger/logger";

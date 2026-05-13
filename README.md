@@ -472,7 +472,7 @@ DataGuardScanner/
 │   ├── utils/             # 工具函数
 │   │   ├── error-utils.ts     # 错误处理工具
 │   │   ├── file-utils.ts      # 文件工具
-│   │   ├── file-types.ts      # 文件类型判断
+│   │   ├── file-type-utils.ts      # 文件类型判断
 │   │   ├── file-stream-processor.ts  # 流式处理器
 │   │   ├── logger.ts          # 日志系统（可变参数 API）
 │   │   ├── log-utils.ts       # 日志工具
@@ -1065,7 +1065,7 @@ DataGuard Scanner v1.0.9 引入了全新的模块化架构，将原本扁平的 
 #### 🧰 utils/ - 工具函数
 - **error-utils.ts**：错误分类和友好提示
 - **file-utils.ts**：文件路径、大小、类型判断
-- **file-types.ts**：文件扩展名映射
+- **file-type-utils.ts**：文件扩展名映射
 - **file-stream-processor.ts**：流式处理器（分块读取）
 - **logger.ts**：日志系统（可变参数 API，链式调用）
 - **zip-utils.ts**：ZIP 解压（fflate，高性能）
