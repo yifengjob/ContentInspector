@@ -46,6 +46,8 @@ import {
     getFileTypeConfig,
     FileProcessorType
 } from '../utils/file-type-utils';
+// 【关键】Worker线程需要单独初始化注册中心
+import '../extractors';
 // 【优化】导入配置常量和智能超时计算函数
 import {calculateWorkerTimeout} from '../core/config/constants';
 import {workerLogger} from "../logger/logger";
