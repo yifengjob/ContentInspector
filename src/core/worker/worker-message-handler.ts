@@ -7,12 +7,10 @@
  * - 任务结果处理
  */
 
-import type {Consumer} from './worker-pool-core';
-import type {PendingTask} from './worker-pool-types';
+import type {Consumer, PendingTask, WorkerPoolCallbacks} from './worker-pool-types';
 import type {BrowserWindow} from 'electron';
 import type {EventBus} from '../infra/event-bus';
 import type {ScanState} from '../state/scan-state';
-import type {WorkerPoolCallbacks} from './worker-pool-core';
 import {Logger} from '../../logger/logger';
 
 /**
