@@ -9,7 +9,6 @@
  */
 
 import {Worker} from 'worker_threads';
-import * as path from 'path';
 import * as fs from 'fs';
 import {BrowserWindow} from 'electron';
 import {mainLogger} from '../../logger/logger';
@@ -46,12 +45,9 @@ export interface PreviewWorkerManager {
 /**
  * 创建预览 Worker 管理器
  * 
- * @param getMainWindow 获取主窗口的函数
  * @returns 预览 Worker 管理器实例
  */
-export function createPreviewWorkerManager(
-    getMainWindow: () => BrowserWindow | null
-): PreviewWorkerManager {
+export function createPreviewWorkerManager(): PreviewWorkerManager {
     const previewWorkers = new Map<number, Worker>();
 
     return {

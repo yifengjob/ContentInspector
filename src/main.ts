@@ -28,9 +28,7 @@ const scanState = ScanState.getInstance();
 
 // 【新增】创建管理器实例
 const powerSaveManager = createPowerSaveManager();
-const previewWorkerManager = createPreviewWorkerManager(
-    () => mainWindow
-);
+const previewWorkerManager = createPreviewWorkerManager();
 
 // 【重构】使用窗口管理器
 let windowManager: any = null;
