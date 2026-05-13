@@ -7,6 +7,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 // 【修复】从 file-type-utils 导入 getSupportedExtensions 函数
 import {getSupportedExtensions} from '../utils/file-type-utils';
+// 【关键】导入 extractors 模块以触发自动注册（Worker 线程需要独立的注册中心）
+import '../extractors';
 // 【优化】导入配置常量
 import {BYTES_TO_MB} from '../core/config/constants';
 import {workerLogger} from "../logger/logger";
