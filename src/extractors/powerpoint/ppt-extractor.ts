@@ -3,10 +3,10 @@
  * 支持: pptx, dps
  */
 
-import {unzipFile, findZipEntries, extractEntriesText} from '../utils/zip-utils';
-import type {ExtractorResult} from './types';
-import {BaseExtractor} from './base-extractor';
-import {withTimeout, withLogging, composeDecorators} from './extractor-decorators';
+import {unzipFile, findZipEntries, extractEntriesText} from '../../utils/zip-utils';
+import type {ExtractorResult} from '../types';
+import {BaseExtractor} from '../base-extractor';
+import {withTimeout, withLogging, composeDecorators} from '../extractor-decorators';
 
 /**
  * PPTX 文件提取器类

@@ -4,10 +4,10 @@
  */
 
 import {createReadStream} from 'fs';
-import {MAX_TEXT_CONTENT_SIZE_MB, BYTES_TO_MB} from '../core/config/constants';
-import type {ExtractorResult} from './types';
-import {BaseExtractor} from './base-extractor';
-import {withTimeout, withLogging, composeDecorators} from './extractor-decorators';
+import {MAX_TEXT_CONTENT_SIZE_MB, BYTES_TO_MB} from '../../core/config/constants';
+import type {ExtractorResult} from '../types';
+import {BaseExtractor} from '../base-extractor';
+import {withTimeout, withLogging, composeDecorators} from '../extractor-decorators';
 
 /**
  * 文本文件提取器类

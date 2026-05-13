@@ -4,11 +4,11 @@
  */
 
 import * as XLSX from 'xlsx';
-import {FILE_READ_TIMEOUT_STANDARD_MS} from '../core/config/constants';
-import type {ExtractorResult} from './types';
-import {BaseExtractor} from './base-extractor';
-import {readFileWithTimeout} from '../utils/file-utils';
-import {withTimeout, withLogging, composeDecorators} from './extractor-decorators';
+import {FILE_READ_TIMEOUT_STANDARD_MS} from '../../core/config/constants';
+import type {ExtractorResult} from '../types';
+import {BaseExtractor} from '../base-extractor';
+import {readFileWithTimeout} from '../../utils/file-utils';
+import {withTimeout, withLogging, composeDecorators} from '../extractor-decorators';
 
 /**
  * Excel 文件提取器类

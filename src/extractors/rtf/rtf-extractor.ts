@@ -4,11 +4,11 @@
  */
 
 import * as iconv from 'iconv-lite';
-import {FILE_READ_TIMEOUT_STANDARD_MS} from '../core/config/constants';
-import type {ExtractorResult} from './types';
-import {BaseExtractor} from './base-extractor';
-import {readFileWithTimeout} from '../utils/file-utils';
-import {withTimeout, withLogging, composeDecorators} from './extractor-decorators';
+import {FILE_READ_TIMEOUT_STANDARD_MS} from '../../core/config/constants';
+import type {ExtractorResult} from '../types';
+import {BaseExtractor} from '../base-extractor';
+import {readFileWithTimeout} from '../../utils/file-utils';
+import {withTimeout, withLogging, composeDecorators} from '../extractor-decorators';
 
 /**
  * RTF 文件提取器类

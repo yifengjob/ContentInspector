@@ -7,9 +7,9 @@
 
 import { createReadStream } from 'fs';
 import * as ExcelJS from 'exceljs';
-import type { ExtractorResult } from './types';
-import { BaseExtractor } from './base-extractor';
-import { withTimeout, withLogging, composeDecorators } from './extractor-decorators';
+import type { ExtractorResult } from '../types';
+import { BaseExtractor } from '../base-extractor';
+import { withTimeout, withLogging, composeDecorators } from '../extractor-decorators';
 
 /**
  * Excel 流式提取器类

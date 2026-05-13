@@ -4,13 +4,13 @@
  */
 
 import * as path from 'path';
-import WordExtractor from 'word-extractor';
-import {FILE_READ_TIMEOUT_FAST_MS} from '../core/config/constants';
-import type {ExtractorResult} from './types';
-import {BaseExtractor} from './base-extractor';
-import {extractTextFromBinary} from './binary-extractor';
-import {readFileWithTimeout} from '../utils/file-utils';
-import {withTimeout, withLogging, composeDecorators} from './extractor-decorators';
+import {FILE_READ_TIMEOUT_FAST_MS} from '../../core/config/constants';
+import type {ExtractorResult} from '../types';
+import {BaseExtractor} from '../base-extractor';
+import {extractTextFromBinary} from '../binary/binary-extractor';
+import {readFileWithTimeout} from '../../utils/file-utils';
+import {withTimeout, withLogging, composeDecorators} from '../extractor-decorators';
+import WordExtractor from "word-extractor";
 
 /**
  * Word 文件提取器类

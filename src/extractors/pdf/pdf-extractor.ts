@@ -19,11 +19,11 @@ import {
     PDF_PAGE_TIMEOUT_MS,
     PDF_TOTAL_TIMEOUT_MS,
     FILE_READ_TIMEOUT_STANDARD_MS
-} from '../core/config/constants';
-import type {ExtractorResult} from './types';
-import {BaseExtractor} from './base-extractor';
-import {readFileWithTimeout} from '../utils/file-utils';
-import {withTimeout, withLogging, composeDecorators} from './extractor-decorators';
+} from '../../core/config/constants';
+import type {ExtractorResult} from '../types';
+import {BaseExtractor} from '../base-extractor';
+import {readFileWithTimeout} from '../../utils/file-utils';
+import {withTimeout, withLogging, composeDecorators} from '../extractor-decorators';
 
 /** PDF 文档配置 */
 const PDF_DOCUMENT_OPTIONS = {

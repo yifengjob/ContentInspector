@@ -3,10 +3,10 @@
  * 支持: odt, ods, odp
  */
 
-import {unzipFile, extractEntriesText} from '../utils/zip-utils';
-import type {ExtractorResult} from './types';
-import {BaseExtractor} from './base-extractor';
-import {withTimeout, withLogging, composeDecorators} from './extractor-decorators';
+import {unzipFile, extractEntriesText} from '../../utils/zip-utils';
+import type {ExtractorResult} from '../types';
+import {BaseExtractor} from '../base-extractor';
+import {withTimeout, withLogging, composeDecorators} from '../extractor-decorators';
 
 /**
  * OpenDocument 基础提取器类
