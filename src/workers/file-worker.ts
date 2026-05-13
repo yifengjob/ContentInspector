@@ -37,10 +37,13 @@ import {setupAllPdfPolyfills} from '../extractors/pdf/polyfills/pdf-polyfills';
 setupAllPdfPolyfills();
 
 import {parentPort, threadId} from 'worker_threads';
+import * as fs from 'fs';
 
 import {extractTextFromFile} from '../extractors';
 // 【新增】导入流式处理器
 import {FileStreamProcessor} from '../extractors/stream/file-stream-processor';
+// 【类型安全】导入流式处理器类型定义
+import type {ChunkData, ProcessingStats} from '../extractors/stream/file-stream-processor';
 // 【新增】导入文件类型配置
 import {
     getFileTypeConfig,
@@ -104,8 +107,7 @@ async function processTask(task: WorkerTask): Promise<void> {
 
     try {
         // 【优化】获取文件统计信息（添加错误处理）
-        const fs = require('fs');
-        let stat: any;
+        let stat: fs.Stats;
         try {
             stat = fs.statSync(filePath);
         } catch (statError: any) {
@@ -163,7 +165,7 @@ async function processTask(task: WorkerTask): Promise<void> {
         try {
             // 【重构】提取公共回调函数，消除重复代码
             const createCallbacks = () => ({
-                onChunk: (chunkData: any) => {
+                onChunk: (chunkData: ChunkData) => {
                     if (previewMode) {
                         parentPort?.postMessage({
                             type: 'chunk',
@@ -175,7 +177,7 @@ async function processTask(task: WorkerTask): Promise<void> {
                     }
                 },
 
-                onComplete: (stats: any) => {
+                onComplete: (stats: ProcessingStats) => {
                     if (previewMode) {
                         parentPort?.postMessage({
                             type: 'complete',
