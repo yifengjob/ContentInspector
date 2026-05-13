@@ -85,6 +85,9 @@ export class WorkerMessageHandler {
             // 解析完成，清理状态
             this.callbacks.onCleanupConsumerState(consumer);
             
+            // 【修复】减少活跃 Worker 计数
+            this.scanState.decrementActiveWorkers();
+            
             // 更新进度
             this.callbacks.onSendProgressUpdate(result.filePath);
             
