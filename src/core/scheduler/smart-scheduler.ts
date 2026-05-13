@@ -101,9 +101,13 @@ export class SmartScheduler {
             return;
         }
 
-        // 【防御性编程】重置警告标志（允许重新初始化）
+        // 【防御性编程】重置警告标志
+        // 注意：虽然下面的赋值会覆盖默认的事件处理器，
+        // 但重置标志是为了支持“销毁后重新初始化”的场景
         this.initializationWarningShown = false;
 
+        // 【关键】这里的事件处理器赋值会覆盖构造函数中的默认实现
+        // 因此 initialize() 之后，不会再触发初始化警告
         // 【新增】创建并保存事件处理器引用
         this.onWorkerCreated = (consumer: Consumer) => {
             this.assignTaskToIdleConsumer(consumer);
