@@ -138,14 +138,7 @@ export function getFileType(filePath: string): string {
  * ```
  */
 export function getSupportedExtensions(): string[] {
-    const extensions = getAllSupportedExtensions();
-    // 【调试】输出注册中心状态
-    if (extensions.length === 0) {
-        console.warn('⚠️ [file-type-utils] getSupportedExtensions() 返回空数组！注册中心可能未完成初始化');
-    } else {
-        console.log(`✅ [file-type-utils] getSupportedExtensions() 返回 ${extensions.length} 个扩展名`);
-    }
-    return extensions;
+    return getAllSupportedExtensions();
 }
 
 /**

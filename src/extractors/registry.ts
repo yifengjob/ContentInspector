@@ -85,9 +85,6 @@ export function registerExtractor(config: FileTypeConfig): void {
             `(${config.extensions.map(e => `.${e}`).join(', ')})`
         );
     }
-    
-    // 【调试】始终输出注册统计
-    log.info(`📊 [Registry] 当前已注册 ${registry.size} 个扩展名, ${registeredConfigs.size} 个配置`);
 }
 
 /**
