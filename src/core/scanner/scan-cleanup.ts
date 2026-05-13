@@ -112,7 +112,8 @@ export class ScanCleanup {
             if (walkerWorker) {
                 walkerWorker.postMessage({type: 'cancel-all'});
                 walkerWorker.removeAllListeners();
-                walkerWorker.terminate();
+                // 【修复】正确处理 terminate 返回的 Promise
+                void walkerWorker.terminate();
             }
         } catch (error) {
             this.options.log.info(`终止 Walker Worker 失败: ${error}`);
