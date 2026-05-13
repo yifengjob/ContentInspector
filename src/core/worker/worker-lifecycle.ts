@@ -187,38 +187,6 @@ export class WorkerLifecycleManager {
     }
 
     /**
-     * 重启单个 Worker
-     */
-    restartWorker(consumer: Consumer): void {
-        const consumerId = consumer.id;
-        
-        this.log.info(`[Worker重启] 正在重启 Consumer ${consumerId}...`);
-
-        // 标记为终止中
-        consumer.isTerminating = true;
-
-        // 安全终止旧 Worker
-        safelyTerminateWorker(consumer.worker, consumer, (msg) => this.log.info(msg));
-
-        // 从 Map 中删除
-        this.consumers.delete(consumerId);
-
-        // 延迟后创建新 Worker
-        setTimeout(() => {
-            try {
-                this.createConsumer(
-                    consumerId,
-                    this.defaultOldGenMB,
-                    this.defaultYoungGenMB
-                );
-                this.log.info(`[Worker重启] Consumer ${consumerId} 重启成功`);
-            } catch (error: any) {
-                this.log.error(`[Worker重启] Consumer ${consumerId} 重启失败: ${error.message}`);
-            }
-        }, WORKER_RESTART_DELAY);
-    }
-
-    /**
      * 批量重启空闲 Worker（用于应用新内存配置）
      */
     restartIdleWorkers(newOldGenMB: number, newYoungGenMB: number): number {

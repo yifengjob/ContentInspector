@@ -259,8 +259,8 @@ export class WorkerPool {
             this.callbacks.calculateTimeout
         );
         
-        // 重启 Worker
-        this.lifecycleManager.restartWorker(consumer);
+        // 【修复】调用 worker-pool-core 自己的 restartWorker，而不是 lifecycleManager 的
+        this.restartWorker(consumer);
     }
 
     /**
