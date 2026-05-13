@@ -140,4 +140,64 @@ export class EventBus {
     getListenerCount(event: WorkerEventType): number {
         return this.listeners.get(event)?.length || 0;
     }
+
+    /**
+     * 【新增】获取所有事件的监听器统计信息
+     * 
+     * @returns Map<事件类型, 监听器数量>
+     * 
+     * 【使用场景】
+     * - 清理后验证监听器是否被正确清除
+     * - 检测内存泄漏风险
+     * - 调试 EventBus 状态
+     * 
+     * 【示例】
+     * ```typescript
+     * const stats = eventBus.getAllListenerStats();
+     * console.log('监听器统计:', stats);
+     * // Map {
+     * //   'worker.idle' => 0,
+     * //   'worker.created' => 0,
+     * //   'log:message' => 1
+     * // }
+     * ```
+     */
+    getAllListenerStats(): Map<WorkerEventType, number> {
+        const stats = new Map<WorkerEventType, number>();
+        for (const [event, handlers] of this.listeners.entries()) {
+            stats.set(event, handlers.length);
+        }
+        return stats;
+    }
+
+    /**
+     * 【新增】检查是否有非预期的监听器
+     * 
+     * @param expectedEvents 期望存在的事件列表（这些事件的监听器数量可以 > 0）
+     * @returns 非预期事件的列表 [{ event, count }]
+     * 
+     * 【使用场景】
+     * - 清理后验证只有预期的监听器存在
+     * - 检测是否有遗漏的清理操作
+     * 
+     * 【示例】
+     * ```typescript
+     * // 期望只有 log:message 监听器存在
+     * const unexpected = eventBus.checkUnexpectedListeners(['log:message']);
+     * if (unexpected.length > 0) {
+     *     console.warn('发现非预期监听器:', unexpected);
+     * }
+     * ```
+     */
+    checkUnexpectedListeners(expectedEvents: WorkerEventType[]): Array<{ event: WorkerEventType; count: number }> {
+        const unexpected: Array<{ event: WorkerEventType; count: number }> = [];
+        
+        for (const [event, handlers] of this.listeners.entries()) {
+            if (!expectedEvents.includes(event) && handlers.length > 0) {
+                unexpected.push({ event, count: handlers.length });
+            }
+        }
+        
+        return unexpected;
+    }
 }
