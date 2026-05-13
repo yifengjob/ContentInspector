@@ -11,6 +11,7 @@
 import {EventBus} from '../infra';
 import type {TaskQueueManager, Task} from '../queue';
 import type {WorkerPool, Consumer} from '../worker';
+import type {ScanState} from '../state';
 import {
     ENABLE_SMART_SCHEDULING,
     LARGE_FILE_THRESHOLD_MB,
@@ -48,6 +49,7 @@ export class SmartScheduler {
     private eventBus: EventBus;
     private queueManager: TaskQueueManager;
     private workerPool: WorkerPool;
+    private scanState?: ScanState;  // 【新增】ScanState 引用，用于状态同步
     private readonly assignTaskToConsumer: (consumer: Consumer, task: Task) => void;
 
     // 【智能调度】状态跟踪
@@ -78,18 +80,24 @@ export class SmartScheduler {
     private onWalkerBatchReady: () => void = () => {
         this.showInitializationWarning('onWalkerBatchReady');
     };
+    
+    // 【新增】状态同步监听器（用于清理）
+    private onQueueLengthChanged?: (length: number) => void;
+    private onPendingTasksSizeChanged?: (size: number) => void;
 
     constructor(
         eventBus: EventBus,
         queueManager: TaskQueueManager,
         workerPool: WorkerPool,
-        assignTaskToConsumer: (consumer: Consumer, task: Task) => void
+        assignTaskToConsumer: (consumer: Consumer, task: Task) => void,
+        scanState?: ScanState  // 【新增】ScanState 引用，用于状态同步
     ) {
         this.log = createLogger('SmartScheduler');
         this.eventBus = eventBus;
         this.queueManager = queueManager;
         this.workerPool = workerPool;
         this.assignTaskToConsumer = assignTaskToConsumer;
+        this.scanState = scanState;
     }
 
     /**
@@ -145,6 +153,19 @@ export class SmartScheduler {
 
         // 订阅 Walker 批量文件就绪事件
         this.eventBus.on('walker.batch-ready', this.onWalkerBatchReady);
+        
+        // 【新增】注册状态同步监听器（如果提供了 scanState）
+        if (this.scanState) {
+            this.onQueueLengthChanged = (length: number) => {
+                this.scanState!.setTaskQueueLength(length);
+            };
+            this.onPendingTasksSizeChanged = (size: number) => {
+                this.scanState!.setPendingTasksSize(size);
+            };
+            
+            this.eventBus.on('task-queue-length-changed', this.onQueueLengthChanged);
+            this.eventBus.on('pending-tasks-size-changed', this.onPendingTasksSizeChanged);
+        }
     }
 
     /**
@@ -389,6 +410,14 @@ export class SmartScheduler {
         this.eventBus.off('worker.idle', this.onWorkerIdle);
         this.eventBus.off('task.enqueued', this.onTaskEnqueued);
         this.eventBus.off('walker.batch-ready', this.onWalkerBatchReady);
+        
+        // 【新增】移除状态同步监听器
+        if (this.onQueueLengthChanged) {
+            this.eventBus.off('task-queue-length-changed', this.onQueueLengthChanged);
+        }
+        if (this.onPendingTasksSizeChanged) {
+            this.eventBus.off('pending-tasks-size-changed', this.onPendingTasksSizeChanged);
+        }
 
         // 清空状态
         this.processingTypeCount.clear();
