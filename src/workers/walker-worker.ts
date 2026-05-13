@@ -8,22 +8,14 @@ import * as fs from 'fs';
 // 【优化】导入配置常量
 import {BYTES_TO_MB} from '../core/config/constants';
 import {workerLogger} from "../logger/logger";
-import {getSupportedExtensions} from "../utils/file-type-utils";
+// 【类型安全】导入 Worker 消息类型定义
+import type {WalkerWorkerMessage, WalkerConfig} from './walker-message-types';
 
 // 【方案C】缓存支持的扩展名列表（通过 init-config 消息接收）
 let cachedSupportedExtensions: string[] = [];
 
 // 动态导入 walkdir（避免顶层 import 导致的问题）
 let walkdir: any;
-
-interface WalkerConfig {
-    rootPath: string;
-    selectedExtensions: string[];
-    ignoreDirNames: string[];
-    systemDirs: string[];
-    maxFileSizeMb: number;
-    maxPdfSizeMb: number;
-}
 
 /**
  * 检查是否应该忽略目录
@@ -367,7 +359,7 @@ async function processNextTask() {
     }
 }
 
-parentPort?.on('message', (message: any) => {
+parentPort?.on('message', (message: WalkerWorkerMessage) => {
     if (message.type === 'init-config') {
         // 【方案C】接收并缓存支持的扩展名列表
         cachedSupportedExtensions = message.supportedExtensions || [];
