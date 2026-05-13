@@ -16,6 +16,7 @@ import {EventBus} from '../infra';
 import {SmartScheduler} from '../scheduler';
 import {LogThrottler, resultBatchSender, sendToMainWindow} from './helpers/scanner-helpers';
 import {StagnationDetector} from './scan-stagnation-detector';
+import {Logger} from '../../logger/logger';
 
 export interface CleanupOptions {
     state: ScanState;
@@ -25,7 +26,7 @@ export interface CleanupOptions {
     eventBus: EventBus;
     scheduler: SmartScheduler;  // 【新增】智能调度器
     resultLogThrottler: LogThrottler;
-    log: any;
+    log: Logger;  // 【修复】使用明确的 Logger 类型，替代 any
     walkerWorker: any; // Walker Worker 实例
     stagnationDetector?: StagnationDetector; // 停滞检测器
 }
