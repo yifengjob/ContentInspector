@@ -10,7 +10,7 @@ import {ipcMain, dialog, BrowserWindow} from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import {Logger} from '../../logger/logger';
+import {mainLogger} from '../../logger/logger';
 import {ScanState} from '../state/scan-state';
 import {startScan, cancelScan} from '../scanner';
 import {getDirectoryTree} from '../../services/directory-tree';
@@ -38,10 +38,6 @@ export function setupIpcHandlers(
     powerSaveManager: PowerSaveManager,
     previewWorkerManager: PreviewWorkerManager
 ): void {
-    const log = (msg: string, ...args: any[]) => {
-        // 使用全局 mainLogger
-        require('../../logger/logger').mainLogger.info(msg, ...args);
-    };
 
     // 获取目录树
     ipcMain.handle('get-directory-tree', async (_, dirPath: string, showHidden: boolean) => {
@@ -63,7 +59,7 @@ export function setupIpcHandlers(
 
             // 不 await，让扫描在后台进行
             startScan(config, mainWindow).catch(error => {
-                log('扫描异常:', error);
+                mainLogger.error('扫描异常:', error);
                 if (mainWindow) {
                     mainWindow.webContents.send('scan-error', error.message);
                 }
@@ -76,7 +72,7 @@ export function setupIpcHandlers(
 
     // 取消扫描
     ipcMain.handle('scan-cancel', async () => {
-        log('[取消扫描] 收到取消请求');
+        mainLogger.info('[取消扫描] 收到取消请求');
 
         // 【修复】不再检查 isScanning，始终调用 cancelScan
         // 即使 isScanning 为 false，也要确保清理所有资源
@@ -90,7 +86,7 @@ export function setupIpcHandlers(
             const checkInterval = setInterval(() => {
                 if (!scanState.isScanning) {
                     clearInterval(checkInterval);
-                    log('[取消扫描] 扫描已安全取消');
+                    mainLogger.info('[取消扫描] 扫描已安全取消');
 
                     // 【新增】停止电源阻止器
                     powerSaveManager.stop();
@@ -103,7 +99,7 @@ export function setupIpcHandlers(
             setTimeout(() => {
                 clearInterval(checkInterval);
                 if (scanState.isScanning) {
-                    log(`[取消扫描] 警告: 等待 ${CANCEL_SCAN_MAX_WAIT / 1000} 秒后扫描仍未结束，强制重置状态`);
+                    mainLogger.warn(`[取消扫描] 警告: 等待 ${CANCEL_SCAN_MAX_WAIT / 1000} 秒后扫描仍未结束，强制重置状态`);
                     scanState.isScanning = false;
                 }
 
@@ -282,7 +278,7 @@ export function setupIpcHandlers(
                 for (const logFile of logFiles) {
                     // 跳过当前正在使用的日志文件
                     if (logFile === currentLogFile) {
-                        log(`[clear-cache] 保留当前日志: ${logFile}`);
+                        mainLogger.info(`[clear-cache] 保留当前日志: ${logFile}`);
                         continue;
                     }
 
@@ -295,7 +291,7 @@ export function setupIpcHandlers(
                             cleanedFiles.push(`logs/${logFile}`);
                         }
                     } catch (e) {
-                        log(`[clear-cache] 无法删除日志文件 ${logFile}:`, e);
+                        mainLogger.warn(`[clear-cache] 无法删除日志文件 ${logFile}:`, e);
                     }
                 }
 
@@ -304,9 +300,9 @@ export function setupIpcHandlers(
                 if (fs.existsSync(currentLogPath)) {
                     try {
                         fs.writeFileSync(currentLogPath, '');
-                        log('[clear-cache] 已清空当前日志文件内容');
+                        mainLogger.info('[clear-cache] 已清空当前日志文件内容');
                     } catch (e) {
-                        log('[clear-cache] 清空当前日志失败:', e);
+                        mainLogger.warn('[clear-cache] 清空当前日志失败:', e);
                     }
                 }
             }
@@ -333,12 +329,12 @@ export function setupIpcHandlers(
             }
 
             const cleanedSizeMB = Math.round(cleanedSize / BYTES_TO_MB);
-            log(`[clear-cache] 缓存清理完成，释放 ${cleanedSizeMB} MB 空间`);
-            log(`[clear-cache] 清理的文件: ${cleanedFiles.join(', ') || '无'}`);
+            mainLogger.info(`[clear-cache] 缓存清理完成，释放 ${cleanedSizeMB} MB 空间`);
+            mainLogger.info(`[clear-cache] 清理的文件: ${cleanedFiles.join(', ') || '无'}`);
 
             return {success: true, cleanedSize, cleanedFiles};
         } catch (error: any) {
-            log('[clear-cache] 清理缓存失败:', error);
+            mainLogger.error('[clear-cache] 清理缓存失败:', error);
             return {error: error.message};
         }
     });
