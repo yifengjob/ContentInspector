@@ -42,6 +42,9 @@ class ExcelStreamingExtractor extends BaseExtractor {
             // 逐个工作表读取
             let sheetIndex = 0;
             for await (const worksheet of workbook) {
+                if(sheetIndex > 0){
+                    textChunks.push('\n');
+                }
                 sheetIndex++;
                 const sheetName = (worksheet as any).name || `Sheet${sheetIndex}`;
                 textChunks.push(`\n=== ${sheetName} ===\n`);
