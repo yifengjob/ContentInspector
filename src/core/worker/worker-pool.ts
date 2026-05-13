@@ -9,7 +9,6 @@
  */
 
 import {Worker} from 'worker_threads';
-import * as path from 'path';
 import {EventBus} from '../infra/event-bus';
 import type {ScanState} from '../state/scan-state';
 import type {BrowserWindow} from 'electron';

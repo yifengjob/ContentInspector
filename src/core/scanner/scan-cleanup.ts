@@ -86,7 +86,24 @@ export class ScanCleanup {
             // 10. 【修复】销毁调度器，清除扫描相关的事件监听器（保留日志监听器）
             this.options.scheduler.destroy();
 
-            // 11. 触发垃圾回收（在所有资源清理完成后）
+            // 11. 【监控】验证监听器是否被正确清除
+            const workerIdleListeners = this.options.eventBus.getListenerCount('worker.idle');
+            const workerCreatedListeners = this.options.eventBus.getListenerCount('worker.created');
+            const taskEnqueuedListeners = this.options.eventBus.getListenerCount('task.enqueued');
+            const walkerBatchReadyListeners = this.options.eventBus.getListenerCount('walker.batch-ready');
+            const logMessageListeners = this.options.eventBus.getListenerCount('log:message');
+            
+            this.options.log.info(`[cleanup] 事件监听器状态: worker.idle=${workerIdleListeners}, worker.created=${workerCreatedListeners}, task.enqueued=${taskEnqueuedListeners}, walker.batch-ready=${walkerBatchReadyListeners}, log.message=${logMessageListeners}`);
+            
+            if (workerIdleListeners !== 0 || workerCreatedListeners !== 0 || taskEnqueuedListeners !== 0 || walkerBatchReadyListeners !== 0) {
+                this.options.log.warn('[cleanup] ⚠️ 检测到扫描相关的监听器未被清除，可能存在内存泄漏风险！');
+            }
+            
+            if (logMessageListeners === 0) {
+                this.options.log.warn('[cleanup] ⚠️ 日志监听器也被清除了，第二次扫描时将无法显示日志！');
+            }
+
+            // 12. 触发垃圾回收（在所有资源清理完成后）
             this.triggerGC();
         } catch (error) {
             this.options.log('[cleanup] 清理过程中出错: ' + error);
