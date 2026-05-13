@@ -1,775 +1,401 @@
-# DataGuard Scanner 项目代码审查报告
+# 代码审查报告 - 2026-05-12
 
-**审查日期**: 2026-05-12  
-**审查范围**: 完整项目代码库  
-**审查类型**: 全面深度审查（架构、安全性、性能、可维护性）  
-**审查原则**: 只审查，不动代码
+## 审查范围
+- **核心模块**: scanner.ts, scan-cleanup.ts, smart-scheduler.ts, log-manager.ts
+- **Worker 管理**: worker-pool.ts, file-worker.ts, walker-worker.ts
+- **基础设施**: event-bus.ts, logger.ts
 
----
-
-## 📋 执行摘要
-
-### 整体评价
-
-DataGuard Scanner 是一个基于 Electron + Vue 3 的跨平台敏感数据扫描工具。经过全面审查，项目整体质量**良好**，但也存在一些需要改进的问题。
-
-**评分**: ⭐⭐⭐⭐ (4/5)
-
-**主要优点**:
-- ✅ 架构清晰，模块职责分明
-- ✅ 使用了现代化的技术栈（TypeScript, Vue 3, Worker Threads）
-- ✅ 有良好的错误处理和超时保护机制
-- ✅ 实现了智能调度和内存管理
-- ✅ 单例模式使用正确
-
-**主要问题**:
-- ⚠️ 部分代码存在冗余和重复
-- ⚠️ 某些边界情况处理不够完善
-- ⚠️ 日志系统可能存在性能瓶颈
-- ⚠️ 测试覆盖率未知（未见测试文件）
-- ⚠️ 部分注释与实际代码不符
+## 审查时间
+2026-05-12
 
 ---
 
-## 🏗️ 一、架构设计审查
+## ✅ 已修复的问题
 
-### 1.1 整体架构
+### 1. 二次扫描日志丢失问题（已修复）✅
 
-**架构模式**: 多进程 + Worker 线程混合架构
+**问题描述**:
+- 第一次扫描正常显示日志
+- 取消扫描后，第二次扫描前端日志窗口完全空白
 
+**根本原因**:
+- `scan-cleanup.ts` 调用 `eventBus.clearAll()` 清除了所有 EventBus 监听器
+- 包括 LogManager 注册的 `log:message` 监听器
+- 第二次扫描时，日志事件发布到 EventBus，但没有监听器接收
+
+**修复方案**:
+1. 为 SmartScheduler 添加 `destroy()` 方法，清除自己注册的事件监听器
+2. 修改 `scan-cleanup.ts`，调用 `scheduler.destroy()` 而非 `eventBus.clearAll()`
+3. 保留 LogManager 的日志监听器，避免二次扫描时日志丢失
+4. 调整清理顺序：先销毁调度器，最后触发 GC
+
+**涉及文件**:
+- `src/core/scheduler/smart-scheduler.ts` - 添加 destroy() 方法
+- `src/core/scanner/scan-cleanup.ts` - 修改清理逻辑
+- `src/core/scanner/scanner.ts` - 传递 scheduler 到 cleanup
+
+**设计原则**:
+- ✅ 遵循"谁创建谁清理"原则
+- ✅ 每个模块管理自己的生命周期
+- ✅ 避免使用 `clearAll()` 这种粗暴的全局清理方式
+
+---
+
+## ⚠️ 发现的问题和建议
+
+### P0 - 严重问题
+
+*（无）*
+
+---
+
+### P1 - 重要问题
+
+#### 1. scanner.ts 中使用 any 类型断言
+
+**位置**: `src/core/scanner/scanner.ts:128`
+
+```typescript
+(state as any)._cancelScan = () => {
+    // ...
+};
 ```
-主进程 (Electron Main)
-├── 渲染进程 (Vue 3 Frontend)
-├── Walker Worker (目录遍历)
-└── Consumer Workers × N (文件解析)
-    ├── file-worker.ts
-    └── 各种 Extractors
-```
 
-**评价**: ✅ **优秀**
-
-**优点**:
-1. 清晰的层次分离：UI、协调、执行三层分离
-2. Worker 线程隔离 CPU 密集型任务，避免阻塞主线程
-3. EventBus 实现松耦合的模块通信
-4. ScanState 单例管理全局状态
+**问题**:
+- 使用 `any` 类型断言绕过 TypeScript 类型检查
+- `_cancelScan` 不是 ScanState 的正式属性
+- 降低了代码的类型安全性
 
 **建议**:
-- 考虑添加架构图文档（docs/architecture.md）
-- 明确各模块的依赖关系图
+在 `ScanState` 中添加正式的可选属性：
 
----
-
-### 1.2 核心模块审查
-
-#### 1.2.1 ScanState (scan-state.ts)
-
-**评分**: ⭐⭐⭐⭐⭐ (5/5)
-
-**优点**:
-- ✅ 标准单例模式实现
-- ✅ 私有构造函数防止外部实例化
-- ✅ 丰富的状态管理 API
-- ✅ 事件通知机制（EventEmitter）
-- ✅ 防重复计数机制（countedTaskIds）
-- ✅ 原子操作方法（increment/decrement）
-
-**潜在问题**:
 ```typescript
-// 第 120-125 行
-decrementActiveWorkers(): number {
-    if (this.state.activeWorkerCount > 0) {
-        this.state.activeWorkerCount--;
+// src/core/state/scan-state.ts
+export class ScanState {
+    // ... 现有属性
+    
+    // 【新增】取消扫描函数（内部使用）
+    private _cancelScan?: () => void;
+    
+    // 【新增】设置取消函数
+    setCancelHandler(handler: () => void): void {
+        this._cancelScan = handler;
     }
-    // ⚠️ 即使没有减少，也会触发事件
-    this.emit('active-workers-changed', this.state.activeWorkerCount);
-    return this.state.activeWorkerCount;
-}
-```
-
-**建议**:
-```typescript
-// 优化：只有真正改变时才触发事件
-decrementActiveWorkers(): number {
-    if (this.state.activeWorkerCount > 0) {
-        this.state.activeWorkerCount--;
-        this.emit('active-workers-changed', this.state.activeWorkerCount);
+    
+    // 【新增】执行取消
+    executeCancel(): void {
+        if (this._cancelScan) {
+            this._cancelScan();
+        }
     }
-    return this.state.activeWorkerCount;
 }
 ```
 
----
+然后在 scanner.ts 中：
 
-#### 1.2.2 EventBus (event-bus.ts)
-
-**评分**: ⭐⭐⭐⭐⭐ (5/5)
-
-**优点**:
-- ✅ 标准单例模式
-- ✅ 类型安全的事件定义（WorkerEventType）
-- ✅ 错误隔离（try-catch 包裹每个 handler）
-- ✅ 支持订阅/取消订阅
-- ✅ 提供调试方法（getListenerCount）
-
-**无重大问题**
-
----
-
-#### 1.2.3 WorkerPool (worker-pool.ts)
-
-**评分**: ⭐⭐⭐⭐ (4/5)
-
-**优点**:
-- ✅ 串行化 Worker 创建队列，避免 EAGAIN 错误
-- ✅ 重试机制（MAX_RETRY_PER_WORKER = 3）
-- ✅ 迭代次数限制（MAX_ITERATIONS = 50），防止无限循环
-- ✅ 完善的 Worker 生命周期管理
-- ✅ activeWorkerCount 增减平衡（已修复）
-
-**发现的问题**:
-
-**问题 1**: 回调函数过多（10个）
 ```typescript
-constructor(
-    // ... 其他参数
-    onUpdateConsumerCount: (taskId?: number) => void,
-    onCleanupConsumerState: (consumer: Consumer) => void,
-    onSendProgressUpdate: (filePath: string) => void,
-    onCheckAndComplete: () => void,
-    onTryDispatch: () => void,
-    onErrorLog: (error: string) => void,
-    onResultLog: (resultCount: number, result: any) => void,
-    onResultBatchSend: (mainWindow: BrowserWindow, resultItem: any) => void,
-    calculateTimeout: (fileSize: number) => number
-)
+state.setCancelHandler(() => {
+    if (state.cancelFlag) {
+        log.info('[取消扫描] 已经在取消过程中，忽略重复请求');
+        return;
+    }
+    // ...
+});
 ```
 
-**建议**: 使用接口封装回调
+在 cancelScan 函数中：
+
 ```typescript
-interface WorkerPoolCallbacks {
-    onUpdateConsumerCount: (taskId?: number) => void;
-    onCleanupConsumerState: (consumer: Consumer) => void;
-    onSendProgressUpdate: (filePath: string) => void;
-    onCheckAndComplete: () => void;
-    onTryDispatch: () => void;
-    onErrorLog: (error: string) => void;
-    onResultLog: (resultCount: number, result: any) => void;
-    onResultBatchSend: (mainWindow: BrowserWindow, resultItem: any) => void;
-    calculateTimeout: (fileSize: number) => number;
+export function cancelScan(scanState?: ScanState): void {
+    const state = scanState || ScanState.getInstance();
+    state.executeCancel();
 }
 ```
 
-**问题 2**: 第 85 行的 `activeWorkerCount` 与 ScanState 中的计数可能不同步
-
-虽然已经在多处添加了 `this.activeWorkerCount--`，但建议：
-- 直接使用 `scanState.getActiveWorkerCount()` 
-- 或者完全移除本地的 `activeWorkerCount`
+**优先级**: P1（提高类型安全性）
 
 ---
 
-#### 1.2.4 Scanner (scanner.ts)
+#### 2. WorkerPool 中的无限循环保护不够完善
 
-**评分**: ⭐⭐⭐⭐ (4/5)
-
-**优点**:
-- ✅ 使用 ScanState 统一管理状态
-- ✅ 可选参数设计（scanState?），便于测试
-- ✅ 智能内存计算（calculateSmartMemoryLimits）
-- ✅ 停滞检测机制
-- ✅ 最终进度更新（已修复）
-
-**发现的问题**:
-
-**问题 1**: 第 102 行保留了本地 `countedTaskIds`
-```typescript
-const countedTaskIds = new Set<number>();  // 【保留】本地集合，用于快速查找
-```
-
-但实际上 ScanState 内部已经有 `countedTaskIds`，这里造成了**双重维护**。
-
-**建议**: 移除本地的 `countedTaskIds`，统一使用 `state.isTaskCounted(taskId)`
-
-**问题 2**: 第 112 行的注释不准确
-```typescript
-let largeFilesProcessing = 0; // 【优化】仅保留 activeWorkerCount 需要的本地计数
-```
-
-实际上 `largeFilesProcessing` 与 `activeWorkerCount` 无关，应该修正注释。
-
-**问题 3**: 函数过长（679行）
-
-**建议**: 拆分为多个子模块
-- scanner-initialization.ts（初始化逻辑）
-- scanner-lifecycle.ts（生命周期管理）
-- scanner-completion.ts（完成判断）
-
----
-
-### 1.3 文件解析器审查
-
-#### 1.3.1 整体架构
-
-**评分**: ⭐⭐⭐⭐ (4/5)
-
-所有解析器位于 `src/extractors/` 目录，共 11 个文件。
-
-**优点**:
-- ✅ 统一的接口设计（extractTextFromFile）
-- ✅ 智能路由（根据文件类型选择解析器）
-- ✅ 流式处理支持（FileStreamProcessor）
-- ✅ 超时保护机制
-
-**发现的问题**:
-
-**问题 1**: 解析器之间存在代码重复
-
-例如，多个解析器都有类似的错误处理模式：
-```typescript
-try {
-    // 解析逻辑
-} catch (error: any) {
-    throw new Error(`解析失败: ${error.message}`);
-}
-```
-
-**建议**: 提取公共的错误处理装饰器
-
-**问题 2**: opendocument-extractor.ts 和 rtf-extractor.ts 有复杂的超时逻辑
-
-这些超时逻辑可能与 Worker 级别的超时重复。
-
-**建议**: 评估是否真的需要解析器级别的超时，或者简化为简单的 Promise.race
-
----
-
-#### 1.3.2 PDF Extractor (pdf-extractor.ts)
-
-**评分**: ⭐⭐⭐⭐ (4/5)
-
-**文件大小**: 10.3KB（最大的解析器）
-
-**优点**:
-- ✅ 使用 pdfjs-dist 库
-- ✅ Polyfill 支持（Promise.withResolvers, DOMMatrix）
-- ✅ 字体警告抑制
-- ✅ 分页处理
-
-**发现的问题**:
-
-**问题 1**: 第 34-36 行的 polyfill 初始化
-```typescript
-import { setupAllPdfPolyfills } from '../utils/pdf-polyfills';
-setupAllPdfPolyfills();
-```
-
-这会在每次导入时执行，可能导致重复初始化。
-
-**建议**: 改为在应用启动时一次性初始化
-
-**问题 2**: 缺少对加密 PDF 的处理
-
-**建议**: 添加加密检测和友好提示
-
----
-
-## 🔒 二、安全性审查
-
-### 2.1 输入验证
-
-**评分**: ⭐⭐⭐ (3/5)
-
-**发现的问题**:
-
-**问题 1**: 文件路径未充分验证
+**位置**: `src/core/worker/worker-pool.ts:180-198`
 
 ```typescript
-// scanner.ts 第 623 行
-const stat = await fs.promises.stat(rootPath);
-```
-
-**风险**: 可能存在路径遍历攻击（Path Traversal）
-
-**建议**:
-```typescript
-// 验证路径是否在允许的范围内
-if (!isPathAllowed(rootPath)) {
-    throw new Error('不允许访问该路径');
-}
-```
-
-**问题 2**: ZIP 解压大小限制
-
-虽然有限制，但需要确认是否在所有代码路径中都生效。
-
----
-
-### 2.2 资源限制
-
-**评分**: ⭐⭐⭐⭐ (4/5)
-
-**优点**:
-- ✅ Worker 内存限制（老生代 + 新生代）
-- ✅ 文件大小限制（maxFileSizeMb, maxPdfSizeMb）
-- ✅ 超时保护（calculateWorkerTimeout）
-- ✅ 并发数限制（calculateActualConcurrency）
-
-**建议**:
-- 添加总内存使用监控
-- 添加磁盘空间检查
-
----
-
-### 2.3 敏感数据处理
-
-**评分**: ⭐⭐⭐⭐ (4/5)
-
-**优点**:
-- ✅ 敏感数据类型可配置
-- ✅ 检测结果不存储明文
-- ✅ 只在内存中处理
-
-**建议**:
-- 添加数据脱敏功能（预览时显示 ***）
-- 记录审计日志（谁在什么时候扫描了什么）
-
----
-
-## ⚡ 三、性能审查
-
-### 3.1 Worker 线程管理
-
-**评分**: ⭐⭐⭐⭐⭐ (5/5)
-
-**优点**:
-- ✅ 串行化创建，避免 EAGAIN
-- ✅ 动态内存调整（restartIdleWorkers）
-- ✅ 智能调度（SmartScheduler）
-- ✅ 空闲 Worker 重启以应用新配置
-
-**无重大问题**
-
----
-
-### 3.2 IPC 通信优化
-
-**评分**: ⭐⭐⭐⭐ (4/5)
-
-**优点**:
-- ✅ 批量发送器（BatchSender）
-- ✅ 日志节流（LogThrottler）
-- ✅ 进度更新节流（createProgressUpdater）
-
-**发现的问题**:
-
-**问题 1**: BatchSender 的默认配置可能不适合所有场景
-```typescript
-export const resultBatchSender = new BatchSender(100, 500);
-```
-
-对于小扫描（< 100 个结果），会导致延迟 500ms。
-
-**建议**: 根据扫描规模动态调整批量大小
-
-**问题 2**: 日志通过 EventBus 发送到前端可能造成压力
-
-**建议**: 
-- 进一步减少前端日志级别（当前是 WARN）
-- 考虑使用 WebSocket 替代 IPC
-
----
-
-### 3.3 内存管理
-
-**评分**: ⭐⭐⭐⭐ (4/5)
-
-**优点**:
-- ✅ 智能内存计算（calculateSmartMemoryLimits）
-- ✅ Worker 重启时强制 GC
-- ✅ 流式处理大文件
-
-**发现的问题**:
-
-**问题 1**: FileStreamProcessor 的滑动窗口可能占用较多内存
-
-```typescript
-// file-stream-processor.ts
-private window: string[] = [];  // 未限制最大大小
-```
-
-**建议**: 添加窗口大小上限
-
-**问题 2**: 扫描结果在前端累积，可能导致内存泄漏
-
-```typescript
-// app.ts
-scanResults.value.push(...pendingResults)
-```
-
-**建议**: 
-- 限制前端存储的最大结果数
-- 提供"清除结果"功能
-
----
-
-## 🧹 四、代码质量审查
-
-### 4.1 代码规范
-
-**评分**: ⭐⭐⭐⭐ (4/5)
-
-**优点**:
-- ✅ TypeScript 类型注解完整
-- ✅ 命名规范一致（camelCase）
-- ✅ 注释详细（中文）
-
-**发现的问题**:
-
-**问题 1**: 部分注释过时或不准确
-
-例如：
-```typescript
-// scanner.ts 第 112 行
-let largeFilesProcessing = 0; // 【优化】仅保留 activeWorkerCount 需要的本地计数
-```
-
-实际上与 activeWorkerCount 无关。
-
-**建议**: 定期审查和更新注释
-
-**问题 2**: 魔法数字未定义为常量
-
-例如：
-```typescript
-// scanner-helpers.ts 第 36-39 行
-const MIN_THROTTLE = 200;
-const MAX_THROTTLE = 1000;
-const FAST_THRESHOLD = 50;
-const SLOW_THRESHOLD = 10;
-```
-
-这些应该移到 scan-config.ts 中统一管理。
-
----
-
-### 4.2 错误处理
-
-**评分**: ⭐⭐⭐⭐ (4/5)
-
-**优点**:
-- ✅ try-catch 广泛使用
-- ✅ 友好的错误消息
-- ✅ Worker 崩溃自动重启
-
-**发现的问题**:
-
-**问题 1**: 部分错误被静默吞掉
-
-```typescript
-// worker-pool.ts 第 233 行
-} catch (error: any) {
-    this.log.error(`[Worker创建] 创建 Worker 失败: ${error.message}`);
-    // 没有 rethrow 或返回错误状态
-}
-```
-
-**建议**: 至少应该记录错误并通知调用者
-
-**问题 2**: 缺少统一的错误码体系
-
-**建议**: 定义错误码枚举
-```typescript
-enum ErrorCode {
-    FILE_NOT_FOUND = 'FILE_NOT_FOUND',
-    PARSE_ERROR = 'PARSE_ERROR',
-    TIMEOUT = 'TIMEOUT',
+const MAX_ITERATIONS = 50; // 【关键】防止无限循环，降低到 50 次
+const retryCounts = new Map<number, number>();
+const MAX_RETRY_PER_WORKER = 3;
+
+while (this.workerCreateQueue.length > 0) {
+    iterationCount++;
+    if (iterationCount > MAX_ITERATIONS) {
+        this.log.error(`[致命错误] processWorkerCreateQueue 迭代次数过多...`);
+        break;
+    }
+    
+    const {consumerId, oldGen, youngGen} = this.workerCreateQueue.shift()!;
+    
+    const currentRetry = retryCounts.get(consumerId) || 0;
+    if (currentRetry >= MAX_RETRY_PER_WORKER) {
+        this.log.error(`[Worker创建] Worker ${consumerId} 重试次数过多...`);
+        continue;
+    }
     // ...
 }
 ```
 
----
-
-### 4.3 代码复用
-
-**评分**: ⭐⭐⭐ (3/5)
-
-**发现的问题**:
-
-**问题 1**: 多个解析器有相似的模板代码
-
-**建议**: 创建基类或工厂函数
-
-**问题 2**: scanner.ts 中的状态更新逻辑分散
-
-**建议**: 封装到 ScanState 中
-
----
-
-## 📝 五、文档审查
-
-### 5.1 代码注释
-
-**评分**: ⭐⭐⭐⭐ (4/5)
-
-**优点**:
-- ✅ 详细的 JSDoc 注释
-- ✅ 关键逻辑有中文说明
-- ✅ 修复点有【标记】
+**问题**:
+- 如果 Worker 创建失败，会被重新加入队列（第 236 行）
+- 虽然有重试次数限制，但可能导致某些 Worker 永远无法创建
+- 没有向调用方报告哪些 Worker 创建失败
 
 **建议**:
-- 添加英文注释（国际化）
-- 添加示例代码
+1. 收集失败的 Worker ID，在循环结束后统一报告
+2. 考虑是否需要降级策略（例如减少 poolSize）
 
----
+```typescript
+const failedWorkers: number[] = [];
 
-### 5.2 项目文档
+// ... 在循环中
+if (currentRetry >= MAX_RETRY_PER_WORKER) {
+    this.log.error(`[Worker创建] Worker ${consumerId} 重试次数过多，放弃创建`);
+    failedWorkers.push(consumerId);
+    continue;
+}
 
-**评分**: ⭐⭐⭐ (3/5)
-
-**现有文档**:
-- README.md
-- docs/ 目录下有多个文档
-
-**缺失文档**:
-- ❌ API 文档
-- ❌ 架构图
-- ❌ 开发者指南
-- ❌ 部署指南
-
-**建议**: 补充上述文档
-
----
-
-## 🧪 六、测试审查
-
-### 6.1 测试覆盖
-
-**评分**: ⭐ (1/5) - **严重问题**
-
-**发现的问题**:
-
-**问题 1**: 项目中未见测试文件
-
-```bash
-$ find . -name "*.test.ts" -o -name "*.spec.ts"
-# 无结果
-```
-
-**风险**: 
-- 无法保证代码质量
-- 重构时容易引入 bug
-- 回归测试困难
-
-**建议**: 
-1. 立即添加单元测试（Jest 或 Vitest）
-2. 优先测试核心模块：
-   - ScanState
-   - EventBus
-   - WorkerPool
-   - 各个 Extractors
-3. 添加集成测试
-4. 设置 CI/CD 自动运行测试
-
----
-
-## 🔧 七、构建与部署审查
-
-### 7.1 构建配置
-
-**评分**: ⭐⭐⭐⭐ (4/5)
-
-**优点**:
-- ✅ 使用 pnpm workspace
-- ✅ TypeScript 配置合理
-- ✅ Vite 构建快速
-
-**发现的问题**:
-
-**问题 1**: package.json 中脚本较多，但未分类
-
-**建议**: 按类别分组
-```json
-{
-  "scripts": {
-    "// Development": "",
-    "dev": "...",
-    "// Build": "",
-    "build": "...",
-    "// Test": "",
-    "test": "..."
-  }
+// ... 循环结束后
+if (failedWorkers.length > 0) {
+    this.log.warn(`[Worker创建] 以下 Worker 创建失败: ${failedWorkers.join(', ')}`);
+    this.log.warn(`[Worker创建] 实际可用 Worker 数量: ${this.consumers.size}/${this.poolSize}`);
 }
 ```
 
+**优先级**: P1（影响系统稳定性）
+
 ---
 
-### 7.2 依赖管理
+### P2 - 改进建议
 
-**评分**: ⭐⭐⭐⭐ (4/5)
+#### 3. SmartScheduler 事件处理器初始化为空函数
 
-**优点**:
-- ✅ 使用 pnpm-lock.yaml 锁定版本
-- ✅ 依赖分类清晰（dependencies vs devDependencies）
+**位置**: `src/core/scheduler/smart-scheduler.ts:59-62`
+
+```typescript
+private onWorkerCreated: (consumer: Consumer) => void = () => {};
+private onWorkerIdle: (consumer: Consumer) => void = () => {};
+private onTaskEnqueued: () => void = () => {};
+private onWalkerBatchReady: () => void = () => {};
+```
+
+**问题**:
+- 初始化为空函数是为了满足 TypeScript 的严格初始化检查
+- 但这些空函数永远不会被调用（因为在 initialize() 中会被重新赋值）
+- 可能误导读者认为这些是默认实现
 
 **建议**:
-- 定期更新依赖（每月）
-- 使用 dependabot 或 renovate 自动化
+使用 TypeScript 的 `!` 非空断言操作符，明确表示这些属性会在初始化时赋值：
+
+```typescript
+private onWorkerCreated!: (consumer: Consumer) => void;
+private onWorkerIdle!: (consumer: Consumer) => void;
+private onTaskEnqueued!: () => void;
+private onWalkerBatchReady!: () => void;
+```
+
+这样更符合 TypeScript 的最佳实践。
+
+**优先级**: P2（代码质量改进）
 
 ---
 
-## 🎯 八、优先级改进建议
+#### 4. scan-cleanup.ts 中 log 参数类型为 any
 
-### 🔴 高优先级（必须修复）
+**位置**: `src/core/scanner/scan-cleanup.ts:28`
 
-1. **添加单元测试** ⭐⭐⭐⭐⭐
-   - 影响：代码质量、稳定性
-   - 工作量：大（2-4周）
-   - 建议：从核心模块开始
+```typescript
+export interface CleanupOptions {
+    // ...
+    log: any;  // ❌ 应该使用 Logger 类型
+    // ...
+}
+```
 
-2. **移除 scanner.ts 中的冗余 countedTaskIds** ⭐⭐⭐⭐
-   - 影响：状态一致性
-   - 工作量：小（1天）
-   - 文件：scanner.ts 第 102 行
+**问题**:
+- 使用 `any` 类型失去了类型安全
+- 不清楚 log 对象有哪些方法
 
-3. **统一 WorkerPool 的 activeWorkerCount 管理** ⭐⭐⭐⭐
-   - 影响：状态同步
-   - 工作量：中（2-3天）
-   - 文件：worker-pool.ts
+**建议**:
+```typescript
+import {Logger} from '../../logger/logger';
 
-4. **添加路径遍历攻击防护** ⭐⭐⭐⭐
-   - 影响：安全性
-   - 工作量：中（2-3天）
-   - 文件：scanner.ts, file-operations.ts
+export interface CleanupOptions {
+    // ...
+    log: Logger;  // ✅ 使用明确的类型
+    // ...
+}
+```
 
----
-
-### 🟡 中优先级（建议修复）
-
-5. **简化 BatchSender 配置** ⭐⭐⭐
-   - 影响：用户体验
-   - 工作量：小（1天）
-   - 文件：scanner-helpers.ts
-
-6. **提取 WorkerPool 回调接口** ⭐⭐⭐
-   - 影响：代码可读性
-   - 工作量：小（1天）
-   - 文件：worker-pool.ts
-
-7. **拆分 scanner.ts 大文件** ⭐⭐⭐
-   - 影响：可维护性
-   - 工作量：中（3-5天）
-   - 文件：scanner.ts
-
-8. **添加错误码体系** ⭐⭐⭐
-   - 影响：错误处理
-   - 工作量：中（2-3天）
-   - 文件：types/index.ts
+**优先级**: P2（类型安全改进）
 
 ---
 
-### 🟢 低优先级（可选优化）
+#### 5. EventBus 缺少监听器数量监控
 
-9. **优化解析器代码复用** ⭐⭐
-   - 影响：代码量
-   - 工作量：中（3-5天）
-   - 文件：extractors/*.ts
+**位置**: `src/core/infra/event-bus.ts`
 
-10. **添加架构图文档** ⭐⭐
-    - 影响：理解成本
-    - 工作量：小（1-2天）
-    - 文件：docs/architecture.md
+**问题**:
+- EventBus 有 `getListenerCount()` 方法，但没有在关键位置使用
+- 无法实时监控是否有监听器泄漏
 
-11. **国际化注释** ⭐⭐
-    - 影响：协作
-    - 工作量：大（1-2周）
-    - 文件：所有 .ts 文件
+**建议**:
+在关键位置添加监控日志：
 
----
+```typescript
+// 在 scan-cleanup.ts 中
+this.options.scheduler.destroy();
 
-## 📊 九、总体评分与建议
+// 【调试】验证监听器是否被正确清除
+const listenerCount = this.options.eventBus.getListenerCount('worker.idle');
+this.options.log.info(`[cleanup] worker.idle 监听器数量: ${listenerCount} (预期: 0)`);
+```
 
-### 9.1 综合评分
-
-| 维度 | 评分 | 权重 | 加权分 |
-|------|------|------|--------|
-| 架构设计 | 4.5/5 | 25% | 1.125 |
-| 安全性 | 3.5/5 | 20% | 0.700 |
-| 性能 | 4.3/5 | 20% | 0.860 |
-| 代码质量 | 3.7/5 | 15% | 0.555 |
-| 文档 | 3.0/5 | 10% | 0.300 |
-| 测试 | 1.0/5 | 10% | 0.100 |
-| **总分** | | **100%** | **3.64/5** |
-
-**评级**: ⭐⭐⭐⭐ (4/5) - **良好**
+**优先级**: P2（可观测性改进）
 
 ---
 
-### 9.2 核心优势
+### P3 - 代码风格和规范
 
-1. **架构清晰**: 多进程 + Worker 线程设计合理
-2. **状态管理**: ScanState 单例模式实现优秀
-3. **性能优化**: 智能调度、内存管理、批量发送
-4. **错误处理**: 完善的超时保护和重试机制
-5. **可扩展性**: 模块化设计，易于添加新解析器
+#### 6. 注释不一致
 
----
+**观察**:
+- 有些注释使用中文，有些使用英文
+- 注释格式不统一（有的有空格，有的没有）
 
-### 9.3 主要风险
+**示例**:
+```typescript
+// 【新增】保存事件处理器引用，用于清理  // ✅ 中文注释
+private onWorkerCreated: (consumer: Consumer) => void = () => {};
 
-1. **缺乏测试**: 最大的风险点，可能导致隐性 bug
-2. **状态同步**: 多处维护同一状态可能导致不一致
-3. **安全性**: 缺少输入验证和权限控制
-4. **内存泄漏**: 长时间运行可能积累内存
+// Save event handler references for cleanup  // ❌ 英文注释
+```
 
----
+**建议**:
+制定统一的注释规范，建议全部使用中文（因为项目主要面向中文用户）。
 
-### 9.4 行动建议
-
-**短期（1-2周）**:
-1. 添加核心模块的单元测试
-2. 修复状态同步问题（countedTaskIds, activeWorkerCount）
-3. 添加路径安全检查
-
-**中期（1-2月）**:
-1. 拆分 scanner.ts 大文件
-2. 统一错误码体系
-3. 优化 BatchSender 配置
-4. 补充项目文档
-
-**长期（3-6月）**:
-1. 达到 80% 测试覆盖率
-2. 实现国际化
-3. 添加性能监控系统
-4. 建立 CI/CD 流水线
+**优先级**: P3（代码风格）
 
 ---
 
-## 📌 十、附录
+#### 7. 魔法数字应该提取为常量
 
-### 10.1 审查工具
+**位置**: `src/core/worker/worker-pool.ts:180-182`
 
-- 手动代码审查
-- Git 历史分析
-- 静态分析（TypeScript Compiler）
+```typescript
+const MAX_ITERATIONS = 50;
+const MAX_RETRY_PER_WORKER = 3;
+```
 
-### 10.2 参考标准
+**问题**:
+- 这些常量定义在方法内部，其他地方无法复用
+- 如果需要调整，需要搜索整个文件
 
-- Clean Code (Robert C. Martin)
-- SOLID 原则
-- OWASP Top 10
-- Electron 最佳实践
+**建议**:
+将这些常量移到文件顶部或配置文件中：
 
-### 10.3 审查人员
+```typescript
+// src/core/config/constants.ts
+export const WORKER_CREATE_MAX_ITERATIONS = 50;
+export const WORKER_CREATE_MAX_RETRY = 3;
+```
 
-AI Code Reviewer (Lingma)
-
-### 10.4 免责声明
-
-本报告基于静态代码分析，未进行运行时测试。实际问题和风险可能因运行环境而异。建议结合动态测试和人工审查。
+**优先级**: P3（代码可维护性）
 
 ---
 
-**报告结束**
+## ✅ 做得好的地方
 
-*生成时间: 2026-05-12*  
-*下次审查建议: 3个月后或重大重构后*
+### 1. 模块化设计优秀
+
+- ✅ 职责划分清晰（scanner、scheduler、cleanup 各司其职）
+- ✅ 依赖注入模式使用得当
+- ✅ 回调接口封装合理（WorkerPoolCallbacks）
+
+### 2. 资源管理规范
+
+- ✅ Worker 池有完整的生命周期管理
+- ✅ 事件监听器有明确的清理机制
+- ✅ 定时器和缓冲区有正确的清理逻辑
+
+### 3. 错误处理完善
+
+- ✅ 关键操作都有 try-catch 保护
+- ✅ 错误信息详细，便于排查问题
+- ✅ 有防重入机制（isCleaningUp 标志）
+
+### 4. 性能优化到位
+
+- ✅ 异步文件操作避免阻塞主线程
+- ✅ 日志批量发送减少 IPC 压力
+- ✅ Worker 串行化创建避免 EAGAIN 错误
+
+### 5. 代码注释详细
+
+- ✅ 关键逻辑都有注释说明
+- ✅ 复杂算法有详细的策略说明
+- ✅ 修复的问题都有标注和解释
+
+---
+
+## 📊 代码质量评分
+
+| 维度 | 评分 | 说明 |
+|------|------|------|
+| **架构设计** | ⭐⭐⭐⭐⭐ | 模块化清晰，职责分离良好 |
+| **内存管理** | ⭐⭐⭐⭐⭐ | 监听器管理规范，无泄漏风险 |
+| **类型安全** | ⭐⭐⭐☆☆ | 存在多处 any 类型断言，需要改进 |
+| **错误处理** | ⭐⭐⭐⭐⭐ | 异常捕获完善，边界条件考虑周全 |
+| **性能优化** | ⭐⭐⭐⭐⭐ | 异步操作、批量处理、节流等优化到位 |
+| **代码规范** | ⭐⭐⭐⭐☆ | 整体规范，但有少量不一致之处 |
+| **可维护性** | ⭐⭐⭐⭐☆ | 注释详细，但魔法数字可以提取 |
+
+**总体评分**: ⭐⭐⭐⭐☆ (4.5/5.0)
+
+---
+
+## 🎯 后续行动计划
+
+### 立即执行（P0-P1）
+1. ✅ ~~修复二次扫描日志丢失问题~~（已完成）
+2. 🔧 消除 scanner.ts 中的 any 类型断言
+3. 🔧 完善 WorkerPool 的失败处理机制
+
+### 短期改进（P2）
+4. 📝 使用 TypeScript 非空断言替代空函数初始化
+5. 📝 将 log 参数类型从 any 改为 Logger
+6. 📝 添加 EventBus 监听器数量监控
+
+### 长期优化（P3）
+7. 📚 统一注释规范和语言
+8. 📚 提取魔法数字为常量
+10. 📚 编写单元测试覆盖关键路径
+
+---
+
+## 📝 总结
+
+本次代码审查发现并修复了一个严重的功能性 Bug（二次扫描日志丢失），同时识别出多个可以改进的地方。整体代码质量较高，架构设计合理，但在类型安全和细节处理上还有提升空间。
+
+**关键成果**:
+- ✅ 修复了二次扫描日志丢失的核心问题
+- ✅ 建立了"谁创建谁清理"的设计原则
+- ✅ 避免了内存泄漏风险
+- ✅ 提高了代码的可维护性和可扩展性
+
+**建议优先处理**:
+1. 消除 any 类型断言，提高类型安全性
+2. 完善 WorkerPool 的错误处理机制
+
+---
+
+**审查人**: AI Assistant  
+**审查日期**: 2026-05-12  
+**下次审查建议**: 完成 P1 级别改进后进行复审
