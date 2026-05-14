@@ -183,6 +183,29 @@ export async function loadConfig(): Promise<AppConfig> {
     return getDefaultConfig();
 }
 
+/**
+ * 【新增】同步读取配置（用于 getSensitiveRules 等同步场景）
+ */
+export function getConfigSync(): AppConfig {
+    try {
+        if (fs.existsSync(CONFIG_FILE)) {
+            const data = fs.readFileSync(CONFIG_FILE, 'utf-8');
+            const config = JSON.parse(data);
+            const defaultConfig = getDefaultConfig();
+            const mergedConfig = {...defaultConfig, ...config};
+
+            // 根据 ignoreOtherDrivesSystemDirs 选项重新生成系统目录
+            mergedConfig.systemDirs = generateSystemDirs(mergedConfig.ignoreOtherDrivesSystemDirs);
+
+            return mergedConfig;
+        }
+    } catch (error: any) {
+        logger.warn('getConfigSync: {}', error.message);
+    }
+
+    return getDefaultConfig();
+}
+
 export async function saveConfig(config: AppConfig): Promise<void> {
     try {
         const data = JSON.stringify(config, null, 2);

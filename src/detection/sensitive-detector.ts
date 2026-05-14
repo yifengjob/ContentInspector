@@ -192,8 +192,31 @@ const sensitiveRules: SensitiveRule[] = [
   }
 ];
 
+/**
+ * 获取敏感规则列表
+ * 
+ * 【新增】如果配置中存在自定义表达式，会添加到列表中
+ */
 export function getSensitiveRules(): Array<[string, string]> {
-  return sensitiveRules.map(rule => [rule.id, rule.name]);
+  const rules: Array<[string, string]> = sensitiveRules.map(rule => [rule.id, rule.name]);
+  
+  // 【新增】检查是否有自定义表达式配置
+  try {
+    // 注意：这里使用同步方式读取配置，因为该函数被同步调用
+    // 在 Electron 主进程中，config-manager 支持同步读取
+    const { getConfigSync } = require('../core/config');
+    const config = getConfigSync();
+    
+    if (config?.customSensitiveExpression && config.customSensitiveExpression.trim()) {
+      rules.push(['custom_expression', '自定义表达式']);
+      mainLogger.debug('[敏感规则] 已添加自定义表达式到规则列表');
+    }
+  } catch (error: any) {
+    // 如果读取配置失败，忽略错误，只返回内置规则
+    mainLogger.warn('[敏感规则] 读取配置失败，仅返回内置规则: {}', error.message);
+  }
+  
+  return rules;
 }
 
 /**
