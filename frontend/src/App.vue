@@ -63,6 +63,29 @@
           <use href="#icon-dev-tools"/>
         </svg>
       </button>
+      
+      <!-- 【新增】自定义敏感词逻辑表达式输入框 -->
+      <div class="expression-input-container" :title="expressionValidationStatus">
+        <input
+            v-model="customExpression"
+            type="text"
+            class="expression-input"
+            placeholder="自定义敏感词（如：密码 & 身份证）"
+            @input="onExpressionInput"
+            @blur="handleSaveExpression"
+            @keyup.enter="handleSaveExpression"
+        />
+        <span 
+          v-if="expressionValidationError" 
+          class="expression-error-icon" 
+          :title="expressionValidationError"
+        >⚠️</span>
+        <span 
+          v-else-if="expressionValidated && !expressionValidationError" 
+          class="expression-success-icon"
+          title="表达式语法正确"
+        >✅</span>
+      </div>
       <button
           class="btn btn-icon-only theme-toggle"
           @click="toggleTheme"
@@ -183,7 +206,7 @@
 </template>
 
 <script setup lang="ts">
-import {onMounted, ref} from 'vue'
+import {onMounted, ref, computed} from 'vue'
 import {useAppStore} from '@/stores/app'
 import {storeToRefs} from 'pinia'
 import {
@@ -197,7 +220,10 @@ import {
   onScanProgress,
   onScanResult,
   showMessage,
-  startScan
+  startScan,
+  setCustomExpression,
+  getCustomExpression,
+  validateExpression
 } from './utils/electron-api'
 import DirectoryTree from './components/DirectoryTree.vue'
 import FileTypeFilter from './components/FileTypeFilter.vue'
@@ -243,6 +269,12 @@ const showExport = ref(false)
 const isSidebarCollapsed = ref(false)
 const currentTheme = ref<ThemeMode>('system')
 const isCancelling = ref(false) // 【新增】取消扫描状态
+
+// 【新增】自定义敏感词逻辑表达式相关
+const customExpression = ref('')
+const expressionValidationError = ref('')
+const expressionValidated = ref(false)
+let validationTimer: number | null = null  // 防抖定时器
 
 // 加载配置
 onMounted(async () => {
@@ -339,6 +371,13 @@ onMounted(async () => {
   await onScanLogBatch((logs) => {
     appStore.addLogs(logs)  // ← 批量添加，只触发一次响应式更新
   })
+  
+  // 【新增】加载自定义表达式
+  try {
+    customExpression.value = await getCustomExpression()
+  } catch (error) {
+    console.error('加载自定义表达式失败:', error)
+  }
 })
 
 // 开始扫描
@@ -369,6 +408,7 @@ const handleStartScan = async () => {
     maxFileSizeMb: config.value.maxFileSizeMb,
     maxPdfSizeMb: config.value.maxPdfSizeMb,
     scanConcurrency: config.value.scanConcurrency,
+    customSensitiveExpression: customExpression.value.trim() || undefined,  // 【新增】自定义表达式
   }
 
   try {
@@ -415,6 +455,80 @@ const handleOpenDevTools = () => {
     console.warn('electronAPI.openDevTools 不可用')
   }
 }
+
+// ==================== 自定义敏感词逻辑表达式相关 ====================
+
+// 【新增】实时验证表达式（带防抖）
+const validateExpressionDebounced = async () => {
+  const expr = customExpression.value.trim()
+  
+  // 清空状态
+  if (!expr) {
+    expressionValidationError.value = ''
+    expressionValidated.value = false
+    return
+  }
+  
+  try {
+    const result = await validateExpression(expr)
+    expressionValidated.value = true
+    
+    if (!result.valid) {
+      expressionValidationError.value = result.error || '语法错误'
+    } else {
+      expressionValidationError.value = ''
+    }
+  } catch (error: any) {
+    expressionValidationError.value = error.message || '验证失败'
+  }
+}
+
+// 【新增】监听输入变化（防抖）
+const onExpressionInput = () => {
+  // 清除之前的定时器
+  if (validationTimer !== null) {
+    clearTimeout(validationTimer)
+  }
+  
+  // 设置新的定时器（500ms 防抖）
+  validationTimer = window.setTimeout(() => {
+    validateExpressionDebounced()
+  }, 500)
+}
+
+// 【新增】保存表达式
+const handleSaveExpression = async () => {
+  const expr = customExpression.value.trim()
+  
+  try {
+    await setCustomExpression(expr)
+    expressionValidated.value = true
+    expressionValidationError.value = ''
+    
+    // 如果之前有错误，清除它
+    if (expr === '') {
+      expressionValidationError.value = ''
+      expressionValidated.value = false
+    }
+  } catch (error: any) {
+    expressionValidationError.value = error.message || '保存失败'
+    await showMessage(`保存自定义表达式失败：${error.message}`, {
+      title: '错误',
+      type: 'error'
+    })
+  }
+}
+
+// 【新增】获取表达式验证状态提示
+const expressionValidationStatus = computed(() => {
+  if (expressionValidationError.value) {
+    return `语法错误: ${expressionValidationError.value}`
+  }
+  if (expressionValidated.value && customExpression.value.trim()) {
+    return '表达式语法正确'
+  }
+  return '输入自定义敏感词逻辑表达式，如：密码 & 身份证'
+})
 
 // 预览文件
 const handlePreview = (filePath: string) => {
@@ -466,6 +580,58 @@ const getThemeTooltip = () => {
   background-color: var(--toolbar-bg);
   border-bottom: var(--border-width) solid var(--border-color);
   contain: layout style; /* ← 限制重排范围 */
+  align-items: center; /* 垂直居中对齐 */
+}
+
+/* 【新增】自定义表达式输入框容器 */
+.expression-input-container {
+  display: flex;
+  align-items: center;
+  gap: 0.25em;
+  position: relative;
+}
+
+/* 【新增】表达式输入框 */
+.expression-input {
+  padding: 0.375em 0.75em; /* 6px 12px */
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-size: 0.9em;
+  width: 280px;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.expression-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+.expression-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+/* 【新增】错误图标 */
+.expression-error-icon {
+  font-size: 1em;
+  cursor: help;
+  animation: shake 0.3s ease-in-out;
+}
+
+/* 【新增】成功图标 */
+.expression-success-icon {
+  font-size: 1em;
+  cursor: default;
+}
+
+/* 【新增】错误抖动动画 */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
 }
 
 .btn {
