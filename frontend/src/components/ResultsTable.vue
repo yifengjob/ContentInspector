@@ -130,8 +130,20 @@
                 <div class="cell size-cell mono-font">{{ formatFileSize(item.fileSize) }}</div>
                 <div class="cell mono-font time-cell">{{ formatTime(item.modifiedTime) }}</div>
                 <div v-for="type in sensitiveTypes" :key="type.id" class="cell number-cell mono-font"
-                     :class="{ 'highlight-count': (item.counts[type.id] || 0) > 0 }">
-                  {{ (item.counts[type.id] || 0) > 0 ? Number(item.counts[type.id]).toLocaleString() : '-' }}
+                     :class="{ 
+                       'highlight-count': (item.counts[type.id] || 0) > 0,
+                       'expression-column-center': type.id === 'custom_expression'
+                     }">
+                  <!-- 【需求变更】自定义表达式列显示图标，其他列显示数字 -->
+                  <template v-if="type.id === 'custom_expression'">
+                    <svg v-if="(item.counts[type.id] || 0) > 0" class="check-icon" style="width: 16px; height: 16px; color: var(--success-color);">
+                      <use href="#icon-check-fill"></use>
+                    </svg>
+                    <span v-else>-</span>
+                  </template>
+                  <template v-else>
+                    {{ (item.counts[type.id] || 0) > 0 ? Number(item.counts[type.id]).toLocaleString() : '-' }}
+                  </template>
                 </div>
                 <div class="cell total-cell mono-font">{{ item.total.toLocaleString() }}</div>
                 <div class="cell actions-col frozen-right">
@@ -287,8 +299,8 @@ const sensitiveTypes = computed(() => {
     // 检查是否已经存在 custom_expression
     const hasCustomType = enabledTypes.some(t => t.id === 'custom_expression')
     if (!hasCustomType) {
-      // 添加自定义表达式类型
-      enabledTypes.push({ id: 'custom_expression', name: '自定义表达式' })
+      // 【需求变更】添加自定义表达式类型，列名为"表达式"
+      enabledTypes.push({ id: 'custom_expression', name: '表达式' })
     }
   }
   
@@ -1056,6 +1068,14 @@ const handleBatchDelete = async () => {
 .highlight-count {
   color: var(--error-color);
   font-weight: 600;
+}
+
+/* 【需求变更】自定义表达式列居中显示 */
+.expression-column-center {
+  text-align: center !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .actions-cell {

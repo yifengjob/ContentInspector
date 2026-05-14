@@ -435,8 +435,9 @@ export class FileStreamProcessor {
       if (isMatched) {
         this.accumulatedCounts['custom_expression'] = 
           (this.accumulatedCounts['custom_expression'] || 0) + 1;
-        this.totalCount++;
-        mainLogger.info('[流式处理] ✅ 自定义表达式匹配成功，计数+1');
+        // 【需求变更】自定义表达式不计入敏感信息总数，只记录有无
+        // this.totalCount++;  // ← 已注释，不再累加到总数
+        mainLogger.info('[流式处理] ✅ 自定义表达式匹配成功');
       }
       
       this.hasEvaluatedExpression = true;
