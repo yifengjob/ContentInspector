@@ -359,21 +359,26 @@ const filteredResults = computed(() => {
         const typeId = sortField.value.replace('counts.', '')
         aVal = a.counts[typeId] || 0
         bVal = b.counts[typeId] || 0
-      } else if (sortField.value === 'expression_matched') {
-        // 【需求变更】表达式列排序：使用 counts.custom_expression
-        aVal = a.counts['custom_expression'] || 0
-        bVal = b.counts['custom_expression'] || 0
       } else {
         // 普通字段 - 将下划线命名转换为驼峰命名
         const fieldMap: Record<string, string> = {
           'file_path': 'filePath',
           'file_size': 'fileSize',
           'modified_time': 'modifiedTime',
-          'total': 'total'
+          'total': 'total',
+          'expression_matched': 'counts.custom_expression'  // 【需求变更】表达式列映射到 counts.custom_expression
         }
         const actualField = fieldMap[sortField.value] || sortField.value
-        aVal = a[actualField as keyof typeof a]
-        bVal = b[actualField as keyof typeof b]
+        
+        // 【需求变更】支持嵌套字段访问（如 counts.custom_expression）
+        if (actualField.includes('.')) {
+          const [parent, child] = actualField.split('.')
+          aVal = (a as any)[parent]?.[child] || 0
+          bVal = (b as any)[parent]?.[child] || 0
+        } else {
+          aVal = a[actualField as keyof typeof a]
+          bVal = b[actualField as keyof typeof b]
+        }
       }
 
       if (typeof aVal === 'string') {
