@@ -314,6 +314,7 @@ export class WorkerPool {
             taskId: this.nextTaskId,
             filePath: task.filePath,
             enabledSensitiveTypes: this.config.enabledSensitiveTypes,
+            customExpression: this.config.customSensitiveExpression,  // 【新增】自定义表达式
             config: {
                 enabledSensitiveTypes: this.config.enabledSensitiveTypes,
                 maxFileSizeMb: this.config.maxFileSizeMb,
