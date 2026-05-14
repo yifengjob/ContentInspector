@@ -59,6 +59,7 @@ interface WorkerTask {
     taskId: number;
     filePath: string;
     enabledSensitiveTypes: string[];
+    customExpression?: string; // 自定义敏感词逻辑表达式
     previewMode?: boolean; // 预览模式：只提取文本，不检测敏感数据
     config?: {
         maxFileSizeMb?: number;
@@ -100,7 +101,7 @@ process.on('uncaughtException', (error) => {
 
 // 【事件驱动】Worker任务处理器 - 使用Promise链式处理
 async function processTask(task: WorkerTask): Promise<void> {
-    const {taskId, filePath, enabledSensitiveTypes, previewMode = false} = task;
+    const {taskId, filePath, enabledSensitiveTypes, customExpression, previewMode = false} = task;
 
     // 【优化】设置超时保护（使用配置常量）
     let timeoutId: NodeJS.Timeout | null = null;
@@ -213,6 +214,7 @@ async function processTask(task: WorkerTask): Promise<void> {
                     processor.processFile(filePath, {
                         mode: previewMode ? 'preview' : 'detect',
                         enabledTypes: enabledSensitiveTypes,
+                        customExpression,
                         ...createCallbacks()
                     }),
                     timeoutPromise
@@ -243,6 +245,7 @@ async function processTask(task: WorkerTask): Promise<void> {
                 await processor.processFile('', {
                     mode: previewMode ? 'preview' : 'detect',
                     enabledTypes: enabledSensitiveTypes,
+                    customExpression,
                     ...createCallbacks()
                 }, text); // 传入预提取的文本
             }

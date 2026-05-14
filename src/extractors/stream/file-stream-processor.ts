@@ -13,7 +13,7 @@ import {
   SLIDING_WINDOW_OVERLAP_SIZE,
   BYTES_TO_MB
 } from '../../core/config/constants';
-import { getHighlights } from '../../detection/sensitive-detector';
+import { getHighlights, countSensitiveMatches } from '../../detection/sensitive-detector';
 import type { HighlightRange } from '../../types';
 
 /**
@@ -53,6 +53,7 @@ export interface ProcessingStats {
 export interface StreamProcessorOptions {
   mode: 'detect' | 'preview';           // 处理模式
   enabledTypes: string[];               // 启用的敏感词类型
+  customExpression?: string;            // 自定义敏感词逻辑表达式
   
   // 回调函数
   onChunk?: (chunkData: ChunkData) => void;           // 每块就绪回调
@@ -215,7 +216,7 @@ export class FileStreamProcessor {
 
       // 检测敏感词 (带重叠区)
       const fullChunk = this.previousOverlap + chunkText;
-      const localHighlights = this.detectWithOverlap(fullChunk, options.enabledTypes);
+      const localHighlights = this.detectWithOverlap(fullChunk, options.enabledTypes, options.customExpression);
       
       // 【修复】将局部偏移转换为全局偏移（基于字符数）
       const charsBefore = this.totalChars;  // 当前块之前的总字符数
@@ -264,7 +265,7 @@ export class FileStreamProcessor {
     const currentChunk = this.previousOverlap + this.buffer.slice(0, splitPos);
 
     // 检测敏感词
-    const localHighlights = this.detectWithOverlap(currentChunk, options.enabledTypes);
+    const localHighlights = this.detectWithOverlap(currentChunk, options.enabledTypes, options.customExpression);
     
     // 【修复】将局部偏移转换为全局偏移（基于字符数）
     const charsBefore = this.totalChars;  // 当前块之前的总字符数
@@ -330,7 +331,8 @@ export class FileStreamProcessor {
    */
   private detectWithOverlap(
     chunk: string,
-    enabledTypes: string[]
+    enabledTypes: string[],
+    customExpression?: string
   ): HighlightRange[] {
     const allHighlights = getHighlights(chunk, enabledTypes);
 
@@ -339,8 +341,8 @@ export class FileStreamProcessor {
     const newHighlights = allHighlights.filter(h => h.start >= overlapLength);
 
     // 【扫描模式】累加计数
-    if (enabledTypes.length > 0) {
-      this.accumulateCounts(newHighlights);
+    if (enabledTypes.length > 0 || (customExpression && customExpression.trim())) {
+      this.accumulateCounts(newHighlights, chunk, enabledTypes, customExpression);
     }
 
     return newHighlights;
@@ -349,11 +351,31 @@ export class FileStreamProcessor {
   /**
    * 累加敏感词计数 (扫描模式)
    */
-  private accumulateCounts(highlights: HighlightRange[]): void {
+  private accumulateCounts(
+    highlights: HighlightRange[],
+    chunkText: string,
+    enabledTypes: string[],
+    customExpression?: string
+  ): void {
+    // 累加内置规则的计数
     for (const highlight of highlights) {
       this.accumulatedCounts[highlight.typeId] = 
         (this.accumulatedCounts[highlight.typeId] || 0) + 1;
       this.totalCount++;
+    }
+    
+    // 评估自定义表达式（仅在第一块或最后一块评估一次，避免重复）
+    if (customExpression && customExpression.trim() && this.chunkIndex === 0) {
+      try {
+        const counts = countSensitiveMatches(chunkText, enabledTypes, customExpression);
+        if (counts['custom_expression']) {
+          this.accumulatedCounts['custom_expression'] = 
+            (this.accumulatedCounts['custom_expression'] || 0) + counts['custom_expression'];
+          this.totalCount += counts['custom_expression'];
+        }
+      } catch (error: any) {
+        // 静默失败，不影响其他检测
+      }
     }
   }
 
