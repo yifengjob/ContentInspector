@@ -143,18 +143,18 @@ export function createWindowManager(): WindowManager {
             try {
                 // macOS优先使用.icns，其他平台使用.png
                 const iconPath = process.platform === 'darwin'
-                    ? path.join(__dirname, '..', '..', 'build', 'icons', 'icon.icns')
-                    : path.join(__dirname, '..', '..', 'build', 'icons', 'icon.png');
+                    ? path.join(__dirname, '..', '..', '..', 'build', 'icons', 'icon.icns')
+                    : path.join(__dirname, '..', '..', '..', 'build', 'icons', 'icon.png');
 
-                mainLogger.info('尝试加载图标，路径:', iconPath);
+                mainLogger.info('尝试加载图标，路径: {}', iconPath);
                 if (fs.existsSync(iconPath)) {
                     icon = nativeImage.createFromPath(iconPath);
-                    mainLogger.info('✓ 图标加载成功，尺寸:', icon.getSize());
+                    mainLogger.info('✓ 图标加载成功，尺寸: {}', icon.getSize());
                 } else {
-                    mainLogger.warn('⚠ 图标文件不存在:', iconPath);
+                    mainLogger.warn('⚠ 图标文件不存在: {}', iconPath);
                 }
-            } catch (error) {
-                mainLogger.error('✗ 加载图标失败:', error);
+            } catch (error: any) {
+                mainLogger.error('✗ 加载图标失败: {}', error.message);
             }
 
             mainWindow = new BrowserWindow({
