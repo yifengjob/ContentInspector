@@ -193,11 +193,11 @@
 </template>
 
 <script setup lang="ts">
-import {ref, computed, onMounted, onUnmounted, watch, nextTick} from 'vue'
+import {computed, nextTick, onMounted, onUnmounted, ref, watch} from 'vue'
 import {useAppStore} from '@/stores/app'
 import {storeToRefs} from 'pinia'
-import {formatFileSize, formatTime, debounce, promisePool} from '@/utils/format'
-import {openFile, openFileLocation, deleteFile, getSensitiveRules, showMessage, askDialog} from '@/utils/electron-api'
+import {debounce, formatFileSize, formatTime, promisePool} from '@/utils/format'
+import {askDialog, deleteFile, getSensitiveRules, openFile, openFileLocation, showMessage} from '@/utils/electron-api'
 // 【虚拟滚动优化】导入 vue-virtual-scroller（支持动态行高）
 import {DynamicScroller, DynamicScrollerItem} from 'vue-virtual-scroller'
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
@@ -294,11 +294,9 @@ onMounted(async () => {
 
 // 只显示启用且存在于规则中的敏感类型（排除 custom_expression）
 const sensitiveTypes = computed(() => {
-  const enabledTypes = allSensitiveTypes.value.filter(type =>
+  return allSensitiveTypes.value.filter(type =>
       config.value.enabledSensitiveTypes.includes(type.id) && type.id !== 'custom_expression'
   )
-  
-  return enabledTypes
 })
 
 // 【新增】判断是否显示表达式列
