@@ -274,9 +274,25 @@ onMounted(async () => {
 
 // 只显示启用且存在于规则中的敏感类型
 const sensitiveTypes = computed(() => {
-  return allSensitiveTypes.value.filter(type =>
+  const enabledTypes = allSensitiveTypes.value.filter(type =>
       config.value.enabledSensitiveTypes.includes(type.id)
   )
+  
+  // 【新增】如果扫描结果中有 custom_expression 数据，强制显示该列
+  const hasCustomExpressionData = scanResults.value.some(item => 
+    item.counts && item.counts['custom_expression'] !== undefined
+  )
+  
+  if (hasCustomExpressionData) {
+    // 检查是否已经存在 custom_expression
+    const hasCustomType = enabledTypes.some(t => t.id === 'custom_expression')
+    if (!hasCustomType) {
+      // 添加自定义表达式类型
+      enabledTypes.push({ id: 'custom_expression', name: '自定义表达式' })
+    }
+  }
+  
+  return enabledTypes
 })
 
 // 【修复】动态计算 Grid 列模板 - 使用 1fr 自动填充
