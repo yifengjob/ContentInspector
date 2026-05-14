@@ -136,7 +136,7 @@
                      }">
                   <!-- 【需求变更】自定义表达式列显示图标，其他列显示数字 -->
                   <template v-if="type.id === 'custom_expression'">
-                    <svg v-if="(item.counts[type.id] || 0) > 0" class="check-icon" style="width: 16px; height: 16px; color: var(--success-color);">
+                    <svg v-if="(item.counts[type.id] || 0) > 0" class="check-icon-svg">
                       <use href="#icon-check-fill"></use>
                     </svg>
                     <span v-else>-</span>
@@ -1076,6 +1076,13 @@ const handleBatchDelete = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* 【需求变更】自定义表达式列的对勾图标样式 */
+.check-icon-svg {
+  width: 16px;
+  height: 16px;
+  color: var(--success-color);
 }
 
 .actions-cell {
