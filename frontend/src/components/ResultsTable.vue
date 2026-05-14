@@ -81,12 +81,18 @@
                 {{ sortOrder === 'asc' ? '↑' : '↓' }}
               </span>
             </div>
-            <!-- 【需求变更】表达式列表头单独放置 -->
+            <!-- 【需求变更】表达式列表头单独放置，支持排序 -->
             <div
                 v-if="hasCustomExpressionColumn"
-                class="cell header-cell center-header"
+                class="cell header-cell sortable center-header"
+                :class="{ 'sorted-asc': sortField === 'counts.custom_expression' && sortOrder === 'asc', 'sorted-desc': sortField === 'counts.custom_expression' && sortOrder === 'desc' }"
+                @click="sortBy('counts.custom_expression')"
+                title="点击排序"
             >
               表达式
+              <span v-if="sortField === 'counts.custom_expression'" class="sort-indicator">
+                {{ sortOrder === 'asc' ? '↑' : '↓' }}
+              </span>
             </div>
             <div
                 class="cell header-cell sortable number-header"
