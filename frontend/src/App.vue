@@ -109,7 +109,7 @@
         </button>
         <button
             v-if="isDevMode"
-            class="btn btn-icon-only dev-tools-btn"
+            class="btn btn-icon-only"
             @click="handleOpenDevTools"
             title="打开开发者工具（仅开发环境）"
         >
@@ -817,16 +817,6 @@ const getThemeTooltip = () => {
 .theme-toggle .btn-icon {
   //color: var(--text-color); /* 明确指定使用主题文本颜色 */
   transition: color 0.2s ease;
-}
-
-/* 【优化】开发者工具按钮样式（开发环境） */
-.dev-tools-btn {
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
-}
-
-.dev-tools-btn:hover {
-  opacity: 1;
 }
 
 /* 【新增】响应式设计：小屏幕优化 */
