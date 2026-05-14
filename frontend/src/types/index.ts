@@ -24,6 +24,7 @@ export interface ScanResultItem {
   modifiedTime: string
   counts: Record<string, number>
   total: number
+  expressionMatched?: number // 【需求变更】自定义表达式匹配状态（0或1）
   unsupportedPreview: boolean
 }
 
