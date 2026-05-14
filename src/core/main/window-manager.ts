@@ -81,8 +81,8 @@ function getWindowBounds(): { x?: number; y?: number; width: number; height: num
         const x = workArea.x + Math.floor((workArea.width - width) / 2);
         const y = workArea.y + Math.floor((workArea.height - height) / 2);
 
-        mainLogger.info(`窗口位置: (${x}, ${y}), 尺寸: ${width}x${height}`);
-        mainLogger.info(`显示器工作区: ${workArea.width}x${workArea.height}, 缩放: ${display.scaleFactor}x`);
+        mainLogger.info('窗口位置: ({}, {}), 尺寸: {}x{}', x, y, width, height);
+        mainLogger.info('显示器工作区: {}x{}, 缩放: {}x', workArea.width, workArea.height, display.scaleFactor);
 
         return {x, y, width, height};
     } catch (error) {

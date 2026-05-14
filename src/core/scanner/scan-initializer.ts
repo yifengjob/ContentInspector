@@ -1,6 +1,6 @@
 /**
  * 扫描初始化模块
- * 
+ *
  * 职责：
  * - 计算并发数和内存配置
  * - 初始化日志、事件总线、任务队列
@@ -17,7 +17,13 @@ import {
     WORKER_MAX_OLD_GENERATION_MB,
     WORKER_MAX_YOUNG_GENERATION_MB
 } from '../config';
-import {configureBatchSender, createProgressUpdater, resultBatchSender, calculateTimeout} from './helpers/scanner-helpers';
+import {
+    configureBatchSender,
+    createProgressUpdater,
+    resultBatchSender,
+    calculateTimeout,
+    BatchSender
+} from './helpers/scanner-helpers';
 import {EventBus} from '../infra';
 import {TaskQueueManager} from '../queue';
 import {Consumer, WorkerPool} from '../worker';
@@ -103,7 +109,7 @@ export function getFreeMemoryMB(): number {
             const freeMatch = output.match(/Pages free:\s+(\d+)/);
             const inactiveMatch = output.match(/Pages inactive:\s+(\d+)/);
             const speculativeMatch = output.match(/Pages speculative:\s+(\d+)/);
-            
+
             if (pageSizeMatch && freeMatch && inactiveMatch) {
                 const pageSize = parseInt(pageSizeMatch[1]);
                 const freePages = parseInt(freeMatch[1]);
@@ -133,16 +139,16 @@ export async function initializeScanner(
     const poolSize = concurrencyInfo.actualConcurrency;
 
     if (config.scanConcurrency && config.scanConcurrency > concurrencyInfo.maxAllowedConcurrency) {
-        log.warn(`配置的并发数 ${config.scanConcurrency} 超过最大值 ${concurrencyInfo.maxAllowedConcurrency}，已自动调整`);
-        log.info(`系统可用内存 ${concurrencyInfo.freeMemoryGB.toFixed(1)} GB, CPU ${concurrencyInfo.cpuCount} 核, 建议不超过 ${concurrencyInfo.maxAllowedConcurrency}`);
+        log.warn('配置的并发数 {} 超过最大值 {}，已自动调整', config.scanConcurrency, concurrencyInfo.maxAllowedConcurrency);
+        log.info('系统可用内存 {} GB, CPU {} 核, 建议不超过 {}', concurrencyInfo.freeMemoryGB.toFixed(1), concurrencyInfo.cpuCount, concurrencyInfo.maxAllowedConcurrency);
     }
 
-    log.info(`使用 ${poolSize} 个 Consumer Workers (CPU: ${concurrencyInfo.cpuCount}核, 可用内存: ${concurrencyInfo.freeMemoryGB.toFixed(1)}GB)`);
+    log.info('使用 {} 个 Consumer Workers (CPU: {}核, 可用内存: {}GB)', poolSize, concurrencyInfo.cpuCount, concurrencyInfo.freeMemoryGB.toFixed(1));
 
     // 根据扫描路径数智能配置 BatchSender
     const estimatedTotalFiles = config.selectedPaths.length * 1000;
     configureBatchSender(estimatedTotalFiles);
-    log.info(`【BatchSender】已根据扫描规模配置（预估文件数: ${estimatedTotalFiles}）`);
+    log.info('[BatchSender]已根据扫描规模配置（预估文件数: {}）', estimatedTotalFiles);
 
     // 获取 EventBus 单例实例
     const eventBus = EventBus.getInstance();
@@ -166,7 +172,7 @@ export async function initializeScanner(
     let dynamicOldGenMB = Math.floor(WORKER_MAX_OLD_GENERATION_MB * 0.9);
     let dynamicYoungGenMB = Math.floor(WORKER_MAX_YOUNG_GENERATION_MB * 0.9);
 
-    log.info(`【内存优化】可用内存: ${freeMemoryMB.toFixed(0)}MB, 初始每 Worker 限制: ${dynamicOldGenMB + dynamicYoungGenMB}MB`);
+    log.info('【内存优化】可用内存: {}MB, 初始每 Worker 限制: {}MB', freeMemoryMB.toFixed(0), dynamicOldGenMB + dynamicYoungGenMB);
 
     // 辅助函数
     const sendProgressUpdate = createProgressUpdater(
@@ -195,21 +201,23 @@ export async function initializeScanner(
             }
         },
         onSendProgressUpdate: sendProgressUpdate,
-        onCheckAndComplete: () => {}, // 稍后由 scanner.ts 通过 updateCallback 设置
-        onTryDispatch: () => {}, // 智能调度模式下无需主动分发，由事件驱动
+        onCheckAndComplete: () => {
+        }, // 稍后由 scanner.ts 通过 updateCallback 设置
+        onTryDispatch: () => {
+        }, // 智能调度模式下无需主动分发，由事件驱动
         onErrorLog: (error: string) => {
             errorLogCount++;
             if (errorLogCount % ERROR_LOG_INTERVAL === 1) {
-                log.info(`处理文件失败: ${error}`);
+                log.info('处理文件失败: {}', error);
             } else if (errorLogCount % ERROR_LOG_INTERVAL === 0) {
-                log.info(`累计处理失败 ${errorLogCount} 个文件`);
+                log.info('累计处理失败 {} 个文件', errorLogCount);
             }
         },
         onResultLog: (total: number, result: any) => {
             state.incrementResultCount();
             state.addTotalSensitiveItems(total);
             if (resultLogThrottler.shouldLog(state.getResultCount())) {
-                log.info(`发现敏感文件 [${state.getResultCount()}]: ${result.filePath} (总计: ${total} 个敏感项)`);
+                log.info('发现敏感文件 [{}]: {} (总计: {} 个敏感项)', state.getResultCount(), result.filePath, total);
             }
         },
         onResultBatchSend: (mainWindow: BrowserWindow, resultItem: any) => {
@@ -217,7 +225,8 @@ export async function initializeScanner(
         },
         calculateTimeout: calculateTimeout,
         // 【新增】重启 Worker 回调 - 稍后设置
-        onRestartWorker: (consumer: Consumer) => {} // 临时占位
+        onRestartWorker: (consumer: Consumer) => {
+        } // 临时占位
     };
 
     // 创建 Worker 池

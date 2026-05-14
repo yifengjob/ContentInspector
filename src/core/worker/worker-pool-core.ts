@@ -1,6 +1,6 @@
 /**
  * Worker Pool 核心管理模块
- * 
+ *
  * 职责：
  * - Worker 池的初始化和清理
  * - 获取空闲 Consumer
@@ -103,7 +103,7 @@ export class WorkerPool {
      * 初始化 Worker 池
      */
     async initialize(): Promise<void> {
-        this.log.info(`正在初始化 ${this.poolSize} 个 Consumer Workers...`);
+        this.log.info('正在初始化 {} 个 Consumer Workers...', this.poolSize);
 
         // 创建子模块
         this.messageHandler = new WorkerMessageHandler(
@@ -139,7 +139,7 @@ export class WorkerPool {
                     await this.lifecycleManager.processWorkerCreateQueue();
                     resolve();
                 } catch (error: any) {
-                    this.log.error(`[Worker初始化] 创建 Worker 失败: ${error.message}`);
+                    this.log.error('[Worker初始化] 创建 Worker 失败: {}', error.message);
                     reject(error);
                 }
             });
@@ -231,13 +231,13 @@ export class WorkerPool {
         // 4. 异步处理队列
         setImmediate(() => {
             this.lifecycleManager.processWorkerCreateQueue().catch(error => {
-                this.log.error(`[Worker重启] 处理创建队列失败: ${error.message}`);
+                this.log.error('[Worker重启] 处理创建队列失败: {}', error.message);
             });
         });
 
         // 5. 强制 GC
         if ((global as any).gc) {
-            this.log.info(`[Worker重启] 执行强制垃圾回收...`);
+            this.log.info('[Worker重启] 执行强制垃圾回收...');
             (global as any).gc();
         }
 
@@ -255,7 +255,7 @@ export class WorkerPool {
             consumer,
             task
         );
-        
+
         // 【修复】调用 worker-pool-core 自己的 restartWorker，而不是 lifecycleManager 的
         this.restartWorker(consumer);
     }
@@ -299,11 +299,13 @@ export class WorkerPool {
         // 添加到待处理任务
         this.pendingTasks.set(this.nextTaskId, {
             filePath: task.filePath,
-            resolve: () => {},
-            reject: () => {},
+            resolve: () => {
+            },
+            reject: () => {
+            },
             timeoutId
         });
-        
+
         // 【状态同步】通知待处理任务数变化
         this.eventBus.emit('pending-tasks-size-changed', this.pendingTasks.size);
 

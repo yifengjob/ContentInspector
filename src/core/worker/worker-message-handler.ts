@@ -1,6 +1,6 @@
 /**
  * Worker 消息处理模块
- * 
+ *
  * 职责：
  * - 处理 Worker 发送的消息
  * - 任务超时管理
@@ -75,7 +75,7 @@ export class WorkerMessageHandler {
             // 清除超时定时器
             clearTimeout(pending.timeoutId);
             this.pendingTasks.delete(taskId);
-            
+
             // 【状态同步】通知待处理任务数变化
             this.eventBus.emit('pending-tasks-size-changed', this.pendingTasks.size);
 
@@ -133,7 +133,7 @@ export class WorkerMessageHandler {
      */
     setupErrorListener(consumer: Consumer): void {
         consumer.worker.on('error', (error: any) => {
-            this.log.error(`[Consumer ${consumer.id}] Worker 错误: ${error.message}`);
+            this.log.error('[Consumer {}] Worker 错误: {}', consumer.id, error.message);
             // 【重构】使用 scanState 管理 activeWorkerCount
             this.scanState.decrementActiveWorkers();
             this.callbacks.onUpdateConsumerCount(consumer.taskId);
@@ -147,12 +147,12 @@ export class WorkerMessageHandler {
         consumer.worker.on('exit', (code: number, signal: string | null) => {
             // 区分主动终止和异常退出
             if (signal) {
-                this.log.warn(`[Consumer ${consumer.id}] Worker 被信号终止: ${signal}, 代码: ${code}`);
+                this.log.warn('[Consumer {}] Worker 被信号终止: {}, 代码: {}', consumer.id, signal, code);
             }
 
             if (consumer.isTerminating) {
                 // 主动终止（超时等情况），不视为异常
-                this.log.info(`[Consumer ${consumer.id}] Worker 已终止（代码: ${code}）`);
+                this.log.info('[Consumer {}] Worker 已终止（代码: {}）', consumer.id, code);
                 consumer.isTerminating = false;
                 consumer.busy = false;
                 this.callbacks.onCleanupConsumerState(consumer);
@@ -160,12 +160,12 @@ export class WorkerMessageHandler {
             }
 
             if (code !== 0 && !this.scanState.cancelFlag) {
-                this.log.error(`[Consumer ${consumer.id}] Worker 异常退出，代码: ${code}, 信号: ${signal || 'none'}`);
+                this.log.error('[Consumer {}] Worker 异常退出，代码: {}, 信号: {}', consumer.id, code, signal || 'none');
 
                 // 检测是否是 OOM 导致的退出
                 const isOOM = signal === 'SIGABRT' || code === 134;
                 if (isOOM) {
-                    this.log.error(`[Consumer ${consumer.id}] ⚠️ 检测到 Worker OOM！将重启 Worker 并跳过当前文件`);
+                    this.log.error('[Consumer {}] ⚠️ 检测到 Worker OOM！将重启 Worker 并跳过当前文件', consumer.id);
                 }
 
                 // 【重构】使用 scanState 管理 activeWorkerCount
@@ -194,15 +194,15 @@ export class WorkerMessageHandler {
         consumer: Consumer,
         task: any  // Task type from task-queue
     ): void {
-        this.log.warn(`[TaskQueue] 任务 ${consumer.taskId} 超时: ${task.filePath}`);
+        this.log.warn('[TaskQueue] 任务 {} 超时: {}', consumer.taskId, task.filePath);
 
         const pending = this.pendingTasks.get(consumer.taskId!);
         if (pending) {
             this.pendingTasks.delete(consumer.taskId!);
-            
+
             // 【状态同步】通知待处理任务数变化
             this.eventBus.emit('pending-tasks-size-changed', this.pendingTasks.size);
-            
+
             // 【重构】使用 scanState 管理 activeWorkerCount
             this.scanState.decrementActiveWorkers();
             this.callbacks.onUpdateConsumerCount(consumer.taskId);

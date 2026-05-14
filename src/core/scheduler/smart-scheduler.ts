@@ -64,23 +64,23 @@ export class SmartScheduler {
     // 【新增】保存事件处理器引用，用于清理
     // 【防御性编程】初始化为带警告的空函数，如果忘记调用 initialize() 会输出警告日志
     private initializationWarningShown = false;
-    
+
     private onWorkerCreated: (consumer: Consumer) => void = (consumer) => {
         this.showInitializationWarning('onWorkerCreated', `Consumer ID: ${consumer.id}`);
     };
-    
+
     private onWorkerIdle: (consumer: Consumer) => void = (consumer) => {
         this.showInitializationWarning('onWorkerIdle', `Consumer ID: ${consumer.id}`);
     };
-    
+
     private onTaskEnqueued: () => void = () => {
         this.showInitializationWarning('onTaskEnqueued');
     };
-    
+
     private onWalkerBatchReady: () => void = () => {
         this.showInitializationWarning('onWalkerBatchReady');
     };
-    
+
     // 【新增】状态同步监听器（用于清理）
     private onQueueLengthChanged?: (length: number) => void;
     private onPendingTasksSizeChanged?: (size: number) => void;
@@ -153,7 +153,7 @@ export class SmartScheduler {
 
         // 订阅 Walker 批量文件就绪事件
         this.eventBus.on('walker.batch-ready', this.onWalkerBatchReady);
-        
+
         // 【新增】注册状态同步监听器（如果提供了 scanState）
         if (this.scanState) {
             this.onQueueLengthChanged = (length: number) => {
@@ -162,7 +162,7 @@ export class SmartScheduler {
             this.onPendingTasksSizeChanged = (size: number) => {
                 this.scanState!.setPendingTasksSize(size);
             };
-            
+
             this.eventBus.on('task-queue-length-changed', this.onQueueLengthChanged);
             this.eventBus.on('pending-tasks-size-changed', this.onPendingTasksSizeChanged);
         }
@@ -382,19 +382,18 @@ export class SmartScheduler {
 
     /**
      * 【防御性编程】显示初始化警告（只输出一次）
-     * 
+     *
      * 如果忘记调用 initialize()，事件处理器被调用时会输出此警告
      * 帮助开发者快速定位问题
-     * 
+     *
      * @param methodName 被调用的方法名
      * @param context 上下文信息（可选）
      */
     private showInitializationWarning(methodName: string, context?: string): void {
         if (!this.initializationWarningShown) {
             this.log.warn(
-                `⚠️ ${methodName} 被调用，但 SmartScheduler 尚未初始化！\n` +
-                `  ${context ? context + '\n' : ''}` +
-                `  请确保在创建 SmartScheduler 后立即调用 initialize()`
+                '⚠️ {} 被调用，但 SmartScheduler 尚未初始化！\n  {}\n  请确保在创建 SmartScheduler 后立即调用 initialize()',
+                methodName, context ? context : ''
             );
             this.initializationWarningShown = true;
         }
@@ -410,7 +409,7 @@ export class SmartScheduler {
         this.eventBus.off('worker.idle', this.onWorkerIdle);
         this.eventBus.off('task.enqueued', this.onTaskEnqueued);
         this.eventBus.off('walker.batch-ready', this.onWalkerBatchReady);
-        
+
         // 【新增】移除状态同步监听器
         if (this.onQueueLengthChanged) {
             this.eventBus.off('task-queue-length-changed', this.onQueueLengthChanged);

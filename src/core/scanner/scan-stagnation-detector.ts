@@ -1,6 +1,6 @@
 /**
  * 停滞检测模块
- * 
+ *
  * 职责：
  * - 监控扫描进度，检测是否停滞
  * - 在长时间无进展时强制结束扫描
@@ -116,7 +116,8 @@ export class StagnationDetector {
 
         // 警告阶段
         if (idleTime > STAGNATION_THRESHOLD && idleTime <= MAX_IDLE_TIME) {
-            log.warn(`提示: ${idleTime / 1000}秒内无任何进展（活跃Worker:${state.getActiveWorkerCount()}, 队列:${state.getTaskQueueLength()}, 待处理:${state.getPendingTasksSize()}），但仍在等待可能的恢复...`);
+            log.warn('提示: {}秒内无任何进展（活跃Worker:{}, 队列:{}, 待处理:{}），但仍在等待可能的恢复...',
+                idleTime / 1000, state.getActiveWorkerCount(), state.getTaskQueueLength(), state.getPendingTasksSize());
         }
 
         // 强制结束阶段
@@ -127,7 +128,7 @@ export class StagnationDetector {
                 state.getActiveWorkerCount() <= 0 &&
                 (state.getConsumerProcessedCount() + state.getWalkerFilteredCount() + state.getWalkerSkippedCount()) >= state.getWalkerTotalCount())
         ) {
-            log.error(`警告: ${idleTime / 1000}秒内无任何进展，强制结束`);
+            log.error('警告: {}秒内无任何进展，强制结束', idleTime / 1000);
             this.forceComplete();
         }
     }

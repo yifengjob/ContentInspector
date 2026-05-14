@@ -1,6 +1,6 @@
 /**
  * Walker Worker 消息处理模块
- * 
+ *
  * 职责：
  * - 处理 Walker Worker 的消息（files-batch, walking-complete, walking-error）
  * - 管理文件入队逻辑
@@ -46,18 +46,18 @@ export class WalkerHandler {
                     this.handleWalkingError(message);
                 }
             } catch (error: any) {
-                this.options.context.log.error(`[Walker] 处理消息失败: ${error.message}`);
+                this.options.context.log.error('[Walker] 处理消息失败: {}', error.message);
             }
         });
 
         this.worker.on('error', (error: any) => {
-            this.options.context.log.error(`Walker Worker 错误: ${error.message}`);
+            this.options.context.log.error('Walker Worker 错误: {}', error.message);
             this.options.onCheckAndComplete();
         });
 
         this.worker.on('exit', (code) => {
             if (code !== 0) {
-                this.options.context.log.info(`Walker Worker 异常退出，代码: ${code}`);
+                this.options.context.log.info('Walker Worker 异常退出，代码: {}', code);
             }
         });
     }
@@ -82,7 +82,7 @@ export class WalkerHandler {
 
             const fileType = getFileType(file.filePath);
             const isLargeFile = file.stat.size > LARGE_FILE_THRESHOLD_MB * BYTES_TO_MB;
-            
+
             context.queueManager.enqueueTask({
                 filePath: file.filePath,
                 fileSize: file.stat.size,
@@ -104,7 +104,7 @@ export class WalkerHandler {
         const {state, context} = this.options;
         const log = context.log;
 
-        log.info(`Walker 完成: 找到 ${message.fileCount} 个文件, 过滤 ${message.filteredCount || 0} 个, 跳过 ${message.skippedCount} 个`);
+        log.info('Walker 完成: 找到 {} 个文件, 过滤 {} 个, 跳过 {} 个', message.fileCount, message.filteredCount || 0, message.skippedCount);
 
         // Bug2修复：walkerTotalCount 应该包含所有文件（找到+过滤+跳过）
         state.addWalkerTotalCount((message.filteredCount || 0) + message.skippedCount);
@@ -118,11 +118,11 @@ export class WalkerHandler {
 
         // 【防御性检查】正常情况下不应该发生，如果发生说明有严重 bug
         if (this.options.walkerCompletedCountRef.value > this.options.totalWalkerTasks) {
-            log.error(`[Walker] 错误: 完成计数 (${this.options.walkerCompletedCountRef.value}) 超过总任务数 (${this.options.totalWalkerTasks})，这不应该发生！`);
+            log.error('[Walker] 错误: 完成计数 ({}) 超过总任务数 ({})，这不应该发生！', this.options.walkerCompletedCountRef.value, this.options.totalWalkerTasks);
             this.options.walkerCompletedCountRef.value = this.options.totalWalkerTasks;
         }
 
-        log.info(`[Walker] 已完成 ${this.options.walkerCompletedCountRef.value}/${this.options.totalWalkerTasks} 个任务`);
+        log.info('[Walker] 已完成 {}/{} 个任务', this.options.walkerCompletedCountRef.value, this.options.totalWalkerTasks);
 
         // A1 优化：Walker 完成后，根据实际文件大小重新计算内存限制
         this.adjustMemoryAfterWalkerComplete();
@@ -134,7 +134,7 @@ export class WalkerHandler {
      * 处理 Walker 错误消息
      */
     private handleWalkingError(message: any): void {
-        this.options.context.log.error(`Walker 错误: ${message.error}`);
+        this.options.context.log.error('Walker 错误: {}', message.error);
         this.options.onCheckAndComplete();
     }
 
@@ -162,7 +162,7 @@ export class WalkerHandler {
                 context.dynamicOldGenMB = newLimits.oldGen;
                 context.dynamicYoungGenMB = newLimits.youngGen;
 
-                context.log.info(`【智能内存调整】平均文件大小: ${avgFileSizeMB.toFixed(2)}MB, 新内存限制: 老生代=${newLimits.oldGen}MB, 新生代=${newLimits.youngGen}MB`);
+                context.log.info('[智能内存调整]平均文件大小: {}MB, 新内存限制: 老生代={}MB, 新生代={}MB', avgFileSizeMB.toFixed(2), newLimits.oldGen, newLimits.youngGen);
 
                 // 【关键修复】只有在扫描进行中才重启 Worker
                 if (!state.cancelFlag && state.isScanning) {
@@ -172,11 +172,11 @@ export class WalkerHandler {
                             const restartedCount = workerPool.restartIdleWorkers(newLimits.oldGen, newLimits.youngGen);
 
                             if (restartedCount > 0) {
-                                context.log.info(`【智能内存】已重启 ${restartedCount} 个空闲 Worker 以应用新内存配置`);
+                                context.log.info('[智能内存] 已重启 {} 个空闲 Worker 以应用新内存配置', restartedCount);
 
                                 // 批量重启后强制 GC，释放内存
                                 if ((global as any).gc) {
-                                    context.log.info(`【智能内存】执行强制垃圾回收...`);
+                                    context.log.info('[智能内存]执行强制垃圾回收...');
                                     (global as any).gc();
                                 }
                             }
@@ -184,7 +184,7 @@ export class WalkerHandler {
                     }, WORKER_RESTART_DELAY);
                 }
             } else {
-                context.log.info(`【智能内存调整】平均文件大小: ${avgFileSizeMB.toFixed(2)}MB`);
+                context.log.info('[智能内存调整]平均文件大小: {}MB', avgFileSizeMB.toFixed(2));
             }
         }
     }
@@ -199,7 +199,7 @@ export class WalkerHandler {
             // 【修复】正确处理 terminate 返回的 Promise
             void this.worker.terminate();
         } catch (error) {
-            this.options.context.log.info(`终止 Walker Worker 失败: ${error}`);
+            this.options.context.log.info('终止 Walker Worker 失败: {}', error);
         }
     }
 

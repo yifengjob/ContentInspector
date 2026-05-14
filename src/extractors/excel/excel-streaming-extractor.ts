@@ -1,22 +1,22 @@
 /**
  * Excel 表格提取器 - 使用 exceljs 流式解析
  * 支持: xlsx, et（现代 Excel 格式）
- * 
+ *
  * 注意：不支持 .xls 格式（Excel 97-2003），请使用 extractWithSheetJS
  */
 
-import { createReadStream } from 'fs';
+import {createReadStream} from 'fs';
 import * as ExcelJS from 'exceljs';
-import type { ExtractorResult } from '../types';
-import { BaseExtractor } from '../base-extractor';
-import { withTimeout, withLogging, composeDecorators } from '../extractor-decorators';
+import type {ExtractorResult} from '../types';
+import {BaseExtractor} from '../base-extractor';
+import {withTimeout, withLogging, composeDecorators} from '../extractor-decorators';
 
 /**
  * Excel 流式提取器类
  */
 class ExcelStreamingExtractor extends BaseExtractor {
     constructor() {
-        super({ 
+        super({
             name: 'ExcelStreamingExtractor',
             verboseLogging: false
         });
@@ -35,24 +35,24 @@ class ExcelStreamingExtractor extends BaseExtractor {
                     styles: 'ignore'
                 }
             );
-            
+
             // 使用数组收集文本块，避免字符串拼接产生大量临时对象
             const textChunks: string[] = [];
-            
+
             // 逐个工作表读取
             let sheetIndex = 0;
             for await (const worksheet of workbook) {
-                if(sheetIndex > 0){
+                if (sheetIndex > 0) {
                     textChunks.push('\n');
                 }
                 sheetIndex++;
                 const sheetName = (worksheet as any).name || `Sheet${sheetIndex}`;
                 textChunks.push(`\n=== ${sheetName} ===\n`);
-                
+
                 // 逐行读取
                 for await (const row of worksheet) {
                     const values = (row as any).values;
-                    
+
                     if (values && Array.isArray(values)) {
                         const cells = values
                             .map((cell: any) => {
@@ -63,19 +63,19 @@ class ExcelStreamingExtractor extends BaseExtractor {
                                 return String(cell);
                             })
                             .filter((text: string) => text.trim().length > 0);
-                        
+
                         if (cells.length > 0) {
                             textChunks.push(cells.join('\t') + '\n');
                         }
                     }
                 }
             }
-            
+
             const allText = textChunks.join('');
             return this.buildResult(allText, 'ExcelStreamingExtractor');
-            
+
         } catch (error: any) {
-            this.logger.error(`[${this.config.name}] 解析失败: ${error.message}`);
+            this.logger.error('[{}] 解析失败: {}', this.config.name, error.message);
             return this.handleError(error, filePath);
         } finally {
             // 确保释放 WorkbookReader 资源
@@ -97,8 +97,8 @@ const baseExtractor = new ExcelStreamingExtractor();
 const enhancedExtract = composeDecorators(
     baseExtractor.extract.bind(baseExtractor),
     [
-        (fn) => withTimeout(fn, { timeoutMs: 30000 }),
-        (fn) => withLogging(fn, { 
+        (fn) => withTimeout(fn, {timeoutMs: 30000}),
+        (fn) => withLogging(fn, {
             logStart: false,
             logEnd: false,
             logError: true,

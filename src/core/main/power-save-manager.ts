@@ -41,14 +41,14 @@ export function createPowerSaveManager(): PowerSaveManager {
         start(): void {
             if (powerSaveBlockerId === null && !powerSaveBlocker.isStarted(0)) {
                 powerSaveBlockerId = powerSaveBlocker.start('prevent-app-suspension');
-                mainLogger.info(`[电源管理] 已启动电源阻止器 (ID: ${powerSaveBlockerId})，防止系统休眠`);
+                mainLogger.info('[电源管理] 已启动电源阻止器 (ID: {})，防止系统休眠', powerSaveBlockerId);
             }
         },
 
         stop(): void {
             if (powerSaveBlockerId !== null) {
                 powerSaveBlocker.stop(powerSaveBlockerId);
-                mainLogger.info(`[电源管理] 已停止电源阻止器 (ID: ${powerSaveBlockerId})`);
+                mainLogger.info('[电源管理] 已停止电源阻止器 (ID: {})', powerSaveBlockerId);
                 powerSaveBlockerId = null;
             }
         },

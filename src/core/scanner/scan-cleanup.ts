@@ -1,6 +1,6 @@
 /**
  * 扫描清理模块
- * 
+ *
  * 职责：
  * - 清理所有扫描相关资源
  * - 终止 Worker
@@ -118,8 +118,8 @@ export class ScanCleanup {
                 // 【修复】正确处理 terminate 返回的 Promise
                 void walkerWorker.terminate();
             }
-        } catch (error) {
-            this.options.log.info(`终止 Walker Worker 失败: ${error}`);
+        } catch (error: any) {
+            this.options.log.info('终止 Walker Worker 失败: {}', error.message);
         }
     }
 
@@ -156,7 +156,7 @@ export class ScanCleanup {
 
     /**
      * 【监控】验证监听器清理状态
-     * 
+     *
      * 职责：
      * - 输出所有事件的监听器数量
      * - 检测非预期的监听器（内存泄漏风险）
@@ -164,21 +164,21 @@ export class ScanCleanup {
      */
     private verifyListenerCleanup(): void {
         const {eventBus, log} = this.options;
-        
+
         // 1. 输出所有事件的监听器状态
         const allStats = eventBus.getAllListenerStats();
         const statsArray = Array.from(allStats.entries())
             .map(([event, count]) => `${event}=${count}`)
             .join(', ');
-        log.info(`[cleanup] 事件监听器状态: ${statsArray || '无监听器'}`);
-        
+        log.info('[cleanup] 事件监听器状态: {}', statsArray || '无监听器');
+
         // 2. 检查是否有非预期的监听器（期望只有 log:message）
         const unexpectedListeners = eventBus.checkUnexpectedListeners(['log:message']);
         if (unexpectedListeners.length > 0) {
-            const details = unexpectedListeners.map(({ event, count }) => `${event}(${count})`).join(', ');
-            log.warn(`[cleanup] ⚠️ 检测到非预期监听器: ${details}，可能存在内存泄漏风险！`);
+            const details = unexpectedListeners.map(({event, count}) => `${event}(${count})`).join(', ');
+            log.warn('[cleanup] ⚠️ 检测到非预期监听器: {}，可能存在内存泄漏风险！', details);
         }
-        
+
         // 3. 检查日志监听器是否存在
         const logMessageCount = eventBus.getListenerCount('log:message');
         if (logMessageCount === 0) {

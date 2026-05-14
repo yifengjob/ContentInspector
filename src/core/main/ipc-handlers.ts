@@ -1,6 +1,6 @@
 /**
  * IPC 通信处理器模块
- * 
+ *
  * 职责：
  * - 注册和管理所有 IPC 通信处理器
  * - 处理来自渲染进程的请求
@@ -26,7 +26,7 @@ import {getDirectorySize} from './utils';
 
 /**
  * 设置所有 IPC 处理器
- * 
+ *
  * @param getMainWindow 获取主窗口的函数
  * @param scanState 扫描状态实例
  * @param powerSaveManager 电源阻止器管理器
@@ -82,7 +82,7 @@ export function setupIpcHandlers(
         return new Promise((resolve) => {
             const CANCEL_SCAN_CHECK_INTERVAL = 100;
             const CANCEL_SCAN_MAX_WAIT = 5000;
-            
+
             const checkInterval = setInterval(() => {
                 if (!scanState.isScanning) {
                     clearInterval(checkInterval);
@@ -99,7 +99,7 @@ export function setupIpcHandlers(
             setTimeout(() => {
                 clearInterval(checkInterval);
                 if (scanState.isScanning) {
-                    mainLogger.warn(`[取消扫描] 警告: 等待 ${CANCEL_SCAN_MAX_WAIT / 1000} 秒后扫描仍未结束，强制重置状态`);
+                    mainLogger.warn('[取消扫描] 警告: 等待 {} 秒后扫描仍未结束，强制重置状态', CANCEL_SCAN_MAX_WAIT / 1000);
                     scanState.isScanning = false;
                 }
 
@@ -117,7 +117,7 @@ export function setupIpcHandlers(
         if (!mainWindow) {
             return {error: '窗口未初始化'};
         }
-        
+
         try {
             return await previewWorkerManager.previewFile(filePath, mainWindow);
         } catch (error: any) {
@@ -278,7 +278,7 @@ export function setupIpcHandlers(
                 for (const logFile of logFiles) {
                     // 跳过当前正在使用的日志文件
                     if (logFile === currentLogFile) {
-                        mainLogger.info(`[clear-cache] 保留当前日志: ${logFile}`);
+                        mainLogger.info('[clear-cache] 保留当前日志: {}', logFile);
                         continue;
                     }
 
@@ -290,8 +290,8 @@ export function setupIpcHandlers(
                             cleanedSize += stat.size;
                             cleanedFiles.push(`logs/${logFile}`);
                         }
-                    } catch (e) {
-                        mainLogger.warn(`[clear-cache] 无法删除日志文件 ${logFile}:`, e);
+                    } catch (e: any) {
+                        mainLogger.warn('[clear-cache] 无法删除日志文件 {}:{}', logFile, e.message);
                     }
                 }
 
@@ -329,8 +329,8 @@ export function setupIpcHandlers(
             }
 
             const cleanedSizeMB = Math.round(cleanedSize / BYTES_TO_MB);
-            mainLogger.info(`[clear-cache] 缓存清理完成，释放 ${cleanedSizeMB} MB 空间`);
-            mainLogger.info(`[clear-cache] 清理的文件: ${cleanedFiles.join(', ') || '无'}`);
+            mainLogger.info('[clear-cache] 缓存清理完成，释放 {} MB 空间', cleanedSizeMB);
+            mainLogger.info('[clear-cache] 清理的文件: {}', cleanedFiles.join(', ') || '无');
 
             return {success: true, cleanedSize, cleanedFiles};
         } catch (error: any) {

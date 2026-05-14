@@ -78,7 +78,7 @@ async function startWalking(config: WalkerConfig) {
         try {
             stat = await fs.promises.stat(rootPath);
         } catch (error: any) {
-            workerLogger.error(`[Walker] 无法访问路径: ${rootPath}`, error.message);
+            workerLogger.error('[Walker] 无法访问路径: {}, {}', rootPath, error.message);
             parentPort?.postMessage({
                 type: 'walking-error',
                 error: `无法访问路径: ${rootPath}`
@@ -363,7 +363,7 @@ parentPort?.on('message', (message: WalkerWorkerMessage) => {
     if (message.type === 'init-config') {
         // 【方案C】接收并缓存支持的扩展名列表
         cachedSupportedExtensions = message.supportedExtensions || [];
-        workerLogger.info(`[Walker] 已缓存 ${cachedSupportedExtensions.length} 个支持的扩展名`);
+        workerLogger.info('[Walker] 已缓存 {} 个支持的扩展名', cachedSupportedExtensions.length);
     } else if (message.type === 'start-walking') {
         // 【修复】如果正在遍历，将任务加入队列
         if (isWalking) {

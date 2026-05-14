@@ -94,7 +94,7 @@ export class EventBus {
                 try {
                     handler(data);
                 } catch (error: any) {
-                    this.log.error(`[EventBus] 事件 ${event} 处理失败: ${error.message}`);
+                    this.log.error('[EventBus] 事件 {} 处理失败: {}',event,error.message);
                 }
             });
         }

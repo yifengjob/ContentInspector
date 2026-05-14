@@ -1,6 +1,6 @@
 /**
  * 预览 Worker 管理模块
- * 
+ *
  * 职责：
  * - 预览 Worker 的创建和注册
  * - 流式预览消息处理
@@ -12,7 +12,13 @@ import {Worker} from 'worker_threads';
 import * as fs from 'fs';
 import {BrowserWindow} from 'electron';
 import {mainLogger} from '../../logger/logger';
-import {calculatePreviewTimeout, PREVIEW_CHUNK_SIZE, WORKER_MAX_OLD_GENERATION_MB, WORKER_MAX_YOUNG_GENERATION_MB, PREVIEW_BASE_TIMEOUT} from '../config/constants';
+import {
+    calculatePreviewTimeout,
+    PREVIEW_CHUNK_SIZE,
+    WORKER_MAX_OLD_GENERATION_MB,
+    WORKER_MAX_YOUNG_GENERATION_MB,
+    PREVIEW_BASE_TIMEOUT
+} from '../config/constants';
 import {loadConfig} from '../config/manager';
 import {FILE_WORKER_PATH} from '../../workers/file-worker';
 
@@ -22,7 +28,7 @@ import {FILE_WORKER_PATH} from '../../workers/file-worker';
 export interface PreviewWorkerManager {
     /**
      * 预览文件（流式模式）
-     * 
+     *
      * @param filePath 文件路径
      * @param mainWindow 主窗口实例
      * @returns 预览结果 Promise
@@ -31,7 +37,7 @@ export interface PreviewWorkerManager {
 
     /**
      * 取消预览
-     * 
+     *
      * @param taskId 任务 ID
      */
     cancelPreview(taskId: number): void;
@@ -44,7 +50,7 @@ export interface PreviewWorkerManager {
 
 /**
  * 创建预览 Worker 管理器
- * 
+ *
  * @returns 预览 Worker 管理器实例
  */
 export function createPreviewWorkerManager(): PreviewWorkerManager {
@@ -186,7 +192,7 @@ export function createPreviewWorkerManager(): PreviewWorkerManager {
         cancelPreview(taskId: number): void {
             const worker = previewWorkers.get(taskId);
             if (worker) {
-                mainLogger.info(`[预览取消] 终止 Worker (taskId: ${taskId})`);
+                mainLogger.info('[预览取消] 终止 Worker (taskId: {})', taskId);
                 void worker.terminate();  // 强制终止（异步）
                 previewWorkers.delete(taskId);  // 清理
             }
@@ -197,9 +203,9 @@ export function createPreviewWorkerManager(): PreviewWorkerManager {
             for (const [taskId, worker] of previewWorkers.entries()) {
                 try {
                     void worker.terminate();  // 异步终止
-                    mainLogger.info(`[预览清理] 终止 Worker (taskId: ${taskId})`);
-                } catch (error) {
-                    mainLogger.error(`[预览清理] 终止 Worker 失败 (taskId: ${taskId}):`, error);
+                    mainLogger.info('[预览清理] 终止 Worker (taskId: {})', taskId);
+                } catch (error: any) {
+                    mainLogger.error('[预览清理] 终止 Worker 失败 (taskId: {}):{}', taskId, error.message);
                 }
             }
             previewWorkers.clear();

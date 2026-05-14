@@ -28,7 +28,7 @@ export async function startScan(
 ): Promise<void> {
     // 【优化】如果没有传入 scanState，则使用单例
     const state = scanState || ScanState.getInstance();
-    
+
     if (state.isScanning) {
         throw new Error('扫描正在进行中');
     }
@@ -36,17 +36,17 @@ export async function startScan(
     state.isScanning = true;
     state.cancelFlag = false;
     state.logs = [];
-    
+
     // 【重构】重置扫描状态管理器
     state.reset();
 
     const log = getScannerLogger();
 
     log.info('开始扫描...');
-    log.info(`扫描路径数: ${config.selectedPaths.length}`);
-    log.info(`文件类型数: ${config.selectedExtensions.length}`);
-    log.info(`选中的扩展名: ${config.selectedExtensions.join(', ')}`);
-    log.info(`敏感检测类型: ${config.enabledSensitiveTypes.join(', ')}`);
+    log.info('扫描路径数: {}', config.selectedPaths.length);
+    log.info('文件类型数: {}', config.selectedExtensions.length);
+    log.info('选中的扩展名: {}', config.selectedExtensions.join(', '));
+    log.info('敏感检测类型: {}', config.enabledSensitiveTypes.join(', '));
     log.info('---');
 
     // ==================== 【初始化模块】====================
@@ -78,7 +78,8 @@ export async function startScan(
 
         // 【重构】使用 state.isScanComplete 统一完成条件判断
         if (state.isScanComplete(allWalkersCompleted)) {
-            log.info(`扫描完成: 遍历 ${state.getWalkerTotalCount()} 个文件, 处理 ${state.getConsumerProcessedCount()} 个, 跳过 ${state.getWalkerSkippedCount()} 个, 发现 ${state.getResultCount()} 个敏感文件`);
+            log.info('扫描完成: 遍历 {} 个文件, 处理 {} 个, 跳过 {} 个, 发现 {} 个敏感文件',
+                state.getWalkerTotalCount(), state.getConsumerProcessedCount(), state.getWalkerSkippedCount(), state.getResultCount());
             performCleanup();
             return;
         }
@@ -166,22 +167,22 @@ export async function startScan(
             if (stat.isFile()) {
                 const basename = path.basename(rootPath);
                 if (config.ignoreDirNames.includes(basename)) {
-                    log.info(`跳过忽略的文件: ${rootPath}`);
+                    log.info('跳过忽略的文件: {}', rootPath);
                     continue;
                 }
             }
         } catch (error: any) {
-            log.info(`无法访问路径: ${rootPath} - ${error.message}`);
+            log.info('无法访问路径: {} - {}', rootPath, error.message);
             continue;
         }
 
-        log.info(`正在扫描: ${rootPath} (${currentPathIndex}/${totalPaths})`);
+        log.info('正在扫描: {} ({}/{})', rootPath, currentPathIndex, totalPaths);
 
         // 【关键修复】使用异步检查，防止阻塞主线程
         try {
             await fs.promises.access(rootPath, fs.constants.F_OK);
         } catch (error: any) {
-            log.info(`路径不存在或无权限: ${rootPath}`);
+            log.info('路径不存在或无权限: {}', rootPath);
             continue;
         }
 
@@ -200,17 +201,17 @@ export async function startScan(
             }
         });
     }
-    
+
     // 【修复】输出实际发送的任务数
-    log.info(`[Walker] 实际发送任务数: ${actualWalkerTasksRef.value}/${totalPathsCount}`);
-    
+    log.info('[Walker] 实际发送任务数: {}/{}', actualWalkerTasksRef.value, totalPathsCount);
+
     // 【关键修复】更新 WalkerHandler 中的 totalWalkerTasks
     walkerHandler.updateTotalTasks(actualWalkerTasksRef.value);
 }
 
 export function cancelScan(scanState?: ScanState): void {
     const state = scanState || ScanState.getInstance();
-    
+
     // 【类型安全】调用 executeCancel 方法，避免 any 断言
     state.executeCancel();
 }

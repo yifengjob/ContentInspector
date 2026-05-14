@@ -10,14 +10,13 @@
 
 import {app} from 'electron';
 import * as path from 'path';
-import {setupFileLogger, mainLogger, flushLogStream, Logger} from '../../logger/logger';
+import {setupFileLogger, mainLogger, flushLogStream} from '../../logger/logger';
 // 【关键】首先导入日志抑制工具（必须在任何其他导入之前）
 import '../../utils/log-utils';
 // 【修复】初始化 PDF.js 所需的 polyfill（包括 Promise.withResolvers、DOMMatrix、浏览器环境模拟）
 import {setupAllPdfPolyfills} from '../../extractors/pdf/polyfills/pdf-polyfills';
 
 let initialized = false;
-let appLogger: Logger | null = null;
 
 /**
  * 初始化应用
@@ -32,7 +31,6 @@ export function initializeApp(): void {
     // 设置日志文件
     const logDir = path.join(app.getPath('userData'), 'logs');
     setupFileLogger(logDir);
-    appLogger = mainLogger;
 
     // 【新增】启用 V8 垃圾回收 API（用于扫描完成后释放内存）
     app.commandLine.appendSwitch('js-flags', '--expose-gc');
@@ -59,7 +57,7 @@ export function initializeApp(): void {
             timeZone: 'Asia/Shanghai',
             hour12: false  // 24小时制
         });
-        mainLogger.info(`[进程退出] 代码: ${code}, 时间: ${timestamp}`);
+        mainLogger.info('[进程退出] 代码: {}, 时间: {}', code, timestamp);
     });
 
     initialized = true;

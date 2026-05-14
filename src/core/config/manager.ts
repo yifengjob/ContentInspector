@@ -176,7 +176,7 @@ export async function loadConfig(): Promise<AppConfig> {
             return mergedConfig;
         }
     } catch (error: any) {
-        logger.error(`loadConfig: ${error.message}`);
+        logger.error('loadConfig: {}', error.message);
     }
 
     return getDefaultConfig();
@@ -187,7 +187,7 @@ export async function saveConfig(config: AppConfig): Promise<void> {
         const data = JSON.stringify(config, null, 2);
         await fs.promises.writeFile(CONFIG_FILE, data, 'utf-8');
     } catch (error: any) {
-        logger.error(`saveConfig: ${error.message}`);
+        logger.error('saveConfig: {}', error.message);
         throw createConfigSaveError(error);
     }
 }
@@ -259,17 +259,17 @@ export function calculateActualConcurrency(configuredConcurrency: number): {
 
     // 【调试】输出详细的计算过程（仅开发环境）
     if (process.env.NODE_ENV === 'development') {
-        logger.info(`[并发数计算] CPU: ${cpuCount}核, 可用内存: ${freeMemoryGB.toFixed(1)}GB`);
-        logger.info(`[并发数计算] 内存限制: ${maxByMemory}, CPU限制: ${cpuCount}, 绝对最大值: ${CONCURRENCY_ABSOLUTE_MAX}`);
-        logger.info(`[并发数计算] 计算最大值: ${calculatedMaxConcurrency}, 最大允许值: ${maxAllowedConcurrency}`);
-        logger.info(`[并发数计算] 配置值: ${configuredConcurrency}`);
+        logger.info('[并发数计算] CPU: {}核, 可用内存: {}GB', cpuCount, freeMemoryGB.toFixed(1));
+        logger.info('[并发数计算] 内存限制: {}, CPU限制: {}, 绝对最大值: {}', maxByMemory, cpuCount, CONCURRENCY_ABSOLUTE_MAX);
+        logger.info('[并发数计算] 计算最大值: {}, 最大允许值: {}', calculatedMaxConcurrency, maxAllowedConcurrency);
+        logger.info('[并发数计算] 配置值: {}', configuredConcurrency);
     }
 
     let actualConcurrency: number;
     if (configuredConcurrency && configuredConcurrency > 0) {
         actualConcurrency = Math.min(configuredConcurrency, maxAllowedConcurrency);
         if (process.env.NODE_ENV === 'development') {
-            logger.info(`[并发数计算] 使用配置值: min(${configuredConcurrency}, ${maxAllowedConcurrency}) = ${actualConcurrency}`);
+            logger.info('[并发数计算] 使用配置值: min({}, {}) = {}', configuredConcurrency, maxAllowedConcurrency, actualConcurrency);
         }
     } else {
         // 【优化】更保守的默认并发数，避免 CPU 过载
@@ -280,12 +280,12 @@ export function calculateActualConcurrency(configuredConcurrency: number): {
             DEFAULT_CONCURRENCY_MAX
         );
         if (process.env.NODE_ENV === 'development') {
-            logger.info(`[并发数计算] 使用自动计算: min(max(floor(${cpuCount} * ${DEFAULT_CONCURRENCY_CPU_RATIO}), ${DEFAULT_CONCURRENCY_MIN}), ${DEFAULT_CONCURRENCY_MAX}) = ${actualConcurrency}`);
+            logger.info('[并发数计算] 使用自动计算: min(max(floor({} * {}), {}), {}) = {}', cpuCount, DEFAULT_CONCURRENCY_CPU_RATIO, DEFAULT_CONCURRENCY_MIN, DEFAULT_CONCURRENCY_MAX, actualConcurrency);
         }
     }
 
     if (process.env.NODE_ENV === 'development') {
-        logger.info(`[并发数计算] 最终并发数: ${actualConcurrency}`);
+        logger.info('[并发数计算] 最终并发数: {}', actualConcurrency);
     }
 
     return {
