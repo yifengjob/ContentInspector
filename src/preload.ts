@@ -133,15 +133,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openDevTools: () =>
         ipcRenderer.invoke('open-dev-tools'),
 
-    // ==================== 自定义敏感词逻辑表达式相关 ====================
+    // ==================== 搜索表达式相关 ====================
 
-    // 【新增】设置自定义表达式
-    setCustomExpression: (expression: string) =>
-        ipcRenderer.invoke('set-custom-expression', expression),
+    // 【新增】设置搜索表达式
+    setSearchExpression: (expression: string) =>
+        ipcRenderer.invoke('set-search-expression', expression),
 
-    // 【新增】获取当前自定义表达式
-    getCustomExpression: () =>
-        ipcRenderer.invoke('get-custom-expression'),
+    // 【新增】获取当前搜索表达式
+    getSearchExpression: () =>
+        ipcRenderer.invoke('get-search-expression'),
 
     // 【新增】验证表达式语法（用于前端实时校验）
     validateExpression: (expression: string) =>
@@ -184,9 +184,9 @@ declare global {
             clearCache: () => Promise<{ success: boolean; cleanedSize?: number }>;
             openDevTools: () => Promise<void>;
             
-            // 自定义表达式相关
-            setCustomExpression: (expression: string) => Promise<{ success: boolean; error?: string }>;
-            getCustomExpression: () => Promise<{ success: boolean; expression?: string; error?: string }>;
+            // 搜索表达式相关
+            setSearchExpression: (expression: string) => Promise<{ success: boolean; error?: string }>;
+            getSearchExpression: () => Promise<{ success: boolean; expression?: string; error?: string }>;
             validateExpression: (expression: string) => Promise<{ valid: boolean; error?: string; position?: number }>;
         };
     }

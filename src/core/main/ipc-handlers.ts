@@ -6,21 +6,21 @@
  * - 处理来自渲染进程的请求
  */
 
-import {ipcMain, dialog, BrowserWindow, app} from 'electron';
+import {app, BrowserWindow, dialog, ipcMain} from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import {mainLogger} from '../../logger/logger';
 import {ScanState} from '../state/scan-state';
-import {startScan, cancelScan} from '../scanner';
+import {cancelScan, startScan} from '../scanner';
 import {getDirectoryTree} from '../../services/directory-tree';
 import {deleteFile, openFile, openFileLocation} from '../../services/file-operations';
 import {exportReport} from '../../services/report-exporter';
 import {getSensitiveRules} from '../../detection/sensitive-detector';
 import {validateExpression} from '../../utils/expression-parser';
-import {loadConfig, saveConfig, calculateRecommendedConcurrency} from '../config/manager';
+import {calculateRecommendedConcurrency, loadConfig, saveConfig} from '../config/manager';
 import {checkEnvironment} from '../infra';
-import {LOG_RETENTION_DAYS, MS_TO_DAYS, BYTES_TO_MB} from '../config/constants';
+import {BYTES_TO_MB, LOG_RETENTION_DAYS, MS_TO_DAYS} from '../config/constants';
 import {PowerSaveManager} from './power-save-manager';
 import {PreviewWorkerManager} from './preview-worker-manager';
 import {getDirectorySize} from './utils';
@@ -350,10 +350,10 @@ export function setupIpcHandlers(
         return {error: '窗口未初始化'};
     });
 
-    // ==================== 自定义敏感词逻辑表达式相关 ====================
+    // ==================== 搜索表达式相关 ====================
 
-    // 【新增】设置自定义表达式
-    ipcMain.handle('set-custom-expression', async (_, expression: string) => {
+    // 【新增】设置搜索表达式
+    ipcMain.handle('set-search-expression', async (_, expression: string) => {
         try {
             // 验证表达式语法
             if (expression && expression.trim()) {
@@ -368,14 +368,14 @@ export function setupIpcHandlers(
 
             // 保存到配置
             const config = await loadConfig();
-            config.customSensitiveExpression = expression;
+            config.searchExpression = expression;
             await saveConfig(config);
 
-            mainLogger.info('自定义表达式已保存');
+            mainLogger.info('搜索表达式已保存');
 
             return {success: true};
         } catch (error: any) {
-            mainLogger.error('保存自定义表达式失败: {}', error.message);
+            mainLogger.error('保存搜索表达式失败: {}', error.message);
             return {
                 success: false,
                 error: `保存失败: ${error.message}`
@@ -383,16 +383,16 @@ export function setupIpcHandlers(
         }
     });
 
-    // 【新增】获取当前自定义表达式
-    ipcMain.handle('get-custom-expression', async () => {
+    // 【新增】获取当前搜索表达式
+    ipcMain.handle('get-search-expression', async () => {
         try {
             const config = await loadConfig();
             return {
                 success: true,
-                expression: config.customSensitiveExpression || ''
+                expression: config.searchExpression || ''
             };
         } catch (error: any) {
-            mainLogger.error('获取自定义表达式失败: {}', error.message);
+            mainLogger.error('获取搜索表达式失败: {}', error.message);
             return {
                 success: false,
                 error: error.message
@@ -402,7 +402,6 @@ export function setupIpcHandlers(
 
     // 【新增】验证表达式语法（用于前端实时校验）
     ipcMain.handle('validate-expression', (_, expression: string) => {
-        const result = validateExpression(expression);
-        return result;
+        return validateExpression(expression);
     });
 }

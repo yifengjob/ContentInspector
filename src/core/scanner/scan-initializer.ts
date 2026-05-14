@@ -21,8 +21,7 @@ import {
     configureBatchSender,
     createProgressUpdater,
     resultBatchSender,
-    calculateTimeout,
-    BatchSender
+    calculateTimeout
 } from './helpers/scanner-helpers';
 import {EventBus} from '../infra';
 import {TaskQueueManager} from '../queue';

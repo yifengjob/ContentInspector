@@ -13,7 +13,7 @@ import {
   SLIDING_WINDOW_OVERLAP_SIZE,
   BYTES_TO_MB
 } from '../../core/config/constants';
-import { getHighlights, evaluateCustomExpressionOnly } from '../../detection/sensitive-detector';
+import { getHighlights, evaluateSearchExpressionOnly } from '../../detection/sensitive-detector';
 import { mainLogger } from '../../logger/logger';
 import type { HighlightRange } from '../../types';
 
@@ -54,7 +54,7 @@ export interface ProcessingStats {
 export interface StreamProcessorOptions {
   mode: 'detect' | 'preview';           // 处理模式
   enabledTypes: string[];               // 启用的敏感词类型
-  customExpression?: string;            // 自定义敏感词逻辑表达式
+  searchExpression?: string;            // 自定义逻辑表达式
   
   // 回调函数
   onChunk?: (chunkData: ChunkData) => void;           // 每块就绪回调
@@ -153,7 +153,7 @@ export class FileStreamProcessor {
         }
         
         // 【新增】在文件结束时评估自定义表达式
-        this.evaluateCustomExpressionAtEnd(options.customExpression);
+        this.evaluateSearchExpressionAtEnd(options.searchExpression);
 
         // 发送完成消息
         options.onComplete?.({
@@ -227,7 +227,7 @@ export class FileStreamProcessor {
 
       // 检测敏感词 (带重叠区)
       const fullChunk = this.previousOverlap + chunkText;
-      const localHighlights = this.detectWithOverlap(fullChunk, options.enabledTypes, options.customExpression);
+      const localHighlights = this.detectWithOverlap(fullChunk, options.enabledTypes, options.searchExpression);
       
       // 【修复】将局部偏移转换为全局偏移（基于字符数）
       const charsBefore = this.totalChars;  // 当前块之前的总字符数
@@ -258,7 +258,7 @@ export class FileStreamProcessor {
     }
 
     // 【新增】在文件结束时评估自定义表达式
-    this.evaluateCustomExpressionAtEnd(options.customExpression);
+    this.evaluateSearchExpressionAtEnd(options.searchExpression);
     
     // 发送完成消息
     options.onComplete?.({
@@ -279,7 +279,7 @@ export class FileStreamProcessor {
     const currentChunk = this.previousOverlap + this.buffer.slice(0, splitPos);
 
     // 检测敏感词
-    const localHighlights = this.detectWithOverlap(currentChunk, options.enabledTypes, options.customExpression);
+    const localHighlights = this.detectWithOverlap(currentChunk, options.enabledTypes, options.searchExpression);
     
     // 【修复】将局部偏移转换为全局偏移（基于字符数）
     const charsBefore = this.totalChars;  // 当前块之前的总字符数
@@ -346,7 +346,7 @@ export class FileStreamProcessor {
   private detectWithOverlap(
     chunk: string,
     enabledTypes: string[],
-    customExpression?: string
+    searchExpression?: string
   ): HighlightRange[] {
     // 【优化】一次性获取内置规则的高亮
     const allHighlights = getHighlights(chunk, enabledTypes);
@@ -356,8 +356,8 @@ export class FileStreamProcessor {
     const newHighlights = allHighlights.filter(h => h.start >= overlapLength);
 
     // 【扫描模式】累加计数（在一次调用中完成）
-    if (enabledTypes.length > 0 || (customExpression && customExpression.trim())) {
-      this.accumulateCounts(newHighlights, chunk, customExpression);
+    if (enabledTypes.length > 0 || (searchExpression && searchExpression.trim())) {
+      this.accumulateCounts(newHighlights, chunk, searchExpression);
     }
 
     return newHighlights;
@@ -371,7 +371,7 @@ export class FileStreamProcessor {
   private accumulateCounts(
     highlights: HighlightRange[],
     chunkText: string,
-    customExpression?: string
+    searchExpression?: string
   ): void {
     // 1. 累加内置规则的计数（基于已有的高亮结果，无需再次扫描）
     for (const highlight of highlights) {
@@ -381,15 +381,14 @@ export class FileStreamProcessor {
     }
     
     // 2. 【新方案】记录自定义表达式中关键词的出现状态
-    if (customExpression && customExpression.trim()) {
+    if (searchExpression && searchExpression.trim()) {
       // 提取表达式中的所有关键词
-      const keywords = this.extractKeywordsFromExpression(customExpression);
+      const keywords = this.extractKeywordsFromExpression(searchExpression);
       
       // 检查每个关键词是否在当前 chunk 中出现
       for (const keyword of keywords) {
         if (chunkText.includes(keyword)) {
           this.keywordFoundFlags[keyword] = true;
-          mainLogger.debug('[流式处理] 发现关键词: "{}"', keyword);
         }
       }
     }
@@ -419,8 +418,8 @@ export class FileStreamProcessor {
    * 【新增】在文件处理结束时评估自定义表达式
    * 基于累积的关键词出现状态进行评估
    */
-  private evaluateCustomExpressionAtEnd(customExpression?: string): void {
-    if (!customExpression || !customExpression.trim() || this.hasEvaluatedExpression) {
+  private evaluateSearchExpressionAtEnd(searchExpression?: string): void {
+    if (!searchExpression || !searchExpression.trim() || this.hasEvaluatedExpression) {
       return;
     }
     
@@ -430,22 +429,14 @@ export class FileStreamProcessor {
         .filter(k => this.keywordFoundFlags[k])
         .join(' ');
       
-      mainLogger.debug('[流式处理] 📊 文件处理完成，评估表达式');
-      mainLogger.debug('[流式处理] 表达式: "{}"', customExpression);
-      mainLogger.debug('[流式处理] 发现的关键词: {}', foundKeywords || '(无)');
-      mainLogger.debug('[流式处理] 关键词状态: {}', JSON.stringify(this.keywordFoundFlags));
-      
-      // 使用 evaluateCustomExpressionOnly 评估
-      const isMatched = evaluateCustomExpressionOnly(foundKeywords, customExpression);
-      
-      mainLogger.info('[流式处理] 评估结果: {}', isMatched ? '✅ 匹配' : '❌ 不匹配');
+      // 使用 evaluateSearchExpressionOnly 评估
+      const isMatched = evaluateSearchExpressionOnly(foundKeywords, searchExpression);
       
       if (isMatched) {
         // 【需求变更】直接设置独立属性，不再存入accumulatedCounts
         this.expressionMatchedValue = 1;
         // 【需求变更】自定义表达式不计入敏感信息总数，只记录有无
         // this.totalCount++;  // ← 已注释，不再累加到总数
-        mainLogger.info('[流式处理] ✅ 表达式匹配成功');
       }
       
       this.hasEvaluatedExpression = true;

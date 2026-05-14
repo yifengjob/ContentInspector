@@ -41,9 +41,9 @@ declare global {
             onScanLog: (callback: (msg: string) => void) => () => void;
             onScanLogBatch: (callback: (logs: string[]) => void) => () => void;  // 【新增】批量日志监听
             
-            // 【新增】自定义敏感词逻辑表达式相关
-            setCustomExpression: (expression: string) => Promise<{ success: boolean; error?: string }>;
-            getCustomExpression: () => Promise<{ success: boolean; expression?: string; error?: string }>;
+            // 【新增】搜索表达式相关
+            setSearchExpression: (expression: string) => Promise<{ success: boolean; error?: string }>;
+            getSearchExpression: () => Promise<{ success: boolean; expression?: string; error?: string }>;
             validateExpression: (expression: string) => Promise<{ valid: boolean; error?: string; position?: number }>;
         };
     }
@@ -229,17 +229,17 @@ export async function showSaveDialog(options?: {
     return result.filePath || null
 }
 
-// ==================== 自定义敏感词逻辑表达式相关 ====================
+// ==================== 搜索表达式相关 ====================
 
-// 【新增】设置自定义表达式
-export async function setCustomExpression(expression: string): Promise<void> {
-    const result = await window.electronAPI.setCustomExpression(expression)
+// 【新增】设置搜索表达式
+export async function setSearchExpression(expression: string): Promise<void> {
+    const result = await window.electronAPI.setSearchExpression(expression)
     if (!result.success) throw new Error(result.error || '保存失败')
 }
 
-// 【新增】获取当前自定义表达式
-export async function getCustomExpression(): Promise<string> {
-    const result = await window.electronAPI.getCustomExpression()
+// 【新增】获取当前搜索表达式
+export async function getSearchExpression(): Promise<string> {
+    const result = await window.electronAPI.getSearchExpression()
     if (!result.success) throw new Error(result.error || '获取失败')
     return result.expression || ''
 }

@@ -41,12 +41,12 @@
         <!-- 【新增】自定义敏感词逻辑表达式输入框 -->
         <div class="expression-input-container" :title="expressionValidationStatus">
           <input
-              v-model="customExpression"
+              v-model="searchExpression"
               type="text"
               class="expression-input"
               :class="{
                 'expression-input-error': expressionValidationError,
-                'expression-input-success': expressionValidated && !expressionValidationError && customExpression.trim()
+                'expression-input-success': expressionValidated && !expressionValidationError && searchExpression.trim()
               }"
               placeholder="关键字搜索，支持表达式（如：密码 & 身份证）"
               @input="onExpressionInput"
@@ -268,8 +268,8 @@ import {
   onScanResult,
   showMessage,
   startScan,
-  setCustomExpression,
-  getCustomExpression,
+  setSearchExpression,
+  getSearchExpression,
   validateExpression
 } from './utils/electron-api'
 import DirectoryTree from './components/DirectoryTree.vue'
@@ -323,7 +323,7 @@ const isDevMode = computed(() => process.env.NODE_ENV === 'development')
 const showMoreMenu = ref(false)
 
 // 【新增】自定义敏感词逻辑表达式相关
-const customExpression = ref('')
+const searchExpression = ref('')
 const expressionValidationError = ref('')
 const expressionValidated = ref(false)
 let validationTimer: number | null = null  // 防抖定时器
@@ -432,11 +432,11 @@ onMounted(async () => {
     appStore.addLogs(logs)  // ← 批量添加，只触发一次响应式更新
   })
   
-  // 【新增】加载自定义表达式
+  // 【新增】加载搜索表达式
   try {
-    customExpression.value = await getCustomExpression()
+    searchExpression.value = await getSearchExpression()
   } catch (error) {
-    console.error('加载自定义表达式失败:', error)
+    console.error('加载搜索表达式失败:', error)
   }
 })
 
@@ -468,7 +468,7 @@ const handleStartScan = async () => {
     maxFileSizeMb: config.value.maxFileSizeMb,
     maxPdfSizeMb: config.value.maxPdfSizeMb,
     scanConcurrency: config.value.scanConcurrency,
-    customSensitiveExpression: customExpression.value.trim() || undefined,  // 【新增】自定义表达式
+    searchExpression: searchExpression.value.trim() || undefined,  // 【新增】搜索表达式
   }
 
   try {
@@ -516,11 +516,11 @@ const handleOpenDevTools = () => {
   }
 }
 
-// ==================== 自定义敏感词逻辑表达式相关 ====================
+// ==================== 搜索表达式相关 ====================
 
 // 【新增】实时验证表达式（带防抖）
 const validateExpressionDebounced = async () => {
-  const expr = customExpression.value.trim()
+  const expr = searchExpression.value.trim()
   
   // 清空状态
   if (!expr) {
@@ -558,10 +558,10 @@ const onExpressionInput = () => {
 
 // 【新增】保存表达式
 const handleSaveExpression = async () => {
-  const expr = customExpression.value.trim()
+  const expr = searchExpression.value.trim()
   
   try {
-    await setCustomExpression(expr)
+    await setSearchExpression(expr)
     expressionValidated.value = true
     expressionValidationError.value = ''
     
@@ -572,7 +572,7 @@ const handleSaveExpression = async () => {
     }
   } catch (error: any) {
     expressionValidationError.value = error.message || '保存失败'
-    await showMessage(`保存自定义表达式失败：${error.message}`, {
+    await showMessage(`保存搜索表达式失败：${error.message}`, {
       title: '错误',
       type: 'error'
     })
@@ -584,10 +584,10 @@ const expressionValidationStatus = computed(() => {
   if (expressionValidationError.value) {
     return `语法错误: ${expressionValidationError.value}`
   }
-  if (expressionValidated.value && customExpression.value.trim()) {
+  if (expressionValidated.value && searchExpression.value.trim()) {
     return '表达式语法正确'
   }
-  return '输入自定义敏感词逻辑表达式，如：密码 & 身份证'
+  return '输入搜索表达式，如：密码 & 身份证'
 })
 
 // 预览文件
