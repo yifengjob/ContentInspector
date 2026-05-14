@@ -1,4 +1,6 @@
 import { HighlightRange } from '../types';
+import { evaluateExpression } from '../utils/expression-parser';
+import { mainLogger } from '../logger/logger';
 
 interface SensitiveRule {
   id: string;
@@ -194,7 +196,40 @@ export function getSensitiveRules(): Array<[string, string]> {
   return sensitiveRules.map(rule => [rule.id, rule.name]);
 }
 
-export function detectSensitiveData(text: string, enabledTypes: string[]): Record<string, number> {
+/**
+ * 检测敏感数据（包含自定义表达式）
+ * @param text 待检测文本
+ * @param enabledTypes 启用的内置规则类型
+ * @param customExpression 自定义逻辑表达式（可选）
+ * @returns 敏感类型计数
+ */
+export function detectSensitiveData(
+  text: string, 
+  enabledTypes: string[],
+  customExpression?: string
+): Record<string, number> {
+  const counts = detectBuiltinRules(text, enabledTypes);
+  
+  // 执行自定义表达式检测（如果提供且非空）
+  if (customExpression && customExpression.trim()) {
+    try {
+      const result = evaluateExpression(customExpression, text);
+      if (result.matched) {
+        counts['custom_expression'] = 1;
+      }
+    } catch (error: any) {
+      // 表达式评估失败，记录警告但不影响其他检测
+      mainLogger.warn('自定义表达式评估失败: {}', error.message);
+    }
+  }
+  
+  return counts;
+}
+
+/**
+ * 提取内置规则检测逻辑为独立函数
+ */
+function detectBuiltinRules(text: string, enabledTypes: string[]): Record<string, number> {
   const counts: Record<string, number> = {};
   
   for (const rule of sensitiveRules) {
@@ -257,27 +292,22 @@ export function getHighlights(text: string, enabledTypes: string[]): HighlightRa
 }
 
 // 【新增】扫描模式专用：只统计数量，不保存结果（防止 OOM）
-export function countSensitiveMatches(text: string, enabledTypes: string[]): Record<string, number> {
-  const counts: Record<string, number> = {};
+export function countSensitiveMatches(
+  text: string, 
+  enabledTypes: string[],
+  customExpression?: string
+): Record<string, number> {
+  const counts = detectBuiltinRules(text, enabledTypes);
   
-  for (const rule of sensitiveRules) {
-    if (!enabledTypes.includes(rule.id)) continue;
-    
-    // 为每次检测创建新的正则表达式实例，避免lastIndex污染
-    const pattern = new RegExp(rule.pattern.source, rule.pattern.flags);
-    
-    const matches = Array.from(text.matchAll(pattern));
-    
-    let validCount = 0;
-    for (const match of matches) {
-      if (rule.validate && !rule.validate(match[0], text, match.index!)) {
-        continue;
+  // 执行自定义表达式检测（如果提供且非空）
+  if (customExpression && customExpression.trim()) {
+    try {
+      const result = evaluateExpression(customExpression, text);
+      if (result.matched) {
+        counts['custom_expression'] = 1;
       }
-      validCount++;
-    }
-    
-    if (validCount > 0) {
-      counts[rule.id] = validCount;
+    } catch (error: any) {
+      mainLogger.warn('自定义表达式评估失败: {}', error.message);
     }
   }
   
