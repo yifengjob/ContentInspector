@@ -188,8 +188,18 @@ export async function loadConfig(): Promise<AppConfig> {
  */
 export function getConfigSync(): AppConfig {
     try {
-        if (fs.existsSync(CONFIG_FILE)) {
-            const data = fs.readFileSync(CONFIG_FILE, 'utf-8');
+        // 【修复】动态构建配置路径，避免在非 Electron 环境中出错
+        let configPath: string;
+        try {
+            configPath = path.join(app.getPath('userData'), 'config.json');
+        } catch (error) {
+            // 如果 app.getPath 不可用（非 Electron 环境），返回默认配置
+            logger.warn('[getConfigSync] app.getPath 不可用，使用默认配置');
+            return getDefaultConfig();
+        }
+        
+        if (fs.existsSync(configPath)) {
+            const data = fs.readFileSync(configPath, 'utf-8');
             const config = JSON.parse(data);
             const defaultConfig = getDefaultConfig();
             const mergedConfig = {...defaultConfig, ...config};
