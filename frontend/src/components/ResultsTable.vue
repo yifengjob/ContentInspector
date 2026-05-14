@@ -360,17 +360,9 @@ const filteredResults = computed(() => {
         aVal = a.counts[typeId] || 0
         bVal = b.counts[typeId] || 0
       } else {
-        // 普通字段 - 将下划线命名转换为驼峰命名
-        const fieldMap: Record<string, string> = {
-          'file_path': 'filePath',
-          'file_size': 'fileSize',
-          'modified_time': 'modifiedTime',
-          'total': 'total'
-          // 【需求变更】expressionMatched 直接使用，无需映射（与后端保持一致）
-        }
-        const actualField = fieldMap[sortField.value] || sortField.value
-        aVal = a[actualField as keyof typeof a]
-        bVal = b[actualField as keyof typeof b]
+        // 普通字段（前后端统一使用驼峰命名）
+        aVal = a[sortField.value as keyof typeof a]
+        bVal = b[sortField.value as keyof typeof b]
       }
 
       if (typeof aVal === 'string') {
