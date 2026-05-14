@@ -158,7 +158,8 @@ export function getDefaultConfig(): AppConfig {
         enableExperimentalParsers: false,
         enableOfficeParsers: true,
         deleteToTrash: false,
-        ignoreOtherDrivesSystemDirs: false // 默认不忽略其他磁盘的系统目录（即会扫描）
+        ignoreOtherDrivesSystemDirs: false, // 默认不忽略其他磁盘的系统目录（即会扫描）
+        customSensitiveExpression: '' // 默认为空，表示不启用自定义表达式
     };
 }
 
