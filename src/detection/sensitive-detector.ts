@@ -226,7 +226,7 @@ export function detectSensitiveData(
     try {
       const result = evaluateExpression(customExpression, text);
       if (result.matched) {
-        counts['custom_expression'] = 1;
+        counts['expression_matched'] = 1;
       }
     } catch (error: any) {
       // 表达式评估失败，记录警告但不影响其他检测
@@ -341,7 +341,7 @@ export function countSensitiveMatches(
     try {
       const result = evaluateExpression(customExpression, text);
       if (result.matched) {
-        counts['custom_expression'] = 1;
+        counts['expression_matched'] = 1;
       }
     } catch (error: any) {
       mainLogger.warn('自定义表达式评估失败: {}', error.message);

@@ -433,8 +433,8 @@ export class FileStreamProcessor {
       mainLogger.info('[流式处理] 评估结果: {}', isMatched ? '✅ 匹配' : '❌ 不匹配');
       
       if (isMatched) {
-        this.accumulatedCounts['custom_expression'] = 
-          (this.accumulatedCounts['custom_expression'] || 0) + 1;
+        this.accumulatedCounts['expression_matched'] = 
+          (this.accumulatedCounts['expression_matched'] || 0) + 1;
         // 【需求变更】自定义表达式不计入敏感信息总数，只记录有无
         // this.totalCount++;  // ← 已注释，不再累加到总数
         mainLogger.info('[流式处理] ✅ 表达式匹配成功');
