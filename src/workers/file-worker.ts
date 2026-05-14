@@ -59,6 +59,7 @@ interface WorkerTask {
     taskId: number;
     filePath: string;
     enabledSensitiveTypes: string[];
+    customExpression?: string; // 自定义敏感词逻辑表达式
     previewMode?: boolean; // 预览模式：只提取文本，不检测敏感数据
     config?: {
         maxFileSizeMb?: number;
@@ -75,6 +76,7 @@ interface WorkerResult {
     modifiedTime?: string;
     counts?: Record<string, number>;
     total?: number;
+    expressionMatched?: number; // 【需求变更】自定义表达式匹配状态（0或1）
     unsupportedPreview?: boolean;
     error?: string;
 }
@@ -100,7 +102,11 @@ process.on('uncaughtException', (error) => {
 
 // 【事件驱动】Worker任务处理器 - 使用Promise链式处理
 async function processTask(task: WorkerTask): Promise<void> {
-    const {taskId, filePath, enabledSensitiveTypes, previewMode = false} = task;
+    const {taskId, filePath, enabledSensitiveTypes, customExpression, previewMode = false} = task;
+    
+    // 【调试日志】记录接收到的任务参数
+    workerLogger.info('[Worker TID:{}] 收到任务: taskId={}, file={}, customExpression="{}"', 
+        threadId, taskId, filePath, customExpression || '(空)');
 
     // 【优化】设置超时保护（使用配置常量）
     let timeoutId: NodeJS.Timeout | null = null;
@@ -184,16 +190,26 @@ async function processTask(task: WorkerTask): Promise<void> {
                             totalChunks: stats.totalChunks
                         });
                     } else {
-                        // 返回累计的检测结果
-                        parentPort?.postMessage({
+                        // 【需求变更】返回累计的检测结果，包含自定义表达式匹配状态
+                        const counts = processor.getAccumulatedCounts();
+                        
+                        // 【优化】只有当用户配置了自定义表达式时，才返回 expressionMatched 字段
+                        const result: WorkerResult = {
                             taskId,
                             filePath,
                             fileSize: stat.size,
                             modifiedTime: stat.mtime.toISOString(),
-                            counts: processor.getAccumulatedCounts(),
+                            counts: counts,
                             total: processor.getTotalCount(),
                             unsupportedPreview: false
-                        } as WorkerResult);
+                        };
+                        
+                        // 如果传入了自定义表达式，添加 expressionMatched 字段
+                        if (customExpression && customExpression.trim()) {
+                            result.expressionMatched = processor.getExpressionMatched();
+                        }
+                        
+                        parentPort?.postMessage(result);
                     }
                 },
 
@@ -213,6 +229,7 @@ async function processTask(task: WorkerTask): Promise<void> {
                     processor.processFile(filePath, {
                         mode: previewMode ? 'preview' : 'detect',
                         enabledTypes: enabledSensitiveTypes,
+                        customExpression,
                         ...createCallbacks()
                     }),
                     timeoutPromise
@@ -243,6 +260,7 @@ async function processTask(task: WorkerTask): Promise<void> {
                 await processor.processFile('', {
                     mode: previewMode ? 'preview' : 'detect',
                     enabledTypes: enabledSensitiveTypes,
+                    customExpression,
                     ...createCallbacks()
                 }, text); // 传入预提取的文本
             }

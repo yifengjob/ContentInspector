@@ -158,7 +158,8 @@ export function getDefaultConfig(): AppConfig {
         enableExperimentalParsers: false,
         enableOfficeParsers: true,
         deleteToTrash: false,
-        ignoreOtherDrivesSystemDirs: false // 默认不忽略其他磁盘的系统目录（即会扫描）
+        ignoreOtherDrivesSystemDirs: false, // 默认不忽略其他磁盘的系统目录（即会扫描）
+        customSensitiveExpression: '' // 默认为空，表示不启用自定义表达式
     };
 }
 
@@ -177,6 +178,39 @@ export async function loadConfig(): Promise<AppConfig> {
         }
     } catch (error: any) {
         logger.error('loadConfig: {}', error.message);
+    }
+
+    return getDefaultConfig();
+}
+
+/**
+ * 【新增】同步读取配置（用于 getSensitiveRules 等同步场景）
+ */
+export function getConfigSync(): AppConfig {
+    try {
+        // 【修复】动态构建配置路径，避免在非 Electron 环境中出错
+        let configPath: string;
+        try {
+            configPath = path.join(app.getPath('userData'), 'config.json');
+        } catch (error) {
+            // 如果 app.getPath 不可用（非 Electron 环境），返回默认配置
+            logger.warn('[getConfigSync] app.getPath 不可用，使用默认配置');
+            return getDefaultConfig();
+        }
+        
+        if (fs.existsSync(configPath)) {
+            const data = fs.readFileSync(configPath, 'utf-8');
+            const config = JSON.parse(data);
+            const defaultConfig = getDefaultConfig();
+            const mergedConfig = {...defaultConfig, ...config};
+
+            // 根据 ignoreOtherDrivesSystemDirs 选项重新生成系统目录
+            mergedConfig.systemDirs = generateSystemDirs(mergedConfig.ignoreOtherDrivesSystemDirs);
+
+            return mergedConfig;
+        }
+    } catch (error: any) {
+        logger.warn('getConfigSync: {}', error.message);
     }
 
     return getDefaultConfig();

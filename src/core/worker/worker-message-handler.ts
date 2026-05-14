@@ -105,6 +105,7 @@ export class WorkerMessageHandler {
                         modifiedTime: result.modifiedTime || new Date().toISOString(),
                         counts: result.counts || {},
                         total: result.total,
+                        expressionMatched: result.expressionMatched, // 【需求变更】自定义表达式匹配状态
                         unsupportedPreview: false
                     };
 

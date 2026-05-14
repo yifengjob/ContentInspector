@@ -4,89 +4,159 @@
 
     <!-- 工具栏 -->
     <div class="toolbar">
-      <button
-          class="btn btn-primary"
-          @click="handleStartScan"
-          :disabled="isScanning || isCancelling"
-          title="开始扫描选中的目录"
-      >
-        <svg class="btn-icon">
-          <use href="#icon-play"/>
-        </svg>
-        <span>{{ isScanning ? '扫描中...' : isCancelling ? '取消中...' : '开始扫描' }}</span>
-      </button>
-      <button
-          class="btn btn-danger"
-          @click="handleCancelScan"
-          :disabled="!isScanning || isCancelling"
-          title="取消当前扫描任务"
-      >
-        <svg class="btn-icon">
-          <use href="#icon-pause"/>
-        </svg>
-        <span>{{ isCancelling ? '取消中...' : '取消' }}</span>
-      </button>
-      <button
-          class="btn btn-icon-only"
-          @click="handleExportReport"
-          :disabled="scanResults.length === 0"
-          :title="scanResults.length === 0 ? '暂无扫描结果，无法导出' : '导出报告'"
-      >
-        <svg class="btn-icon">
-          <use href="#icon-export"/>
-        </svg>
-      </button>
-      <button
-          class="btn btn-icon-only"
-          @click="showSettings = true"
-          title="打开设置"
-      >
-        <svg class="btn-icon">
-          <use href="#icon-setting"/>
-        </svg>
-      </button>
-      <button
-          class="btn btn-icon-only"
-          @click="showLogs = true"
-          title="查看日志"
-      >
-        <svg class="btn-icon">
-          <use href="#icon-log"/>
-        </svg>
-      </button>
-      <button
-          class="btn btn-icon-only"
-          @click="handleOpenDevTools"
-          title="打开开发者工具"
-      >
-        <svg class="btn-icon">
-          <use href="#icon-dev-tools"/>
-        </svg>
-      </button>
-      <button
-          class="btn btn-icon-only theme-toggle"
-          @click="toggleTheme"
-          :title="getThemeTooltip()"
-      >
-        <!-- 跟随系统主题 -->
-        <svg v-if="currentTheme === 'system'" class="btn-icon">
-          <use href="#icon-system-theme"/>
-        </svg>
-        <!-- 浅色/深色主题 -->
-        <svg v-else class="btn-icon">
-          <use href="#icon-light-dark"/>
-        </svg>
-      </button>
-      <button
-          class="btn btn-icon-only"
-          @click="showAbout = true"
-          title="关于"
-      >
-        <svg class="btn-icon">
-          <use href="#icon-about"/>
-        </svg>
-      </button>
+      <!-- 左侧：辅助功能区 -->
+      <div class="toolbar-section toolbar-left">
+        <button
+            class="btn btn-icon-only"
+            @click="handleExportReport"
+            :disabled="scanResults.length === 0"
+            :title="scanResults.length === 0 ? '暂无扫描结果，无法导出' : '导出报告'"
+        >
+          <svg class="btn-icon">
+            <use href="#icon-export"/>
+          </svg>
+        </button>
+        <button
+            class="btn btn-icon-only"
+            @click="showSettings = true"
+            title="打开设置"
+        >
+          <svg class="btn-icon">
+            <use href="#icon-setting"/>
+          </svg>
+        </button>
+        <button
+            class="btn btn-icon-only"
+            @click="showLogs = true"
+            title="查看日志"
+        >
+          <svg class="btn-icon">
+            <use href="#icon-log"/>
+          </svg>
+        </button>
+      </div>
 
+      <!-- 中间：搜索/表达式输入区 + 执行按钮 -->
+      <div class="toolbar-section toolbar-center">
+        <!-- 【新增】自定义敏感词逻辑表达式输入框 -->
+        <div class="expression-input-container" :title="expressionValidationStatus">
+          <input
+              v-model="customExpression"
+              type="text"
+              class="expression-input"
+              :class="{
+                'expression-input-error': expressionValidationError,
+                'expression-input-success': expressionValidated && !expressionValidationError && customExpression.trim()
+              }"
+              placeholder="关键字搜索，支持表达式（如：密码 & 身份证）"
+              @input="onExpressionInput"
+              @blur="handleSaveExpression"
+              @keyup.enter="handleSaveExpression"
+          />
+        </div>
+        
+        <!-- 【优化】扫描操作按钮组（紧邻输入框右侧） -->
+        <div class="scan-actions">
+          <button
+              class="btn btn-primary"
+              @click="handleStartScan"
+              :disabled="isScanning || isCancelling"
+              title="开始扫描选中的目录"
+          >
+            <svg class="btn-icon">
+              <use href="#icon-play"/>
+            </svg>
+            <span>{{ isScanning ? '扫描中...' : isCancelling ? '取消中...' : '开始扫描' }}</span>
+          </button>
+          <button
+              class="btn btn-danger"
+              @click="handleCancelScan"
+              :disabled="!isScanning || isCancelling"
+              title="取消当前扫描任务"
+          >
+            <svg class="btn-icon">
+              <use href="#icon-pause"/>
+            </svg>
+            <span>{{ isCancelling ? '取消中...' : '取消' }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 右侧：系统功能区 -->
+      <div class="toolbar-section toolbar-right">
+        <button
+            class="btn btn-icon-only theme-toggle"
+            @click="toggleTheme"
+            :title="getThemeTooltip()"
+        >
+          <!-- 跟随系统主题 -->
+          <svg v-if="currentTheme === 'system'" class="btn-icon">
+            <use href="#icon-system-theme"/>
+          </svg>
+          <!-- 浅色/深色主题 -->
+          <svg v-else class="btn-icon">
+            <use href="#icon-light-dark"/>
+          </svg>
+        </button>
+        <button
+            class="btn btn-icon-only"
+            @click="showAbout = true"
+            title="关于"
+        >
+          <svg class="btn-icon">
+            <use href="#icon-about"/>
+          </svg>
+        </button>
+        <button
+            v-if="isDevMode"
+            class="btn btn-icon-only"
+            @click="handleOpenDevTools"
+            title="打开开发者工具（仅开发环境）"
+        >
+          <svg class="btn-icon">
+            <use href="#icon-dev-tools"/>
+          </svg>
+        </button>
+        
+        <!-- 【新增】更多按钮（小屏幕显示） -->
+        <div class="more-menu-container">
+          <button
+              class="btn btn-icon-only more-btn"
+              @click="showMoreMenu = !showMoreMenu"
+              title="更多选项"
+          >
+            <svg class="btn-icon">
+              <use href="#icon-more"/>
+            </svg>
+          </button>
+          
+          <!-- 下拉菜单 -->
+          <div v-if="showMoreMenu" class="more-menu-dropdown">
+            <button
+                class="menu-item"
+                @click="handleExportReport; showMoreMenu = false"
+                :disabled="scanResults.length === 0"
+            >
+              <svg class="menu-icon"><use href="#icon-export"/></svg>
+              <span>导出报告</span>
+            </button>
+            <button
+                class="menu-item"
+                @click="showSettings = true; showMoreMenu = false"
+            >
+              <svg class="menu-icon"><use href="#icon-setting"/></svg>
+              <span>设置</span>
+            </button>
+            <button
+                class="menu-item"
+                @click="showLogs = true; showMoreMenu = false"
+            >
+              <svg class="menu-icon"><use href="#icon-log"/></svg>
+              <span>查看日志</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 主内容区 -->
@@ -183,7 +253,7 @@
 </template>
 
 <script setup lang="ts">
-import {onMounted, ref} from 'vue'
+import {onMounted, ref, computed} from 'vue'
 import {useAppStore} from '@/stores/app'
 import {storeToRefs} from 'pinia'
 import {
@@ -197,7 +267,10 @@ import {
   onScanProgress,
   onScanResult,
   showMessage,
-  startScan
+  startScan,
+  setCustomExpression,
+  getCustomExpression,
+  validateExpression
 } from './utils/electron-api'
 import DirectoryTree from './components/DirectoryTree.vue'
 import FileTypeFilter from './components/FileTypeFilter.vue'
@@ -243,6 +316,17 @@ const showExport = ref(false)
 const isSidebarCollapsed = ref(false)
 const currentTheme = ref<ThemeMode>('system')
 const isCancelling = ref(false) // 【新增】取消扫描状态
+// 【优化】判断是否为开发环境
+const isDevMode = computed(() => process.env.NODE_ENV === 'development')
+
+// 【新增】更多菜单显示状态
+const showMoreMenu = ref(false)
+
+// 【新增】自定义敏感词逻辑表达式相关
+const customExpression = ref('')
+const expressionValidationError = ref('')
+const expressionValidated = ref(false)
+let validationTimer: number | null = null  // 防抖定时器
 
 // 加载配置
 onMounted(async () => {
@@ -266,6 +350,14 @@ onMounted(async () => {
   watchSystemTheme(() => {
     if (currentTheme.value === 'system') {
       applyTheme('system')
+    }
+  })
+  
+  // 【新增】点击外部关闭更多菜单
+  document.addEventListener('click', (e) => {
+    const moreMenuContainer = document.querySelector('.more-menu-container')
+    if (moreMenuContainer && !moreMenuContainer.contains(e.target as Node)) {
+      showMoreMenu.value = false
     }
   })
 
@@ -339,6 +431,13 @@ onMounted(async () => {
   await onScanLogBatch((logs) => {
     appStore.addLogs(logs)  // ← 批量添加，只触发一次响应式更新
   })
+  
+  // 【新增】加载自定义表达式
+  try {
+    customExpression.value = await getCustomExpression()
+  } catch (error) {
+    console.error('加载自定义表达式失败:', error)
+  }
 })
 
 // 开始扫描
@@ -369,6 +468,7 @@ const handleStartScan = async () => {
     maxFileSizeMb: config.value.maxFileSizeMb,
     maxPdfSizeMb: config.value.maxPdfSizeMb,
     scanConcurrency: config.value.scanConcurrency,
+    customSensitiveExpression: customExpression.value.trim() || undefined,  // 【新增】自定义表达式
   }
 
   try {
@@ -415,6 +515,80 @@ const handleOpenDevTools = () => {
     console.warn('electronAPI.openDevTools 不可用')
   }
 }
+
+// ==================== 自定义敏感词逻辑表达式相关 ====================
+
+// 【新增】实时验证表达式（带防抖）
+const validateExpressionDebounced = async () => {
+  const expr = customExpression.value.trim()
+  
+  // 清空状态
+  if (!expr) {
+    expressionValidationError.value = ''
+    expressionValidated.value = false
+    return
+  }
+  
+  try {
+    const result = await validateExpression(expr)
+    expressionValidated.value = true
+    
+    if (!result.valid) {
+      expressionValidationError.value = result.error || '语法错误'
+    } else {
+      expressionValidationError.value = ''
+    }
+  } catch (error: any) {
+    expressionValidationError.value = error.message || '验证失败'
+  }
+}
+
+// 【新增】监听输入变化（防抖）
+const onExpressionInput = () => {
+  // 清除之前的定时器
+  if (validationTimer !== null) {
+    clearTimeout(validationTimer)
+  }
+  
+  // 设置新的定时器（500ms 防抖）
+  validationTimer = window.setTimeout(() => {
+    validateExpressionDebounced()
+  }, 500)
+}
+
+// 【新增】保存表达式
+const handleSaveExpression = async () => {
+  const expr = customExpression.value.trim()
+  
+  try {
+    await setCustomExpression(expr)
+    expressionValidated.value = true
+    expressionValidationError.value = ''
+    
+    // 如果之前有错误，清除它
+    if (expr === '') {
+      expressionValidationError.value = ''
+      expressionValidated.value = false
+    }
+  } catch (error: any) {
+    expressionValidationError.value = error.message || '保存失败'
+    await showMessage(`保存自定义表达式失败：${error.message}`, {
+      title: '错误',
+      type: 'error'
+    })
+  }
+}
+
+// 【新增】获取表达式验证状态提示
+const expressionValidationStatus = computed(() => {
+  if (expressionValidationError.value) {
+    return `语法错误: ${expressionValidationError.value}`
+  }
+  if (expressionValidated.value && customExpression.value.trim()) {
+    return '表达式语法正确'
+  }
+  return '输入自定义敏感词逻辑表达式，如：密码 & 身份证'
+})
 
 // 预览文件
 const handlePreview = (filePath: string) => {
@@ -466,6 +640,101 @@ const getThemeTooltip = () => {
   background-color: var(--toolbar-bg);
   border-bottom: var(--border-width) solid var(--border-color);
   contain: layout style; /* ← 限制重排范围 */
+  align-items: center; /* 垂直居中对齐 */
+  position: relative; /* 【修复】为下拉菜单提供定位上下文 */
+  z-index: 100; /* 【修复】确保工具栏在结果表格之上 */
+}
+
+/* 【优化】工具栏分区布局 */
+.toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+/* 左侧：辅助功能区 */
+.toolbar-left {
+  flex-shrink: 0; /* 不压缩 */
+}
+
+/* 中间：搜索/表达式输入区 + 执行按钮 */
+.toolbar-center {
+  flex: 1; /* 占据剩余空间 */
+  justify-content: center; /* 居中对齐 */
+  min-width: 0; /* 允许收缩 */
+  gap: var(--spacing-md); /* 输入框和按钮组之间的间距 */
+}
+
+/* 【新增】扫描操作按钮组 */
+.scan-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-shrink: 0; /* 按钮不压缩 */
+  white-space: nowrap; /* 防止文字换行 */
+}
+
+/* 右侧：系统功能区 */
+.toolbar-right {
+  flex-shrink: 0; /* 不压缩 */
+  margin-left: auto; /* 推到最右边 */
+}
+
+/* 【新增】自定义表达式输入框容器 */
+.expression-input-container {
+  display: flex;
+  align-items: center;
+  gap: 0.25em;
+  position: relative;
+  width: 100%; /* 占据父容器全部宽度 */
+  max-width: 600px; /* 最大宽度限制 */
+}
+
+/* 【新增】表达式输入框 */
+.expression-input {
+  padding: 0.65em 0.75em; /* 6px 12px */
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-size: 0.9em;
+  width: 100%; /* 占据父容器全部宽度 */
+  min-width: 200px; /* 最小宽度 */
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.expression-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+/* 【需求变更】错误状态 - 红色边框 */
+.expression-input-error {
+  border-color: var(--error-color) !important;
+  background-color: rgba(255, 77, 79, 0.05); /* fallback for older browsers */
+  background-color: rgba(from var(--error-color) r g b / 0.05);
+}
+
+.expression-input-error:focus {
+  box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.1) !important; /* fallback */
+  box-shadow: 0 0 0 2px rgba(from var(--error-color) r g b / 0.1) !important;
+}
+
+/* 【需求变更】成功状态 - 绿色边框 */
+.expression-input-success {
+  border-color: var(--success-color) !important;
+  background-color: rgba(82, 196, 26, 0.05); /* fallback for older browsers */
+  background-color: rgba(from var(--success-color) r g b / 0.05);
+}
+
+.expression-input-success:focus {
+  box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.1) !important; /* fallback */
+  box-shadow: 0 0 0 2px rgba(from var(--success-color) r g b / 0.1) !important;
+}
+
+.expression-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
 }
 
 .btn {
@@ -548,6 +817,104 @@ const getThemeTooltip = () => {
 .theme-toggle .btn-icon {
   //color: var(--text-color); /* 明确指定使用主题文本颜色 */
   transition: color 0.2s ease;
+}
+
+/* 【新增】响应式设计：小屏幕优化 */
+@media (max-width: 1024px) {
+  .toolbar-center {
+    gap: var(--spacing-sm);
+  }
+  
+  /* 隐藏扫描按钮文字，只显示图标 */
+  .scan-actions .btn span {
+    display: none;
+  }
+  
+  /* 【新增】隐藏左侧辅助功能按钮 */
+  .toolbar-left {
+    display: none;
+  }
+  
+  /* 【新增】显示更多按钮 */
+  .more-btn {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .toolbar {
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+  }
+  
+  /* 调整顺序：输入框在上，其他在下 */
+  .toolbar-right {
+    order: 2;
+    width: auto;
+  }
+  
+  .toolbar-center {
+    order: 1;
+    width: 100%;
+    min-width: 100%;
+  }
+}
+
+/* 【新增】更多按钮默认隐藏（大屏幕） */
+.more-btn {
+  display: none;
+}
+
+/* 【新增】更多菜单容器 */
+.more-menu-container {
+  position: relative;
+}
+
+/* 【新增】下拉菜单 */
+.more-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: var(--spacing-xs);
+  background-color: var(--bg-color);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 160px;
+  z-index: 10000; /* 【修复】提高到足够高，确保在所有内容之上 */
+  padding: var(--spacing-xs);
+}
+
+/* 【新增】菜单项 */
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: none;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 0.9em;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.2s ease;
+  text-align: left;
+}
+
+.menu-item:hover:not(:disabled) {
+  background-color: var(--bg-hover);
+}
+
+.menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.menu-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .main-content {

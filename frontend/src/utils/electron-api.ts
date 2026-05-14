@@ -40,6 +40,11 @@ declare global {
             onScanError: (callback: (error: string) => void) => () => void;
             onScanLog: (callback: (msg: string) => void) => () => void;
             onScanLogBatch: (callback: (logs: string[]) => void) => () => void;  // 【新增】批量日志监听
+            
+            // 【新增】自定义敏感词逻辑表达式相关
+            setCustomExpression: (expression: string) => Promise<{ success: boolean; error?: string }>;
+            getCustomExpression: () => Promise<{ success: boolean; expression?: string; error?: string }>;
+            validateExpression: (expression: string) => Promise<{ valid: boolean; error?: string; position?: number }>;
         };
     }
 }
@@ -222,4 +227,24 @@ export async function showSaveDialog(options?: {
     // 这里需要通过IPC调用主进程的dialog
     const result = await window.electronAPI.showSaveDialog(options)
     return result.filePath || null
+}
+
+// ==================== 自定义敏感词逻辑表达式相关 ====================
+
+// 【新增】设置自定义表达式
+export async function setCustomExpression(expression: string): Promise<void> {
+    const result = await window.electronAPI.setCustomExpression(expression)
+    if (!result.success) throw new Error(result.error || '保存失败')
+}
+
+// 【新增】获取当前自定义表达式
+export async function getCustomExpression(): Promise<string> {
+    const result = await window.electronAPI.getCustomExpression()
+    if (!result.success) throw new Error(result.error || '获取失败')
+    return result.expression || ''
+}
+
+// 【新增】验证表达式语法（用于前端实时校验）
+export async function validateExpression(expression: string): Promise<{ valid: boolean; error?: string; position?: number }> {
+    return await window.electronAPI.validateExpression(expression)
 }

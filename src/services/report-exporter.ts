@@ -103,8 +103,15 @@ async function exportToExcel(filePath: string, results: ScanResultItem[]): Promi
   results.forEach(r => Object.keys(r.counts).forEach(t => allTypes.add(t)));
   const typeHeaders = Array.from(allTypes).map(typeId => typeMap.get(typeId) || typeId);
   
+  // 【需求变更】检查是否有表达式匹配数据
+  const hasExpressionMatched = results.some(r => r.expressionMatched !== undefined);
+  
   // 添加表头：敏感数据总数放在最后
-  const headers = ['文件路径', '文件大小(MB)', '修改时间', ...typeHeaders, '敏感数据总数'];
+  const headers = ['文件路径', '文件大小(MB)', '修改时间', ...typeHeaders];
+  if (hasExpressionMatched) {
+    headers.push('表达式'); // 【需求变更】添加表达式列
+  }
+  headers.push('敏感数据总数');
   worksheet.addRow(headers);
   
   // 设置表头样式
@@ -122,9 +129,15 @@ async function exportToExcel(filePath: string, results: ScanResultItem[]): Promi
       result.filePath,
       parseFloat((result.fileSize / BYTES_TO_MB).toFixed(2)), // 数字类型
       result.modifiedTime,
-      ...Array.from(allTypes).map(t => result.counts[t] || 0), // 数字类型
-      result.total // 数字类型
+      ...Array.from(allTypes).map(t => result.counts[t] || 0) // 数字类型
     ];
+    
+    // 【需求变更】如果有表达式匹配数据，添加该列
+    if (hasExpressionMatched) {
+      row.push(result.expressionMatched || 0);
+    }
+    
+    row.push(result.total); // 数字类型
     const dataRow = worksheet.addRow(row);
     
     // 设置数据行样式和格式
@@ -184,6 +197,9 @@ async function exportToExcel(filePath: string, results: ScanResultItem[]): Promi
     } else if (index === headers.length - 1) {
       // 总计列
       column.width = 15;
+    } else if (hasExpressionMatched && index === headers.length - 2) {
+      // 【需求变更】表达式列
+      column.width = 10;
     } else {
       column.width = 20;
     }

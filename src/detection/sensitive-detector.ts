@@ -1,4 +1,6 @@
-import { HighlightRange } from '../types';
+import {HighlightRange} from '../types';
+import {evaluateExpression} from '../utils/expression-parser';
+import {mainLogger} from '../logger/logger';
 
 interface SensitiveRule {
   id: string;
@@ -190,11 +192,40 @@ const sensitiveRules: SensitiveRule[] = [
   }
 ];
 
+/**
+ * 获取敏感规则列表
+ * 
+ * 【新增】如果配置中存在自定义表达式，会添加到列表中
+ */
 export function getSensitiveRules(): Array<[string, string]> {
+  // 【需求变更】不再将 custom_expression 添加到规则列表
+  // 原因：表达式列是独立显示的，不属于敏感类型循环
+  // 前端通过 expressionMatched 字段判断是否显示该列
+  
   return sensitiveRules.map(rule => [rule.id, rule.name]);
 }
 
-export function detectSensitiveData(text: string, enabledTypes: string[]): Record<string, number> {
+/**
+ * 检测敏感数据
+ * 
+ * 【注意】此函数仅处理内置规则，不处理自定义表达式
+ * 自定义表达式应在流式处理器 (FileStreamProcessor) 中处理
+ * 
+ * @param text 待检测文本
+ * @param enabledTypes 启用的内置规则类型
+ * @returns 敏感类型计数
+ */
+export function detectSensitiveData(
+  text: string, 
+  enabledTypes: string[]
+): Record<string, number> {
+  return detectBuiltinRules(text, enabledTypes);
+}
+
+/**
+ * 提取内置规则检测逻辑为独立函数
+ */
+function detectBuiltinRules(text: string, enabledTypes: string[]): Record<string, number> {
   const counts: Record<string, number> = {};
   
   for (const rule of sensitiveRules) {
@@ -256,30 +287,39 @@ export function getHighlights(text: string, enabledTypes: string[]): HighlightRa
   return highlights;
 }
 
-// 【新增】扫描模式专用：只统计数量，不保存结果（防止 OOM）
-export function countSensitiveMatches(text: string, enabledTypes: string[]): Record<string, number> {
-  const counts: Record<string, number> = {};
-  
-  for (const rule of sensitiveRules) {
-    if (!enabledTypes.includes(rule.id)) continue;
-    
-    // 为每次检测创建新的正则表达式实例，避免lastIndex污染
-    const pattern = new RegExp(rule.pattern.source, rule.pattern.flags);
-    
-    const matches = Array.from(text.matchAll(pattern));
-    
-    let validCount = 0;
-    for (const match of matches) {
-      if (rule.validate && !rule.validate(match[0], text, match.index!)) {
-        continue;
-      }
-      validCount++;
-    }
-    
-    if (validCount > 0) {
-      counts[rule.id] = validCount;
-    }
+/**
+ * 仅评估自定义表达式（不扫描内置规则）
+ * 
+ * 【性能优化】用于流式处理场景，避免重复扫描文本
+ * 
+ * @param text 待检测文本
+ * @param customExpression 自定义逻辑表达式
+ * @returns 是否匹配
+ */
+export function evaluateCustomExpressionOnly(
+  text: string,
+  customExpression: string
+): boolean {
+  if (!customExpression || !customExpression.trim()) {
+    return false;
   }
   
-  return counts;
+  try {
+    const result = evaluateExpression(customExpression, text);
+    return result.matched;
+  } catch (error: any) {
+    mainLogger.warn('自定义表达式评估失败: {}', error.message);
+    return false;
+  }
+}
+
+// 【新增】扫描模式专用：只统计数量，不保存结果（防止 OOM）
+// 
+// 【注意】此函数仅处理内置规则，不处理自定义表达式
+// 自定义表达式应在流式处理器 (FileStreamProcessor) 中处理
+export function countSensitiveMatches(
+  text: string, 
+  enabledTypes: string[]
+): Record<string, number> {
+  return detectBuiltinRules(text, enabledTypes);
 }

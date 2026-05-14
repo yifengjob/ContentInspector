@@ -92,6 +92,19 @@
                 {{ sortOrder === 'asc' ? '↑' : '↓' }}
               </span>
             </div>
+            <!-- 【需求变更】表达式列表头单独放置，支持排序 -->
+            <div
+                v-if="hasCustomExpressionColumn"
+                class="cell header-cell sortable center-header"
+                :class="{ 'sorted-asc': sortField === 'expressionMatched' && sortOrder === 'asc', 'sorted-desc': sortField === 'expressionMatched' && sortOrder === 'desc' }"
+                @click="sortBy('expressionMatched')"
+                title="点击排序"
+            >
+              表达式
+              <span v-if="sortField === 'expressionMatched'" class="sort-indicator">
+                {{ sortOrder === 'asc' ? '↑' : '↓' }}
+              </span>
+            </div>
             <div class="cell actions-col header-cell actions-header frozen-right">操作</div>
           </div>
         </div>
@@ -134,6 +147,13 @@
                   {{ (item.counts[type.id] || 0) > 0 ? Number(item.counts[type.id]).toLocaleString() : '-' }}
                 </div>
                 <div class="cell total-cell mono-font">{{ item.total.toLocaleString() }}</div>
+                <!-- 【需求变更】表达式列单独放置，显示图标 -->
+                <div v-if="hasCustomExpressionColumn" class="cell expression-column-center">
+                  <svg v-if="(item.expressionMatched || 0) > 0" class="check-icon-svg">
+                    <use href="#icon-check-fill"></use>
+                  </svg>
+                  <span v-else>-</span>
+                </div>
                 <div class="cell actions-col frozen-right">
                   <div class="actions-cell">
                     <button class="btn-action" @click="handlePreview(item)" title="预览">
@@ -173,11 +193,11 @@
 </template>
 
 <script setup lang="ts">
-import {ref, computed, onMounted, onUnmounted, watch, nextTick} from 'vue'
+import {computed, nextTick, onMounted, onUnmounted, ref, watch} from 'vue'
 import {useAppStore} from '@/stores/app'
 import {storeToRefs} from 'pinia'
-import {formatFileSize, formatTime, debounce, promisePool} from '@/utils/format'
-import {openFile, openFileLocation, deleteFile, getSensitiveRules, showMessage, askDialog} from '@/utils/electron-api'
+import {debounce, formatFileSize, formatTime, promisePool} from '@/utils/format'
+import {askDialog, deleteFile, getSensitiveRules, openFile, openFileLocation, showMessage} from '@/utils/electron-api'
 // 【虚拟滚动优化】导入 vue-virtual-scroller（支持动态行高）
 import {DynamicScroller, DynamicScrollerItem} from 'vue-virtual-scroller'
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
@@ -279,11 +299,22 @@ const sensitiveTypes = computed(() => {
   )
 })
 
+// 【新增】判断是否显示表达式列
+// 只要有 expressionMatched 字段就说明用户配置了表达式（即使值为 0）
+const hasCustomExpressionColumn = computed(() => {
+  return scanResults.value.some(item =>
+      item.expressionMatched !== undefined && item.expressionMatched !== null
+  )
+})
+
 // 【修复】动态计算 Grid 列模板 - 使用 1fr 自动填充
 const gridStyle = computed(() => {
   const countCols = sensitiveTypes.value.length
   // 【关键】所有列使用固定宽度，确保完全对齐
   const countColDefs = `${COLUMN_WIDTHS.count}em `.repeat(countCols)
+
+  // 【需求变更】如果有表达式列，添加其宽度
+  const expressionColDef = hasCustomExpressionColumn.value ? `${COLUMN_WIDTHS.count}em ` : ''
 
   return {
     gridTemplateColumns: `
@@ -291,7 +322,8 @@ const gridStyle = computed(() => {
       minmax(8em, 1fr)                            /* path - 自适应（最少8em，最多占据剩余空间） */
       ${COLUMN_WIDTHS.size}em                     /* size - 固定 */
       ${COLUMN_WIDTHS.time}em                     /* time - 固定 */
-      ${countColDefs}                             /* counts - 优化后（可显示敏感类型名称） */
+      ${countColDefs}                             /* counts - 敏感类型列 */
+      ${expressionColDef}                         /* expression - 表达式列（条件显示） */
       ${COLUMN_WIDTHS.total}em                    /* total - 固定（可显示11-12位，比counts多1-2位） */
       ${COLUMN_WIDTHS.actions}em                  /* actions - 固定（4个按钮足够） */
     `.trim()
@@ -327,16 +359,9 @@ const filteredResults = computed(() => {
         aVal = a.counts[typeId] || 0
         bVal = b.counts[typeId] || 0
       } else {
-        // 普通字段 - 将下划线命名转换为驼峰命名
-        const fieldMap: Record<string, string> = {
-          'file_path': 'filePath',
-          'file_size': 'fileSize',
-          'modified_time': 'modifiedTime',
-          'total': 'total'
-        }
-        const actualField = fieldMap[sortField.value] || sortField.value
-        aVal = a[actualField as keyof typeof a]
-        bVal = b[actualField as keyof typeof b]
+        // 普通字段（前后端统一使用驼峰命名）
+        aVal = a[sortField.value as keyof typeof a] ?? 0
+        bVal = b[sortField.value as keyof typeof b] ?? 0
       }
 
       if (typeof aVal === 'string') {
@@ -445,17 +470,26 @@ watch(sensitiveTypes, () => {
   nextTick(() => updatePathMaxWidth())
 })
 
+// 【需求变更】监听表达式列变化，更新 max-width
+watch(hasCustomExpressionColumn, () => {
+  nextTick(() => updatePathMaxWidth())
+})
+
 // 【优化】响应式计算固定列总宽度（基于 Grid 模板配置）
 const fixedColumnsTotalPx = computed(() => {
   const countCols = sensitiveTypes.value.length
   // 【优化】获取基础字体大小（使用辅助方法）
   const baseFontSize = getBaseFontSize()
 
+  // 【需求变更】如果有表达式列，添加其宽度
+  const expressionColWidth = hasCustomExpressionColumn.value ? COLUMN_WIDTHS.count * baseFontSize : 0
+
   return (
       COLUMN_WIDTHS.checkbox * baseFontSize +   // checkbox
       COLUMN_WIDTHS.size * baseFontSize +       // size
       COLUMN_WIDTHS.time * baseFontSize +       // time
       (COLUMN_WIDTHS.count * baseFontSize * countCols) +  // counts
+      expressionColWidth +                      // expression（条件显示）
       COLUMN_WIDTHS.total * baseFontSize +      // total
       COLUMN_WIDTHS.actions * baseFontSize      // actions
   )
@@ -828,7 +862,7 @@ const handleBatchDelete = async () => {
 }
 
 .search-input {
-  padding: 0.25em 0.625em; /* 4px 10px - 搜索框 */
+  padding: 0.55em 0.625em; /* 4px 10px - 搜索框 */
   border: var(--border-width) solid var(--border-color);
   border-radius: var(--radius-sm);
   font-size: 0.9em; /* 略小但可读 */
@@ -1040,6 +1074,18 @@ const handleBatchDelete = async () => {
 .highlight-count {
   color: var(--error-color);
   font-weight: 600;
+}
+
+/* 【需求变更】表达式列居中显示 */
+.expression-column-center {
+  text-align: center !important;
+}
+
+/* 【需求变更】表达式列的对勾图标样式 */
+.check-icon-svg {
+  width: 16px;
+  height: 16px;
+  color: var(--success-color);
 }
 
 .actions-cell {
