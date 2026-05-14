@@ -85,12 +85,12 @@
             <div
                 v-if="hasCustomExpressionColumn"
                 class="cell header-cell sortable center-header"
-                :class="{ 'sorted-asc': sortField === 'expression_matched' && sortOrder === 'asc', 'sorted-desc': sortField === 'expression_matched' && sortOrder === 'desc' }"
-                @click="sortBy('expression_matched')"
+                :class="{ 'sorted-asc': sortField === 'expressionMatched' && sortOrder === 'asc', 'sorted-desc': sortField === 'expressionMatched' && sortOrder === 'desc' }"
+                @click="sortBy('expressionMatched')"
                 title="点击排序"
             >
               表达式
-              <span v-if="sortField === 'expression_matched'" class="sort-indicator">
+              <span v-if="sortField === 'expressionMatched'" class="sort-indicator">
                 {{ sortOrder === 'asc' ? '↑' : '↓' }}
               </span>
             </div>
@@ -148,7 +148,7 @@
                 </div>
                 <!-- 【需求变更】表达式列单独放置，显示图标 -->
                 <div v-if="hasCustomExpressionColumn" class="cell expression-column-center">
-                  <svg v-if="(item.counts['custom_expression'] || 0) > 0" class="check-icon-svg">
+                  <svg v-if="(item.expressionMatched || 0) > 0" class="check-icon-svg">
                     <use href="#icon-check-fill"></use>
                   </svg>
                   <span v-else>-</span>
@@ -304,7 +304,7 @@ const sensitiveTypes = computed(() => {
 // 【新增】判断是否显示表达式列
 const hasCustomExpressionColumn = computed(() => {
   return scanResults.value.some(item => 
-    item.counts && item.counts['custom_expression'] !== undefined
+    item.expressionMatched !== undefined
   )
 })
 
@@ -365,20 +365,12 @@ const filteredResults = computed(() => {
           'file_path': 'filePath',
           'file_size': 'fileSize',
           'modified_time': 'modifiedTime',
-          'total': 'total',
-          'expression_matched': 'counts.custom_expression'  // 【需求变更】表达式列映射到 counts.custom_expression
+          'total': 'total'
+          // 【需求变更】expressionMatched 直接使用，无需映射（与后端保持一致）
         }
         const actualField = fieldMap[sortField.value] || sortField.value
-        
-        // 【需求变更】支持嵌套字段访问（如 counts.custom_expression）
-        if (actualField.includes('.')) {
-          const [parent, child] = actualField.split('.')
-          aVal = (a as any)[parent]?.[child] || 0
-          bVal = (b as any)[parent]?.[child] || 0
-        } else {
-          aVal = a[actualField as keyof typeof a]
-          bVal = b[actualField as keyof typeof b]
-        }
+        aVal = a[actualField as keyof typeof a]
+        bVal = b[actualField as keyof typeof b]
       }
 
       if (typeof aVal === 'string') {

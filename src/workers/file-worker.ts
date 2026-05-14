@@ -76,6 +76,7 @@ interface WorkerResult {
     modifiedTime?: string;
     counts?: Record<string, number>;
     total?: number;
+    expressionMatched?: number; // 【需求变更】自定义表达式匹配状态（0或1）
     unsupportedPreview?: boolean;
     error?: string;
 }
@@ -189,14 +190,16 @@ async function processTask(task: WorkerTask): Promise<void> {
                             totalChunks: stats.totalChunks
                         });
                     } else {
-                        // 返回累计的检测结果
+                        // 【需求变更】返回累计的检测结果，包含自定义表达式匹配状态
+                        const counts = processor.getAccumulatedCounts();
                         parentPort?.postMessage({
                             taskId,
                             filePath,
                             fileSize: stat.size,
                             modifiedTime: stat.mtime.toISOString(),
-                            counts: processor.getAccumulatedCounts(),
+                            counts: counts,
                             total: processor.getTotalCount(),
+                            expressionMatched: counts['custom_expression'] || 0, // 【需求变更】提取为独立字段
                             unsupportedPreview: false
                         } as WorkerResult);
                     }
