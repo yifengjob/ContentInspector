@@ -135,6 +135,7 @@
     "chrono-node": "^2.9.1",
     "events": "^3.3.0",
     "exceljs": "^4.4.0",
+    "expr-eval": "^2.0.2",
     "fflate": "^0.8.2",
     "iconv-lite": "^0.7.2",
     "pdfjs-dist": "^3.11.174",

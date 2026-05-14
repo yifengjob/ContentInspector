@@ -20,6 +20,9 @@ importers:
       exceljs:
         specifier: ^4.4.0
         version: 4.4.0
+      expr-eval:
+        specifier: ^2.0.2
+        version: 2.0.2
       fflate:
         specifier: ^0.8.2
         version: 0.8.2
@@ -678,6 +681,9 @@ packages:
   execa@2.1.0:
     resolution: {integrity: sha512-Y/URAVapfbYy2Xp/gb6A0E7iR8xeqOCXsuuaoMn7A5PzrXUK84E1gyiEfq0wQd/GHA6GsoHWwhNq8anb0mleIw==}
     engines: {node: ^8.12.0 || >=9.7.0}
+
+  expr-eval@2.0.2:
+    resolution: {integrity: sha512-4EMSHGOPSwAfBiibw3ndnP0AvjDWLsMvGOvWEZ2F96IGk0bIVdjQisOHxReSkE13mHcfbuCiXw+G4y0zv6N8Eg==}
 
   extract-zip@2.0.1:
     resolution: {integrity: sha512-GDhU9ntwuKyGXdZBUgTIe+vXnWj0fppUEtMDL0+idd5Sta8TGpHssn/eusA9mrPr9qNDym6SxAYZjNvCn/9RBg==}
@@ -2395,6 +2401,8 @@ snapshots:
       p-finally: 2.0.1
       signal-exit: 3.0.7
       strip-final-newline: 2.0.0
+
+  expr-eval@2.0.2: {}
 
   extract-zip@2.0.1:
     dependencies:
