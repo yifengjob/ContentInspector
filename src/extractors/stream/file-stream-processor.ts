@@ -14,6 +14,7 @@ import {
   BYTES_TO_MB
 } from '../../core/config/constants';
 import { getHighlights, evaluateCustomExpressionOnly } from '../../detection/sensitive-detector';
+import { mainLogger } from '../../logger/logger';
 import type { HighlightRange } from '../../types';
 
 /**
@@ -372,14 +373,23 @@ export class FileStreamProcessor {
     // 【性能优化】使用 evaluateCustomExpressionOnly，避免重复扫描内置规则
     if (customExpression && customExpression.trim() && this.chunkIndex === 0) {
       try {
+        // 【调试日志】记录表达式评估
+        mainLogger.debug('[流式处理] 评估自定义表达式: "{}"', customExpression);
+        mainLogger.debug('[流式处理] Chunk文本长度: {}, 前100字符: {}', chunkText.length, chunkText.substring(0, 100));
+        
         const isMatched = evaluateCustomExpressionOnly(chunkText, customExpression);
+        mainLogger.debug('[流式处理] 表达式评估结果: {}', isMatched ? '匹配' : '不匹配');
+        
         if (isMatched) {
           this.accumulatedCounts['custom_expression'] = 
             (this.accumulatedCounts['custom_expression'] || 0) + 1;
           this.totalCount++;
+          mainLogger.info('[流式处理] ✅ 自定义表达式匹配成功，计数+1');
+        } else {
+          mainLogger.debug('[流式处理] ❌ 自定义表达式未匹配');
         }
       } catch (error: any) {
-        // 静默失败，不影响其他检测
+        mainLogger.error('[流式处理] 自定义表达式评估失败: {}', error.message);
       }
     }
   }
