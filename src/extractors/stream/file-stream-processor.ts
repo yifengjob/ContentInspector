@@ -80,6 +80,10 @@ export class FileStreamProcessor {
   // 扫描模式：累加计数
   private accumulatedCounts: Record<string, number> = {};
   private totalCount: number = 0;
+  
+  // 【新增】自定义表达式：记录关键词出现状态
+  private keywordFoundFlags: Record<string, boolean> = {};
+  private hasEvaluatedExpression: boolean = false;
 
   constructor() {
     this.chunkSize = SLIDING_WINDOW_CHUNK_SIZE_MB * BYTES_TO_MB;
@@ -144,6 +148,9 @@ export class FileStreamProcessor {
         if (this.buffer.length > 0) {
           this.processBufferChunk(options);
         }
+        
+        // 【新增】在文件结束时评估自定义表达式
+        this.evaluateCustomExpressionAtEnd(options.customExpression);
 
         // 发送完成消息
         options.onComplete?.({
@@ -247,6 +254,9 @@ export class FileStreamProcessor {
       offset = splitPos;
     }
 
+    // 【新增】在文件结束时评估自定义表达式
+    this.evaluateCustomExpressionAtEnd(options.customExpression);
+    
     // 发送完成消息
     options.onComplete?.({
       totalChunks: this.chunkIndex,
@@ -368,29 +378,70 @@ export class FileStreamProcessor {
       this.totalCount++;
     }
     
-    // 2. 评估自定义表达式（仅在第一个 chunk 评估一次，避免重复）
-    // 【关键优化】复用同一个 chunkText，不额外读取文件
-    // 【性能优化】使用 evaluateCustomExpressionOnly，避免重复扫描内置规则
-    if (customExpression && customExpression.trim() && this.chunkIndex === 0) {
-      try {
-        // 【调试日志】记录表达式评估
-        mainLogger.debug('[流式处理] 评估自定义表达式: "{}"', customExpression);
-        mainLogger.debug('[流式处理] Chunk文本长度: {}, 前100字符: {}', chunkText.length, chunkText.substring(0, 100));
-        
-        const isMatched = evaluateCustomExpressionOnly(chunkText, customExpression);
-        mainLogger.debug('[流式处理] 表达式评估结果: {}', isMatched ? '匹配' : '不匹配');
-        
-        if (isMatched) {
-          this.accumulatedCounts['custom_expression'] = 
-            (this.accumulatedCounts['custom_expression'] || 0) + 1;
-          this.totalCount++;
-          mainLogger.info('[流式处理] ✅ 自定义表达式匹配成功，计数+1');
-        } else {
-          mainLogger.debug('[流式处理] ❌ 自定义表达式未匹配');
+    // 2. 【新方案】记录自定义表达式中关键词的出现状态
+    if (customExpression && customExpression.trim()) {
+      // 提取表达式中的所有关键词
+      const keywords = this.extractKeywordsFromExpression(customExpression);
+      
+      // 检查每个关键词是否在当前 chunk 中出现
+      for (const keyword of keywords) {
+        if (chunkText.includes(keyword)) {
+          this.keywordFoundFlags[keyword] = true;
+          mainLogger.debug('[流式处理] 发现关键词: "{}"', keyword);
         }
-      } catch (error: any) {
-        mainLogger.error('[流式处理] 自定义表达式评估失败: {}', error.message);
       }
+    }
+  }
+  
+  /**
+   * 【新增】从表达式中提取所有关键词
+   * 例如："信息安全 & 数据" -> ["信息安全", "数据"]
+   */
+  private extractKeywordsFromExpression(expression: string): string[] {
+    // 移除逻辑运算符和括号
+    const cleaned = expression
+      .replace(/[&|!()]/g, ' ')  // 替换运算符为空格
+      .trim();
+    
+    // 按空格分割，过滤空字符串
+    return cleaned.split(/\s+/).filter(k => k.length > 0);
+  }
+  
+  /**
+   * 【新增】在文件处理结束时评估自定义表达式
+   * 基于累积的关键词出现状态进行评估
+   */
+  private evaluateCustomExpressionAtEnd(customExpression?: string): void {
+    if (!customExpression || !customExpression.trim() || this.hasEvaluatedExpression) {
+      return;
+    }
+    
+    try {
+      // 构建上下文文本：包含所有出现过的关键词
+      const foundKeywords = Object.keys(this.keywordFoundFlags)
+        .filter(k => this.keywordFoundFlags[k])
+        .join(' ');
+      
+      mainLogger.info('[流式处理] 📊 文件处理完成，评估自定义表达式');
+      mainLogger.info('[流式处理] 表达式: "{}"', customExpression);
+      mainLogger.info('[流式处理] 发现的关键词: {}', foundKeywords || '(无)');
+      mainLogger.info('[流式处理] 关键词状态: {}', JSON.stringify(this.keywordFoundFlags));
+      
+      // 使用 evaluateCustomExpressionOnly 评估
+      const isMatched = evaluateCustomExpressionOnly(foundKeywords, customExpression);
+      
+      mainLogger.info('[流式处理] 评估结果: {}', isMatched ? '✅ 匹配' : '❌ 不匹配');
+      
+      if (isMatched) {
+        this.accumulatedCounts['custom_expression'] = 
+          (this.accumulatedCounts['custom_expression'] || 0) + 1;
+        this.totalCount++;
+        mainLogger.info('[流式处理] ✅ 自定义表达式匹配成功，计数+1');
+      }
+      
+      this.hasEvaluatedExpression = true;
+    } catch (error: any) {
+      mainLogger.error('[流式处理] 自定义表达式评估失败: {}', error.message);
     }
   }
 
@@ -420,6 +471,9 @@ export class FileStreamProcessor {
     this.globalLineOffset = 0;
     this.accumulatedCounts = {};
     this.totalCount = 0;
+    // 【新增】重置自定义表达式相关状态
+    this.keywordFoundFlags = {};
+    this.hasEvaluatedExpression = false;
   }
 
   /**
