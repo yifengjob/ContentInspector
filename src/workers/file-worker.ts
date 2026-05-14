@@ -199,7 +199,7 @@ async function processTask(task: WorkerTask): Promise<void> {
                             modifiedTime: stat.mtime.toISOString(),
                             counts: counts,
                             total: processor.getTotalCount(),
-                            expressionMatched: counts['expression_matched'] || 0, // 【需求变更】提取为独立字段
+                            expressionMatched: processor.getExpressionMatched(), // 【需求变更】直接获取独立属性
                             unsupportedPreview: false
                         } as WorkerResult);
                     }

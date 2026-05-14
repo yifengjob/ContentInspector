@@ -208,33 +208,20 @@ export function getSensitiveRules(): Array<[string, string]> {
 }
 
 /**
- * 检测敏感数据（包含自定义表达式）
+ * 检测敏感数据
+ * 
+ * 【注意】此函数仅处理内置规则，不处理自定义表达式
+ * 自定义表达式应在流式处理器 (FileStreamProcessor) 中处理
+ * 
  * @param text 待检测文本
  * @param enabledTypes 启用的内置规则类型
- * @param customExpression 自定义逻辑表达式（可选）
  * @returns 敏感类型计数
  */
 export function detectSensitiveData(
   text: string, 
-  enabledTypes: string[],
-  customExpression?: string
+  enabledTypes: string[]
 ): Record<string, number> {
-  const counts = detectBuiltinRules(text, enabledTypes);
-  
-  // 执行自定义表达式检测（如果提供且非空）
-  if (customExpression && customExpression.trim()) {
-    try {
-      const result = evaluateExpression(customExpression, text);
-      if (result.matched) {
-        counts['expression_matched'] = 1;
-      }
-    } catch (error: any) {
-      // 表达式评估失败，记录警告但不影响其他检测
-      mainLogger.warn('自定义表达式评估失败: {}', error.message);
-    }
-  }
-  
-  return counts;
+  return detectBuiltinRules(text, enabledTypes);
 }
 
 /**
@@ -329,24 +316,12 @@ export function evaluateCustomExpressionOnly(
 }
 
 // 【新增】扫描模式专用：只统计数量，不保存结果（防止 OOM）
+// 
+// 【注意】此函数仅处理内置规则，不处理自定义表达式
+// 自定义表达式应在流式处理器 (FileStreamProcessor) 中处理
 export function countSensitiveMatches(
   text: string, 
-  enabledTypes: string[],
-  customExpression?: string
+  enabledTypes: string[]
 ): Record<string, number> {
-  const counts = detectBuiltinRules(text, enabledTypes);
-  
-  // 执行自定义表达式检测（如果提供且非空）
-  if (customExpression && customExpression.trim()) {
-    try {
-      const result = evaluateExpression(customExpression, text);
-      if (result.matched) {
-        counts['expression_matched'] = 1;
-      }
-    } catch (error: any) {
-      mainLogger.warn('自定义表达式评估失败: {}', error.message);
-    }
-  }
-  
-  return counts;
+  return detectBuiltinRules(text, enabledTypes);
 }

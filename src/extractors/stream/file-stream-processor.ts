@@ -81,6 +81,9 @@ export class FileStreamProcessor {
   private accumulatedCounts: Record<string, number> = {};
   private totalCount: number = 0;
   
+  // 【新增】自定义表达式匹配结果（独立属性，不在counts中）
+  private expressionMatchedValue: number = 0;
+  
   // 【新增】自定义表达式：记录关键词出现状态
   private keywordFoundFlags: Record<string, boolean> = {};
   private hasEvaluatedExpression: boolean = false;
@@ -433,8 +436,8 @@ export class FileStreamProcessor {
       mainLogger.info('[流式处理] 评估结果: {}', isMatched ? '✅ 匹配' : '❌ 不匹配');
       
       if (isMatched) {
-        this.accumulatedCounts['expression_matched'] = 
-          (this.accumulatedCounts['expression_matched'] || 0) + 1;
+        // 【需求变更】直接设置独立属性，不再存入accumulatedCounts
+        this.expressionMatchedValue = 1;
         // 【需求变更】自定义表达式不计入敏感信息总数，只记录有无
         // this.totalCount++;  // ← 已注释，不再累加到总数
         mainLogger.info('[流式处理] ✅ 表达式匹配成功');
@@ -451,6 +454,14 @@ export class FileStreamProcessor {
    */
   getAccumulatedCounts(): Record<string, number> {
     return { ...this.accumulatedCounts };
+  }
+
+  /**
+   * 【新增】获取表达式匹配结果（独立属性）
+   * @returns 0=未匹配，1=已匹配
+   */
+  getExpressionMatched(): number {
+    return this.expressionMatchedValue;
   }
 
   /**
@@ -473,6 +484,7 @@ export class FileStreamProcessor {
     this.accumulatedCounts = {};
     this.totalCount = 0;
     // 【新增】重置自定义表达式相关状态
+    this.expressionMatchedValue = 0;  // 【新增】重置表达式匹配结果
     this.keywordFoundFlags = {};
     this.hasEvaluatedExpression = false;
   }
