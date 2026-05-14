@@ -13,7 +13,7 @@ import {
   SLIDING_WINDOW_OVERLAP_SIZE,
   BYTES_TO_MB
 } from '../../core/config/constants';
-import { getHighlights, countSensitiveMatches } from '../../detection/sensitive-detector';
+import { getHighlights, evaluateCustomExpressionOnly } from '../../detection/sensitive-detector';
 import type { HighlightRange } from '../../types';
 
 /**
@@ -334,13 +334,14 @@ export class FileStreamProcessor {
     enabledTypes: string[],
     customExpression?: string
   ): HighlightRange[] {
+    // 【优化】一次性获取内置规则的高亮
     const allHighlights = getHighlights(chunk, enabledTypes);
 
     // 过滤掉重叠区的重复结果
     const overlapLength = this.previousOverlap.length;
     const newHighlights = allHighlights.filter(h => h.start >= overlapLength);
 
-    // 【扫描模式】累加计数
+    // 【扫描模式】累加计数（在一次调用中完成）
     if (enabledTypes.length > 0 || (customExpression && customExpression.trim())) {
       this.accumulateCounts(newHighlights, chunk, enabledTypes, customExpression);
     }
@@ -350,6 +351,8 @@ export class FileStreamProcessor {
 
   /**
    * 累加敏感词计数 (扫描模式)
+   * 
+   * 【优化】在一次调用中完成内置规则和自定义表达式的计数，避免多次扫描文本
    */
   private accumulateCounts(
     highlights: HighlightRange[],
@@ -357,21 +360,23 @@ export class FileStreamProcessor {
     enabledTypes: string[],
     customExpression?: string
   ): void {
-    // 累加内置规则的计数
+    // 1. 累加内置规则的计数（基于已有的高亮结果，无需再次扫描）
     for (const highlight of highlights) {
       this.accumulatedCounts[highlight.typeId] = 
         (this.accumulatedCounts[highlight.typeId] || 0) + 1;
       this.totalCount++;
     }
     
-    // 评估自定义表达式（仅在第一块或最后一块评估一次，避免重复）
+    // 2. 评估自定义表达式（仅在第一个 chunk 评估一次，避免重复）
+    // 【关键优化】复用同一个 chunkText，不额外读取文件
+    // 【性能优化】使用 evaluateCustomExpressionOnly，避免重复扫描内置规则
     if (customExpression && customExpression.trim() && this.chunkIndex === 0) {
       try {
-        const counts = countSensitiveMatches(chunkText, enabledTypes, customExpression);
-        if (counts['custom_expression']) {
+        const isMatched = evaluateCustomExpressionOnly(chunkText, customExpression);
+        if (isMatched) {
           this.accumulatedCounts['custom_expression'] = 
-            (this.accumulatedCounts['custom_expression'] || 0) + counts['custom_expression'];
-          this.totalCount += counts['custom_expression'];
+            (this.accumulatedCounts['custom_expression'] || 0) + 1;
+          this.totalCount++;
         }
       } catch (error: any) {
         // 静默失败，不影响其他检测

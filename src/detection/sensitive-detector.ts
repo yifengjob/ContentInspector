@@ -291,6 +291,32 @@ export function getHighlights(text: string, enabledTypes: string[]): HighlightRa
   return highlights;
 }
 
+/**
+ * 仅评估自定义表达式（不扫描内置规则）
+ * 
+ * 【性能优化】用于流式处理场景，避免重复扫描文本
+ * 
+ * @param text 待检测文本
+ * @param customExpression 自定义逻辑表达式
+ * @returns 是否匹配
+ */
+export function evaluateCustomExpressionOnly(
+  text: string,
+  customExpression: string
+): boolean {
+  if (!customExpression || !customExpression.trim()) {
+    return false;
+  }
+  
+  try {
+    const result = evaluateExpression(customExpression, text);
+    return result.matched;
+  } catch (error: any) {
+    mainLogger.warn('自定义表达式评估失败: {}', error.message);
+    return false;
+  }
+}
+
 // 【新增】扫描模式专用：只统计数量，不保存结果（防止 OOM）
 export function countSensitiveMatches(
   text: string, 
