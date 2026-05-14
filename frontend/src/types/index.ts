@@ -57,6 +57,12 @@ export interface AppConfig {
   enableOfficeParsers: boolean
   deleteToTrash: boolean
   ignoreOtherDrivesSystemDirs: boolean // 是否忽略其他磁盘的系统目录（仅 Windows）
+  
+  /**
+   * 搜索表达式（支持逻辑运算符：&、|、!、()）
+   * @default '' - 空字符串表示不启用表达式搜索
+   */
+  searchExpression?: string
 }
 
 export interface SensitiveRule {
