@@ -57,14 +57,14 @@ parser.functions = {
  * 
  * 转换规则：
  * - 关键词 "密码" → contains(text, '密码')
- * - 运算符 "&" → "&&"
- * - 运算符 "|" → "||"
- * - 运算符 "!" → "!"
+ * - 运算符 "&" → "and"
+ * - 运算符 "|" → "or"
+ * - 运算符 "!" → "not"
  * - 括号保持不变
  * 
  * 示例：
  * 输入: "密码 & (身份证 | 银行卡)"
- * 输出: "contains(text, '密码') && (contains(text, '身份证') || contains(text, '银行卡'))"
+ * 输出: "contains(text, '密码') and (contains(text, '身份证') or contains(text, '银行卡'))"
  * 
  * @param expression 用户输入的表达式
  * @returns 转换后的表达式
@@ -79,11 +79,13 @@ function transformExpression(expression: string): string {
       // 关键词转换为 contains 函数调用
       return `contains(text, '${escapeString(token)}')`;
     } else if (token === '&') {
-      return '&&';
+      return 'and';
     } else if (token === '|') {
-      return '||';
+      return 'or';
+    } else if (token === '!') {
+      return 'not';
     } else {
-      // 括号和 ! 保持不变
+      // 括号保持不变
       return token;
     }
   });
