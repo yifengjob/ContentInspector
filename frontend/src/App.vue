@@ -117,6 +117,45 @@
             <use href="#icon-dev-tools"/>
           </svg>
         </button>
+        
+        <!-- 【新增】更多按钮（小屏幕显示） -->
+        <div class="more-menu-container">
+          <button
+              class="btn btn-icon-only more-btn"
+              @click="showMoreMenu = !showMoreMenu"
+              title="更多选项"
+          >
+            <svg class="btn-icon">
+              <use href="#icon-more"/>
+            </svg>
+          </button>
+          
+          <!-- 下拉菜单 -->
+          <div v-if="showMoreMenu" class="more-menu-dropdown">
+            <button
+                class="menu-item"
+                @click="handleExportReport; showMoreMenu = false"
+                :disabled="scanResults.length === 0"
+            >
+              <svg class="menu-icon"><use href="#icon-export"/></svg>
+              <span>导出报告</span>
+            </button>
+            <button
+                class="menu-item"
+                @click="showSettings = true; showMoreMenu = false"
+            >
+              <svg class="menu-icon"><use href="#icon-setting"/></svg>
+              <span>设置</span>
+            </button>
+            <button
+                class="menu-item"
+                @click="showLogs = true; showMoreMenu = false"
+            >
+              <svg class="menu-icon"><use href="#icon-log"/></svg>
+              <span>查看日志</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -280,6 +319,9 @@ const isCancelling = ref(false) // 【新增】取消扫描状态
 // 【优化】判断是否为开发环境
 const isDevMode = computed(() => process.env.NODE_ENV === 'development')
 
+// 【新增】更多菜单显示状态
+const showMoreMenu = ref(false)
+
 // 【新增】自定义敏感词逻辑表达式相关
 const customExpression = ref('')
 const expressionValidationError = ref('')
@@ -308,6 +350,14 @@ onMounted(async () => {
   watchSystemTheme(() => {
     if (currentTheme.value === 'system') {
       applyTheme('system')
+    }
+  })
+  
+  // 【新增】点击外部关闭更多菜单
+  document.addEventListener('click', (e) => {
+    const moreMenuContainer = document.querySelector('.more-menu-container')
+    if (moreMenuContainer && !moreMenuContainer.contains(e.target as Node)) {
+      showMoreMenu.value = false
     }
   })
 
@@ -787,6 +837,16 @@ const getThemeTooltip = () => {
   .scan-actions .btn span {
     display: none;
   }
+  
+  /* 【新增】隐藏左侧辅助功能按钮 */
+  .toolbar-left {
+    display: none;
+  }
+  
+  /* 【新增】显示更多按钮 */
+  .more-btn {
+    display: flex !important;
+  }
 }
 
 @media (max-width: 768px) {
@@ -796,9 +856,9 @@ const getThemeTooltip = () => {
   }
   
   /* 调整顺序：输入框在上，其他在下 */
-  .toolbar-left,
   .toolbar-right {
     order: 2;
+    width: auto;
   }
   
   .toolbar-center {
@@ -806,6 +866,63 @@ const getThemeTooltip = () => {
     width: 100%;
     min-width: 100%;
   }
+}
+
+/* 【新增】更多按钮默认隐藏（大屏幕） */
+.more-btn {
+  display: none;
+}
+
+/* 【新增】更多菜单容器 */
+.more-menu-container {
+  position: relative;
+}
+
+/* 【新增】下拉菜单 */
+.more-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: var(--spacing-xs);
+  background-color: var(--bg-color);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 160px;
+  z-index: 1000;
+  padding: var(--spacing-xs);
+}
+
+/* 【新增】菜单项 */
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: none;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 0.9em;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.2s ease;
+  text-align: left;
+}
+
+.menu-item:hover:not(:disabled) {
+  background-color: var(--hover-bg);
+}
+
+.menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.menu-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .main-content {
