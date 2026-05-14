@@ -422,7 +422,7 @@ export class FileStreamProcessor {
         .filter(k => this.keywordFoundFlags[k])
         .join(' ');
       
-      mainLogger.info('[流式处理] 📊 文件处理完成，评估自定义表达式');
+      mainLogger.info('[流式处理] 📊 文件处理完成，评估表达式');
       mainLogger.info('[流式处理] 表达式: "{}"', customExpression);
       mainLogger.info('[流式处理] 发现的关键词: {}', foundKeywords || '(无)');
       mainLogger.info('[流式处理] 关键词状态: {}', JSON.stringify(this.keywordFoundFlags));
@@ -437,12 +437,12 @@ export class FileStreamProcessor {
           (this.accumulatedCounts['custom_expression'] || 0) + 1;
         // 【需求变更】自定义表达式不计入敏感信息总数，只记录有无
         // this.totalCount++;  // ← 已注释，不再累加到总数
-        mainLogger.info('[流式处理] ✅ 自定义表达式匹配成功');
+        mainLogger.info('[流式处理] ✅ 表达式匹配成功');
       }
       
       this.hasEvaluatedExpression = true;
     } catch (error: any) {
-      mainLogger.error('[流式处理] 自定义表达式评估失败: {}', error.message);
+      mainLogger.error('[流式处理] 表达式评估失败: {}', error.message);
     }
   }
 

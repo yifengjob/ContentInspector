@@ -292,10 +292,10 @@ onMounted(async () => {
   }
 })
 
-// 只显示启用且存在于规则中的敏感类型（排除 custom_expression）
+// 只显示启用且存在于规则中的敏感类型
 const sensitiveTypes = computed(() => {
   return allSensitiveTypes.value.filter(type =>
-      config.value.enabledSensitiveTypes.includes(type.id) && type.id !== 'custom_expression'
+      config.value.enabledSensitiveTypes.includes(type.id)
   )
 })
 

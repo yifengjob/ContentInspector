@@ -200,21 +200,9 @@ const sensitiveRules: SensitiveRule[] = [
 export function getSensitiveRules(): Array<[string, string]> {
   const rules: Array<[string, string]> = sensitiveRules.map(rule => [rule.id, rule.name]);
   
-  // 【新增】检查是否有自定义表达式配置
-  try {
-    // 注意：这里使用同步方式读取配置，因为该函数被同步调用
-    // 在 Electron 主进程中，config-manager 支持同步读取
-    const { getConfigSync } = require('../core/config');
-    const config = getConfigSync();
-    
-    if (config?.customSensitiveExpression && config.customSensitiveExpression.trim()) {
-      rules.push(['custom_expression', '自定义表达式']);
-      mainLogger.debug('[敏感规则] 已添加自定义表达式到规则列表');
-    }
-  } catch (error: any) {
-    // 如果读取配置失败，忽略错误，只返回内置规则
-    mainLogger.warn('[敏感规则] 读取配置失败，仅返回内置规则: {}', error.message);
-  }
+  // 【需求变更】不再将 custom_expression 添加到规则列表
+  // 原因：表达式列是独立显示的，不属于敏感类型循环
+  // 前端通过 expressionMatched 字段判断是否显示该列
   
   return rules;
 }
