@@ -131,7 +131,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // 【新增】打开开发者工具
     openDevTools: () =>
-        ipcRenderer.invoke('open-dev-tools')
+        ipcRenderer.invoke('open-dev-tools'),
+
+    // ==================== 自定义敏感词逻辑表达式相关 ====================
+
+    // 【新增】设置自定义表达式
+    setCustomExpression: (expression: string) =>
+        ipcRenderer.invoke('set-custom-expression', expression),
+
+    // 【新增】获取当前自定义表达式
+    getCustomExpression: () =>
+        ipcRenderer.invoke('get-custom-expression'),
+
+    // 【新增】验证表达式语法（用于前端实时校验）
+    validateExpression: (expression: string) =>
+        ipcRenderer.invoke('validate-expression', expression)
 });
 
 // 声明全局类型
@@ -169,6 +183,11 @@ declare global {
             }) => Promise<{ response: number }>;
             clearCache: () => Promise<{ success: boolean; cleanedSize?: number }>;
             openDevTools: () => Promise<void>;
+            
+            // 自定义表达式相关
+            setCustomExpression: (expression: string) => Promise<{ success: boolean; error?: string }>;
+            getCustomExpression: () => Promise<{ success: boolean; expression?: string; error?: string }>;
+            validateExpression: (expression: string) => Promise<{ valid: boolean; error?: string; position?: number }>;
         };
     }
 }
