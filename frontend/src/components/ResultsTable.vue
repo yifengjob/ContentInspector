@@ -81,6 +81,17 @@
                 {{ sortOrder === 'asc' ? '↑' : '↓' }}
               </span>
             </div>
+            <div
+                class="cell header-cell sortable number-header"
+                :class="{ 'sorted-asc': sortField === 'total' && sortOrder === 'asc', 'sorted-desc': sortField === 'total' && sortOrder === 'desc' }"
+                @click="sortBy('total')"
+                title="点击排序"
+            >
+              总计
+              <span v-if="sortField === 'total'" class="sort-indicator">
+                {{ sortOrder === 'asc' ? '↑' : '↓' }}
+              </span>
+            </div>
             <!-- 【需求变更】表达式列表头单独放置，支持排序 -->
             <div
                 v-if="hasCustomExpressionColumn"
@@ -91,17 +102,6 @@
             >
               表达式
               <span v-if="sortField === 'expressionMatched'" class="sort-indicator">
-                {{ sortOrder === 'asc' ? '↑' : '↓' }}
-              </span>
-            </div>
-            <div
-                class="cell header-cell sortable number-header"
-                :class="{ 'sorted-asc': sortField === 'total' && sortOrder === 'asc', 'sorted-desc': sortField === 'total' && sortOrder === 'desc' }"
-                @click="sortBy('total')"
-                title="点击排序"
-            >
-              总计
-              <span v-if="sortField === 'total'" class="sort-indicator">
                 {{ sortOrder === 'asc' ? '↑' : '↓' }}
               </span>
             </div>
@@ -146,6 +146,7 @@
                      :class="{ 'highlight-count': (item.counts[type.id] || 0) > 0 }">
                   {{ (item.counts[type.id] || 0) > 0 ? Number(item.counts[type.id]).toLocaleString() : '-' }}
                 </div>
+                <div class="cell total-cell mono-font">{{ item.total.toLocaleString() }}</div>
                 <!-- 【需求变更】表达式列单独放置，显示图标 -->
                 <div v-if="hasCustomExpressionColumn" class="cell expression-column-center">
                   <svg v-if="(item.expressionMatched || 0) > 0" class="check-icon-svg">
@@ -153,7 +154,6 @@
                   </svg>
                   <span v-else>-</span>
                 </div>
-                <div class="cell total-cell mono-font">{{ item.total.toLocaleString() }}</div>
                 <div class="cell actions-col frozen-right">
                   <div class="actions-cell">
                     <button class="btn-action" @click="handlePreview(item)" title="预览">
@@ -300,9 +300,10 @@ const sensitiveTypes = computed(() => {
 })
 
 // 【新增】判断是否显示表达式列
+// 只要有 expressionMatched 字段就说明用户配置了表达式（即使值为 0）
 const hasCustomExpressionColumn = computed(() => {
-  return scanResults.value.some(item => 
-    item.expressionMatched !== undefined
+  return scanResults.value.some(item =>
+      item.expressionMatched !== undefined && item.expressionMatched !== null
   )
 })
 
@@ -311,7 +312,7 @@ const gridStyle = computed(() => {
   const countCols = sensitiveTypes.value.length
   // 【关键】所有列使用固定宽度，确保完全对齐
   const countColDefs = `${COLUMN_WIDTHS.count}em `.repeat(countCols)
-  
+
   // 【需求变更】如果有表达式列，添加其宽度
   const expressionColDef = hasCustomExpressionColumn.value ? `${COLUMN_WIDTHS.count}em ` : ''
 
@@ -359,8 +360,8 @@ const filteredResults = computed(() => {
         bVal = b.counts[typeId] || 0
       } else {
         // 普通字段（前后端统一使用驼峰命名）
-        aVal = a[sortField.value as keyof typeof a]
-        bVal = b[sortField.value as keyof typeof b]
+        aVal = a[sortField.value as keyof typeof a] ?? 0
+        bVal = b[sortField.value as keyof typeof b] ?? 0
       }
 
       if (typeof aVal === 'string') {
@@ -469,17 +470,26 @@ watch(sensitiveTypes, () => {
   nextTick(() => updatePathMaxWidth())
 })
 
+// 【需求变更】监听表达式列变化，更新 max-width
+watch(hasCustomExpressionColumn, () => {
+  nextTick(() => updatePathMaxWidth())
+})
+
 // 【优化】响应式计算固定列总宽度（基于 Grid 模板配置）
 const fixedColumnsTotalPx = computed(() => {
   const countCols = sensitiveTypes.value.length
   // 【优化】获取基础字体大小（使用辅助方法）
   const baseFontSize = getBaseFontSize()
 
+  // 【需求变更】如果有表达式列，添加其宽度
+  const expressionColWidth = hasCustomExpressionColumn.value ? COLUMN_WIDTHS.count * baseFontSize : 0
+
   return (
       COLUMN_WIDTHS.checkbox * baseFontSize +   // checkbox
       COLUMN_WIDTHS.size * baseFontSize +       // size
       COLUMN_WIDTHS.time * baseFontSize +       // time
       (COLUMN_WIDTHS.count * baseFontSize * countCols) +  // counts
+      expressionColWidth +                      // expression（条件显示）
       COLUMN_WIDTHS.total * baseFontSize +      // total
       COLUMN_WIDTHS.actions * baseFontSize      // actions
   )
@@ -852,7 +862,7 @@ const handleBatchDelete = async () => {
 }
 
 .search-input {
-  padding: 0.25em 0.625em; /* 4px 10px - 搜索框 */
+  padding: 0.55em 0.625em; /* 4px 10px - 搜索框 */
   border: var(--border-width) solid var(--border-color);
   border-radius: var(--radius-sm);
   font-size: 0.9em; /* 略小但可读 */

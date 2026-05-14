@@ -1,6 +1,6 @@
-import { HighlightRange } from '../types';
-import { evaluateExpression } from '../utils/expression-parser';
-import { mainLogger } from '../logger/logger';
+import {HighlightRange} from '../types';
+import {evaluateExpression} from '../utils/expression-parser';
+import {mainLogger} from '../logger/logger';
 
 interface SensitiveRule {
   id: string;
@@ -198,13 +198,11 @@ const sensitiveRules: SensitiveRule[] = [
  * 【新增】如果配置中存在自定义表达式，会添加到列表中
  */
 export function getSensitiveRules(): Array<[string, string]> {
-  const rules: Array<[string, string]> = sensitiveRules.map(rule => [rule.id, rule.name]);
-  
   // 【需求变更】不再将 custom_expression 添加到规则列表
   // 原因：表达式列是独立显示的，不属于敏感类型循环
   // 前端通过 expressionMatched 字段判断是否显示该列
   
-  return rules;
+  return sensitiveRules.map(rule => [rule.id, rule.name]);
 }
 
 /**

@@ -242,6 +242,15 @@ export function validateExpression(expression: string): ExpressionValidationResu
   }
   
   try {
+    // 【新增】先进行词法分析和基本验证
+    const tokens = tokenize(expression);
+    
+    // 验证 token 序列的合法性
+    const basicValidation = validateTokens(tokens);
+    if (!basicValidation.valid) {
+      return basicValidation;
+    }
+    
     // 尝试转换表达式
     const transformed = getTransformedExpression(expression);
     
@@ -260,6 +269,95 @@ export function validateExpression(expression: string): ExpressionValidationResu
       position: extractErrorPosition(error.message)
     };
   }
+}
+
+/**
+ * 【新增】验证 token 序列的基本合法性
+ * 检查：
+ * 1. 运算符是否有操作数
+ * 2. 括号是否匹配
+ * 3. 是否有连续的运算符
+ * 
+ * @param tokens token 数组
+ * @returns 验证结果
+ */
+function validateTokens(tokens: string[]): ExpressionValidationResult {
+  if (tokens.length === 0) {
+    return { valid: true };
+  }
+  
+  // 检查第一个 token 不能是二元运算符
+  if (['&', '|'].includes(tokens[0])) {
+    return {
+      valid: false,
+      error: `语法错误: 表达式不能以运算符 '${tokens[0]}' 开头`
+    };
+  }
+  
+  // 检查最后一个 token 不能是运算符或左括号
+  const lastToken = tokens[tokens.length - 1];
+  if (['!', '&', '|', '('].includes(lastToken)) {
+    return {
+      valid: false,
+      error: `语法错误: 表达式不能以 '${lastToken}' 结尾，缺少操作数`
+    };
+  }
+  
+  // 检查连续的运算符
+  for (let i = 0; i < tokens.length - 1; i++) {
+    const current = tokens[i];
+    const next = tokens[i + 1];
+    
+    // ! 后面必须是关键词或左括号
+    if (current === '!' && (next === '&' || next === '|' || next === ')')) {
+      return {
+        valid: false,
+        error: `语法错误: '!' 后面缺少操作数`
+      };
+    }
+    
+    // & 和 | 后面必须是关键词、! 或左括号
+    if ((current === '&' || current === '|') && (next === '&' || next === '|' || next === ')')) {
+      return {
+        valid: false,
+        error: `语法错误: '${current}' 后面缺少操作数`
+      };
+    }
+    
+    // 关键词或右括号后面不能直接跟关键词或左括号（缺少运算符）
+    if (!['(', ')', '!', '&', '|'].includes(current) && 
+        ![')', '!', '&', '|'].includes(next)) {
+      return {
+        valid: false,
+        error: `语法错误: '${current}' 和 '${next}' 之间缺少运算符`
+      };
+    }
+  }
+  
+  // 检查括号匹配
+  let bracketCount = 0;
+  for (const token of tokens) {
+    if (token === '(') {
+      bracketCount++;
+    } else if (token === ')') {
+      bracketCount--;
+      if (bracketCount < 0) {
+        return {
+          valid: false,
+          error: "语法错误: 右括号 ')' 多余"
+        };
+      }
+    }
+  }
+  
+  if (bracketCount > 0) {
+    return {
+      valid: false,
+      error: "语法错误: 左括号 '(' 未闭合"
+    };
+  }
+  
+  return { valid: true };
 }
 
 /**

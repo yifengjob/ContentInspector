@@ -357,7 +357,7 @@ export class FileStreamProcessor {
 
     // 【扫描模式】累加计数（在一次调用中完成）
     if (enabledTypes.length > 0 || (customExpression && customExpression.trim())) {
-      this.accumulateCounts(newHighlights, chunk, enabledTypes, customExpression);
+      this.accumulateCounts(newHighlights, chunk, customExpression);
     }
 
     return newHighlights;
@@ -371,7 +371,6 @@ export class FileStreamProcessor {
   private accumulateCounts(
     highlights: HighlightRange[],
     chunkText: string,
-    enabledTypes: string[],
     customExpression?: string
   ): void {
     // 1. 累加内置规则的计数（基于已有的高亮结果，无需再次扫描）
@@ -398,7 +397,13 @@ export class FileStreamProcessor {
   
   /**
    * 【新增】从表达式中提取所有关键词
-   * 例如："信息安全 & 数据" -> ["信息安全", "数据"]
+   * 
+   * 【注意】此函数仅提取关键词文本，不保留逻辑运算符语义
+   * 例如："密码 & !身份证" → ["密码", "身份证"]
+   * 用途：仅用于记录关键词是否在chunk中出现，不用于表达式评估
+   * 
+   * @param expression 自定义表达式
+   * @returns 关键词数组
    */
   private extractKeywordsFromExpression(expression: string): string[] {
     // 移除逻辑运算符和括号
@@ -425,10 +430,10 @@ export class FileStreamProcessor {
         .filter(k => this.keywordFoundFlags[k])
         .join(' ');
       
-      mainLogger.info('[流式处理] 📊 文件处理完成，评估表达式');
-      mainLogger.info('[流式处理] 表达式: "{}"', customExpression);
-      mainLogger.info('[流式处理] 发现的关键词: {}', foundKeywords || '(无)');
-      mainLogger.info('[流式处理] 关键词状态: {}', JSON.stringify(this.keywordFoundFlags));
+      mainLogger.debug('[流式处理] 📊 文件处理完成，评估表达式');
+      mainLogger.debug('[流式处理] 表达式: "{}"', customExpression);
+      mainLogger.debug('[流式处理] 发现的关键词: {}', foundKeywords || '(无)');
+      mainLogger.debug('[流式处理] 关键词状态: {}', JSON.stringify(this.keywordFoundFlags));
       
       // 使用 evaluateCustomExpressionOnly 评估
       const isMatched = evaluateCustomExpressionOnly(foundKeywords, customExpression);

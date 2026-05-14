@@ -192,16 +192,24 @@ async function processTask(task: WorkerTask): Promise<void> {
                     } else {
                         // 【需求变更】返回累计的检测结果，包含自定义表达式匹配状态
                         const counts = processor.getAccumulatedCounts();
-                        parentPort?.postMessage({
+                        
+                        // 【优化】只有当用户配置了自定义表达式时，才返回 expressionMatched 字段
+                        const result: WorkerResult = {
                             taskId,
                             filePath,
                             fileSize: stat.size,
                             modifiedTime: stat.mtime.toISOString(),
                             counts: counts,
                             total: processor.getTotalCount(),
-                            expressionMatched: processor.getExpressionMatched(), // 【需求变更】直接获取独立属性
                             unsupportedPreview: false
-                        } as WorkerResult);
+                        };
+                        
+                        // 如果传入了自定义表达式，添加 expressionMatched 字段
+                        if (customExpression && customExpression.trim()) {
+                            result.expressionMatched = processor.getExpressionMatched();
+                        }
+                        
+                        parentPort?.postMessage(result);
                     }
                 },
 
