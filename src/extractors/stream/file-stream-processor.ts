@@ -389,7 +389,6 @@ export class FileStreamProcessor {
       for (const keyword of keywords) {
         if (chunkText.includes(keyword)) {
           this.keywordFoundFlags[keyword] = true;
-          mainLogger.debug('[流式处理] 发现关键词: "{}"', keyword);
         }
       }
     }
@@ -430,22 +429,14 @@ export class FileStreamProcessor {
         .filter(k => this.keywordFoundFlags[k])
         .join(' ');
       
-      mainLogger.debug('[流式处理] 📊 文件处理完成，评估表达式');
-      mainLogger.debug('[流式处理] 表达式: "{}"', searchExpression);
-      mainLogger.debug('[流式处理] 发现的关键词: {}', foundKeywords || '(无)');
-      mainLogger.debug('[流式处理] 关键词状态: {}', JSON.stringify(this.keywordFoundFlags));
-      
       // 使用 evaluateSearchExpressionOnly 评估
       const isMatched = evaluateSearchExpressionOnly(foundKeywords, searchExpression);
-      
-      mainLogger.info('[流式处理] 评估结果: {}', isMatched ? '✅ 匹配' : '❌ 不匹配');
       
       if (isMatched) {
         // 【需求变更】直接设置独立属性，不再存入accumulatedCounts
         this.expressionMatchedValue = 1;
         // 【需求变更】自定义表达式不计入敏感信息总数，只记录有无
         // this.totalCount++;  // ← 已注释，不再累加到总数
-        mainLogger.info('[流式处理] ✅ 表达式匹配成功');
       }
       
       this.hasEvaluatedExpression = true;
