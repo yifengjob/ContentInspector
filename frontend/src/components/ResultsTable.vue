@@ -81,6 +81,13 @@
                 {{ sortOrder === 'asc' ? '↑' : '↓' }}
               </span>
             </div>
+            <!-- 【需求变更】表达式列表头单独放置 -->
+            <div
+                v-if="hasCustomExpressionColumn"
+                class="cell header-cell center-header"
+            >
+              表达式
+            </div>
             <div
                 class="cell header-cell sortable number-header"
                 :class="{ 'sorted-asc': sortField === 'total' && sortOrder === 'asc', 'sorted-desc': sortField === 'total' && sortOrder === 'desc' }"
@@ -130,20 +137,15 @@
                 <div class="cell size-cell mono-font">{{ formatFileSize(item.fileSize) }}</div>
                 <div class="cell mono-font time-cell">{{ formatTime(item.modifiedTime) }}</div>
                 <div v-for="type in sensitiveTypes" :key="type.id" class="cell number-cell mono-font"
-                     :class="{ 
-                       'highlight-count': (item.counts[type.id] || 0) > 0,
-                       'expression-column-center': type.id === 'custom_expression'
-                     }">
-                  <!-- 【需求变更】自定义表达式列显示图标，其他列显示数字 -->
-                  <template v-if="type.id === 'custom_expression'">
-                    <svg v-if="(item.counts[type.id] || 0) > 0" class="check-icon-svg">
-                      <use href="#icon-check-fill"></use>
-                    </svg>
-                    <span v-else>-</span>
-                  </template>
-                  <template v-else>
-                    {{ (item.counts[type.id] || 0) > 0 ? Number(item.counts[type.id]).toLocaleString() : '-' }}
-                  </template>
+                     :class="{ 'highlight-count': (item.counts[type.id] || 0) > 0 }">
+                  {{ (item.counts[type.id] || 0) > 0 ? Number(item.counts[type.id]).toLocaleString() : '-' }}
+                </div>
+                <!-- 【需求变更】表达式列单独放置，显示图标 -->
+                <div v-if="hasCustomExpressionColumn" class="cell expression-column-center">
+                  <svg v-if="(item.counts['custom_expression'] || 0) > 0" class="check-icon-svg">
+                    <use href="#icon-check-fill"></use>
+                  </svg>
+                  <span v-else>-</span>
                 </div>
                 <div class="cell total-cell mono-font">{{ item.total.toLocaleString() }}</div>
                 <div class="cell actions-col frozen-right">
@@ -284,27 +286,20 @@ onMounted(async () => {
   }
 })
 
-// 只显示启用且存在于规则中的敏感类型
+// 只显示启用且存在于规则中的敏感类型（排除 custom_expression）
 const sensitiveTypes = computed(() => {
   const enabledTypes = allSensitiveTypes.value.filter(type =>
-      config.value.enabledSensitiveTypes.includes(type.id)
+      config.value.enabledSensitiveTypes.includes(type.id) && type.id !== 'custom_expression'
   )
-  
-  // 【新增】如果扫描结果中有 custom_expression 数据，强制显示该列
-  const hasCustomExpressionData = scanResults.value.some(item => 
-    item.counts && item.counts['custom_expression'] !== undefined
-  )
-  
-  if (hasCustomExpressionData) {
-    // 检查是否已经存在 custom_expression
-    const hasCustomType = enabledTypes.some(t => t.id === 'custom_expression')
-    if (!hasCustomType) {
-      // 【需求变更】添加自定义表达式类型，列名为"表达式"
-      enabledTypes.push({ id: 'custom_expression', name: '表达式' })
-    }
-  }
   
   return enabledTypes
+})
+
+// 【新增】判断是否显示表达式列
+const hasCustomExpressionColumn = computed(() => {
+  return scanResults.value.some(item => 
+    item.counts && item.counts['custom_expression'] !== undefined
+  )
 })
 
 // 【修复】动态计算 Grid 列模板 - 使用 1fr 自动填充
@@ -312,6 +307,9 @@ const gridStyle = computed(() => {
   const countCols = sensitiveTypes.value.length
   // 【关键】所有列使用固定宽度，确保完全对齐
   const countColDefs = `${COLUMN_WIDTHS.count}em `.repeat(countCols)
+  
+  // 【需求变更】如果有表达式列，添加其宽度
+  const expressionColDef = hasCustomExpressionColumn.value ? `${COLUMN_WIDTHS.count}em ` : ''
 
   return {
     gridTemplateColumns: `
@@ -319,7 +317,8 @@ const gridStyle = computed(() => {
       minmax(8em, 1fr)                            /* path - 自适应（最少8em，最多占据剩余空间） */
       ${COLUMN_WIDTHS.size}em                     /* size - 固定 */
       ${COLUMN_WIDTHS.time}em                     /* time - 固定 */
-      ${countColDefs}                             /* counts - 优化后（可显示敏感类型名称） */
+      ${countColDefs}                             /* counts - 敏感类型列 */
+      ${expressionColDef}                         /* expression - 表达式列（条件显示） */
       ${COLUMN_WIDTHS.total}em                    /* total - 固定（可显示11-12位，比counts多1-2位） */
       ${COLUMN_WIDTHS.actions}em                  /* actions - 固定（4个按钮足够） */
     `.trim()
@@ -1070,15 +1069,12 @@ const handleBatchDelete = async () => {
   font-weight: 600;
 }
 
-/* 【需求变更】自定义表达式列居中显示 */
+/* 【需求变更】表达式列居中显示 */
 .expression-column-center {
   text-align: center !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-/* 【需求变更】自定义表达式列的对勾图标样式 */
+/* 【需求变更】表达式列的对勾图标样式 */
 .check-icon-svg {
   width: 16px;
   height: 16px;
