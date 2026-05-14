@@ -85,12 +85,12 @@
             <div
                 v-if="hasCustomExpressionColumn"
                 class="cell header-cell sortable center-header"
-                :class="{ 'sorted-asc': sortField === 'counts.custom_expression' && sortOrder === 'asc', 'sorted-desc': sortField === 'counts.custom_expression' && sortOrder === 'desc' }"
-                @click="sortBy('counts.custom_expression')"
+                :class="{ 'sorted-asc': sortField === 'expression_matched' && sortOrder === 'asc', 'sorted-desc': sortField === 'expression_matched' && sortOrder === 'desc' }"
+                @click="sortBy('expression_matched')"
                 title="点击排序"
             >
               表达式
-              <span v-if="sortField === 'counts.custom_expression'" class="sort-indicator">
+              <span v-if="sortField === 'expression_matched'" class="sort-indicator">
                 {{ sortOrder === 'asc' ? '↑' : '↓' }}
               </span>
             </div>
@@ -359,6 +359,10 @@ const filteredResults = computed(() => {
         const typeId = sortField.value.replace('counts.', '')
         aVal = a.counts[typeId] || 0
         bVal = b.counts[typeId] || 0
+      } else if (sortField.value === 'expression_matched') {
+        // 【需求变更】表达式列排序：使用 counts.custom_expression
+        aVal = a.counts['custom_expression'] || 0
+        bVal = b.counts['custom_expression'] || 0
       } else {
         // 普通字段 - 将下划线命名转换为驼峰命名
         const fieldMap: Record<string, string> = {
