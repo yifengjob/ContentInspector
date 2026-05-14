@@ -17,6 +17,7 @@ import {getDirectoryTree} from '../../services/directory-tree';
 import {deleteFile, openFile, openFileLocation} from '../../services/file-operations';
 import {exportReport} from '../../services/report-exporter';
 import {getSensitiveRules} from '../../detection/sensitive-detector';
+import {validateExpression} from '../../utils/expression-parser';
 import {loadConfig, saveConfig, calculateRecommendedConcurrency} from '../config/manager';
 import {checkEnvironment} from '../infra';
 import {LOG_RETENTION_DAYS, MS_TO_DAYS, BYTES_TO_MB} from '../config/constants';
@@ -347,5 +348,61 @@ export function setupIpcHandlers(
             return {success: true};
         }
         return {error: '窗口未初始化'};
+    });
+
+    // ==================== 自定义敏感词逻辑表达式相关 ====================
+
+    // 【新增】设置自定义表达式
+    ipcMain.handle('set-custom-expression', async (_, expression: string) => {
+        try {
+            // 验证表达式语法
+            if (expression && expression.trim()) {
+                const validation = validateExpression(expression);
+                if (!validation.valid) {
+                    return {
+                        success: false,
+                        error: validation.error
+                    };
+                }
+            }
+
+            // 保存到配置
+            const config = await loadConfig();
+            config.customSensitiveExpression = expression;
+            await saveConfig(config);
+
+            mainLogger.info('自定义表达式已保存');
+
+            return {success: true};
+        } catch (error: any) {
+            mainLogger.error('保存自定义表达式失败: {}', error.message);
+            return {
+                success: false,
+                error: `保存失败: ${error.message}`
+            };
+        }
+    });
+
+    // 【新增】获取当前自定义表达式
+    ipcMain.handle('get-custom-expression', async () => {
+        try {
+            const config = await loadConfig();
+            return {
+                success: true,
+                expression: config.customSensitiveExpression || ''
+            };
+        } catch (error: any) {
+            mainLogger.error('获取自定义表达式失败: {}', error.message);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    });
+
+    // 【新增】验证表达式语法（用于前端实时校验）
+    ipcMain.handle('validate-expression', (_, expression: string) => {
+        const result = validateExpression(expression);
+        return result;
     });
 }
