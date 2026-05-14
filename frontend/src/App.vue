@@ -641,6 +641,8 @@ const getThemeTooltip = () => {
   border-bottom: var(--border-width) solid var(--border-color);
   contain: layout style; /* ← 限制重排范围 */
   align-items: center; /* 垂直居中对齐 */
+  position: relative; /* 【修复】为下拉菜单提供定位上下文 */
+  z-index: 100; /* 【修复】确保工具栏在结果表格之上 */
 }
 
 /* 【优化】工具栏分区布局 */
@@ -889,7 +891,7 @@ const getThemeTooltip = () => {
   border-radius: var(--radius-md);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   min-width: 160px;
-  z-index: 1000;
+  z-index: 10000; /* 【修复】提高到足够高，确保在所有内容之上 */
   padding: var(--spacing-xs);
 }
 
