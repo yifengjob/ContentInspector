@@ -911,7 +911,7 @@ const getThemeTooltip = () => {
 }
 
 .menu-item:hover:not(:disabled) {
-  background-color: var(--hover-bg);
+  background-color: var(--bg-hover);
 }
 
 .menu-item:disabled {
