@@ -6,21 +6,21 @@
  * - 处理来自渲染进程的请求
  */
 
-import {ipcMain, dialog, BrowserWindow, app} from 'electron';
+import {app, BrowserWindow, dialog, ipcMain} from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import {mainLogger} from '../../logger/logger';
 import {ScanState} from '../state/scan-state';
-import {startScan, cancelScan} from '../scanner';
+import {cancelScan, startScan} from '../scanner';
 import {getDirectoryTree} from '../../services/directory-tree';
 import {deleteFile, openFile, openFileLocation} from '../../services/file-operations';
 import {exportReport} from '../../services/report-exporter';
 import {getSensitiveRules} from '../../detection/sensitive-detector';
 import {validateExpression} from '../../utils/expression-parser';
-import {loadConfig, saveConfig, calculateRecommendedConcurrency} from '../config/manager';
+import {calculateRecommendedConcurrency, loadConfig, saveConfig} from '../config/manager';
 import {checkEnvironment} from '../infra';
-import {LOG_RETENTION_DAYS, MS_TO_DAYS, BYTES_TO_MB} from '../config/constants';
+import {BYTES_TO_MB, LOG_RETENTION_DAYS, MS_TO_DAYS} from '../config/constants';
 import {PowerSaveManager} from './power-save-manager';
 import {PreviewWorkerManager} from './preview-worker-manager';
 import {getDirectorySize} from './utils';
@@ -402,7 +402,6 @@ export function setupIpcHandlers(
 
     // 【新增】验证表达式语法（用于前端实时校验）
     ipcMain.handle('validate-expression', (_, expression: string) => {
-        const result = validateExpression(expression);
-        return result;
+        return validateExpression(expression);
     });
 }

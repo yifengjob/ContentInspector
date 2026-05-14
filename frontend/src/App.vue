@@ -41,12 +41,12 @@
         <!-- 【新增】自定义敏感词逻辑表达式输入框 -->
         <div class="expression-input-container" :title="expressionValidationStatus">
           <input
-              v-model="customExpression"
+              v-model="searchExpression"
               type="text"
               class="expression-input"
               :class="{
                 'expression-input-error': expressionValidationError,
-                'expression-input-success': expressionValidated && !expressionValidationError && customExpression.trim()
+                'expression-input-success': expressionValidated && !expressionValidationError && searchExpression.trim()
               }"
               placeholder="关键字搜索，支持表达式（如：密码 & 身份证）"
               @input="onExpressionInput"
@@ -323,7 +323,7 @@ const isDevMode = computed(() => process.env.NODE_ENV === 'development')
 const showMoreMenu = ref(false)
 
 // 【新增】自定义敏感词逻辑表达式相关
-const customExpression = ref('')
+const searchExpression = ref('')
 const expressionValidationError = ref('')
 const expressionValidated = ref(false)
 let validationTimer: number | null = null  // 防抖定时器
@@ -434,7 +434,7 @@ onMounted(async () => {
   
   // 【新增】加载搜索表达式
   try {
-    customExpression.value = await getSearchExpression()
+    searchExpression.value = await getSearchExpression()
   } catch (error) {
     console.error('加载搜索表达式失败:', error)
   }
@@ -468,7 +468,7 @@ const handleStartScan = async () => {
     maxFileSizeMb: config.value.maxFileSizeMb,
     maxPdfSizeMb: config.value.maxPdfSizeMb,
     scanConcurrency: config.value.scanConcurrency,
-    searchExpression: customExpression.value.trim() || undefined,  // 【新增】搜索表达式
+    searchExpression: searchExpression.value.trim() || undefined,  // 【新增】搜索表达式
   }
 
   try {
@@ -520,7 +520,7 @@ const handleOpenDevTools = () => {
 
 // 【新增】实时验证表达式（带防抖）
 const validateExpressionDebounced = async () => {
-  const expr = customExpression.value.trim()
+  const expr = searchExpression.value.trim()
   
   // 清空状态
   if (!expr) {
@@ -558,7 +558,7 @@ const onExpressionInput = () => {
 
 // 【新增】保存表达式
 const handleSaveExpression = async () => {
-  const expr = customExpression.value.trim()
+  const expr = searchExpression.value.trim()
   
   try {
     await setSearchExpression(expr)
@@ -584,7 +584,7 @@ const expressionValidationStatus = computed(() => {
   if (expressionValidationError.value) {
     return `语法错误: ${expressionValidationError.value}`
   }
-  if (expressionValidated.value && customExpression.value.trim()) {
+  if (expressionValidated.value && searchExpression.value.trim()) {
     return '表达式语法正确'
   }
   return '输入搜索表达式，如：密码 & 身份证'

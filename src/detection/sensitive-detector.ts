@@ -198,7 +198,7 @@ const sensitiveRules: SensitiveRule[] = [
  * 【新增】如果配置中存在自定义表达式，会添加到列表中
  */
 export function getSensitiveRules(): Array<[string, string]> {
-  // 【需求变更】不再将 custom_expression 添加到规则列表
+  // 【需求变更】不再将 search_expression 添加到规则列表
   // 原因：表达式列是独立显示的，不属于敏感类型循环
   // 前端通过 expressionMatched 字段判断是否显示该列
   
@@ -293,19 +293,19 @@ export function getHighlights(text: string, enabledTypes: string[]): HighlightRa
  * 【性能优化】用于流式处理场景，避免重复扫描文本
  * 
  * @param text 待检测文本
- * @param customExpression 自定义逻辑表达式
+ * @param searchExpression 自定义逻辑表达式
  * @returns 是否匹配
  */
-export function evaluateCustomExpressionOnly(
+export function evaluateSearchExpressionOnly(
   text: string,
-  customExpression: string
+  searchExpression: string
 ): boolean {
-  if (!customExpression || !customExpression.trim()) {
+  if (!searchExpression || !searchExpression.trim()) {
     return false;
   }
   
   try {
-    const result = evaluateExpression(customExpression, text);
+    const result = evaluateExpression(searchExpression, text);
     return result.matched;
   } catch (error: any) {
     mainLogger.warn('自定义表达式评估失败: {}', error.message);

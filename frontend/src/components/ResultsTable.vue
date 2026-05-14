@@ -94,7 +94,7 @@
             </div>
             <!-- 【需求变更】表达式列表头单独放置，支持排序 -->
             <div
-                v-if="hasCustomExpressionColumn"
+                v-if="hasSearchExpressionColumn"
                 class="cell header-cell sortable center-header"
                 :class="{ 'sorted-asc': sortField === 'expressionMatched' && sortOrder === 'asc', 'sorted-desc': sortField === 'expressionMatched' && sortOrder === 'desc' }"
                 @click="sortBy('expressionMatched')"
@@ -148,7 +148,7 @@
                 </div>
                 <div class="cell total-cell mono-font">{{ item.total.toLocaleString() }}</div>
                 <!-- 【需求变更】表达式列单独放置，显示图标 -->
-                <div v-if="hasCustomExpressionColumn" class="cell expression-column-center">
+                <div v-if="hasSearchExpressionColumn" class="cell expression-column-center">
                   <svg v-if="(item.expressionMatched || 0) > 0" class="check-icon-svg">
                     <use href="#icon-check-fill"></use>
                   </svg>
@@ -301,7 +301,7 @@ const sensitiveTypes = computed(() => {
 
 // 【新增】判断是否显示表达式列
 // 只要有 expressionMatched 字段就说明用户配置了表达式（即使值为 0）
-const hasCustomExpressionColumn = computed(() => {
+const hasSearchExpressionColumn = computed(() => {
   return scanResults.value.some(item =>
       item.expressionMatched !== undefined && item.expressionMatched !== null
   )
@@ -314,7 +314,7 @@ const gridStyle = computed(() => {
   const countColDefs = `${COLUMN_WIDTHS.count}em `.repeat(countCols)
 
   // 【需求变更】如果有表达式列，添加其宽度
-  const expressionColDef = hasCustomExpressionColumn.value ? `${COLUMN_WIDTHS.count}em ` : ''
+  const expressionColDef = hasSearchExpressionColumn.value ? `${COLUMN_WIDTHS.count}em ` : ''
 
   return {
     gridTemplateColumns: `
@@ -471,7 +471,7 @@ watch(sensitiveTypes, () => {
 })
 
 // 【需求变更】监听表达式列变化，更新 max-width
-watch(hasCustomExpressionColumn, () => {
+watch(hasSearchExpressionColumn, () => {
   nextTick(() => updatePathMaxWidth())
 })
 
@@ -482,7 +482,7 @@ const fixedColumnsTotalPx = computed(() => {
   const baseFontSize = getBaseFontSize()
 
   // 【需求变更】如果有表达式列，添加其宽度
-  const expressionColWidth = hasCustomExpressionColumn.value ? COLUMN_WIDTHS.count * baseFontSize : 0
+  const expressionColWidth = hasSearchExpressionColumn.value ? COLUMN_WIDTHS.count * baseFontSize : 0
 
   return (
       COLUMN_WIDTHS.checkbox * baseFontSize +   // checkbox
