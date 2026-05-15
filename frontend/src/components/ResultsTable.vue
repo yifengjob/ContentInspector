@@ -485,7 +485,18 @@ watch(hasSearchExpressionColumn, () => {
 
 // 【新增】监听内置规则开关变化，更新 max-width
 watch(() => config.value.enableBuiltinRules, () => {
-  nextTick(() => updatePathMaxWidth())
+  // 【修复】等待 Grid 布局更新后再计算
+  nextTick(() => {
+    nextTick(() => {  // 双重 nextTick 确保虚拟滚动完全渲染
+      updatePathMaxWidth()
+      // 【关键】强制触发重排，确保 sticky 定位正确
+      const tableElement = document.querySelector('.results-table') as HTMLElement
+      if (tableElement) {
+        // 强制浏览器重新计算布局
+        void tableElement.offsetHeight
+      }
+    })
+  })
 })
 
 // 【优化】响应式计算固定列总宽度（基于 Grid 模板配置）
@@ -1031,6 +1042,11 @@ const handleBatchDelete = async () => {
   right: 0;
   z-index: 5;
   background-color: inherit;
+}
+
+/* 【关键】操作列需要确保在最右侧 */
+.actions-col.frozen-right {
+  /* 不需要额外设置，right: 0 已经足够 */
 }
 
 /* 【关键】当表头使用 transform 时，冻结列需要反向 transform 来保持固定 */
