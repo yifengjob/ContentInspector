@@ -490,7 +490,12 @@ watch(hasSearchExpressionColumn, () => {
 
 // 【新增】监听内置规则开关变化，更新 max-width
 watch(() => config.value.enableBuiltinRules, () => {
-  nextTick(() => updatePathMaxWidth())
+  // 【修复】等待 Grid 布局更新后再计算
+  nextTick(() => {
+    nextTick(() => {  // 双重 nextTick 确保虚拟滚动完全渲染
+      updatePathMaxWidth()
+    })
+  })
 })
 
 // 【优化】响应式计算固定列总宽度（基于 Grid 模板配置）
