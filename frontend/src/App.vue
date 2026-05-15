@@ -50,8 +50,6 @@
               }"
               placeholder="关键字搜索，支持表达式（如：密码 & 身份证）"
               @input="onExpressionInput"
-              @blur="handleSaveExpression"
-              @keyup.enter="handleSaveExpression"
           />
         </div>
         
@@ -60,8 +58,8 @@
           <button
               class="btn btn-primary"
               @click="handleStartScan"
-              :disabled="isScanning || isCancelling"
-              title="开始扫描选中的目录"
+              :disabled="isScanning || isCancelling || isStartScanDisabled"
+              :title="startScanButtonTitle"
           >
             <svg class="btn-icon">
               <use href="#icon-play"/>
@@ -464,26 +462,8 @@ const handleStartScan = async () => {
     return
   }
 
-  // 【新增】如果用户输入了表达式，无论 enableBuiltinRules 是什么值，都验证表达式语法
-  const expr = searchExpression.value.trim()
-  if (expr) {
-    try {
-      const result = await validateExpression(expr)
-      if (!result.valid) {
-        await showMessage(`搜索表达式语法错误：${result.error || '请检查表达式语法'}`, {
-          title: '表达式错误',
-          type: 'error'
-        })
-        return
-      }
-    } catch (error: any) {
-      await showMessage(`搜索表达式验证失败：${error.message || '未知错误'}`, {
-        title: '验证错误',
-        type: 'error'
-      })
-      return
-    }
-  }
+  // 【修复】表达式验证已在输入框实时进行，此处无需再次验证
+  // 如果表达式有误，按钮会被禁用，无法点击
 
   // 获取有效的扫描路径（只保留叶子节点）
   const effectivePaths = appStore.getEffectiveScanPaths()
@@ -494,6 +474,7 @@ const handleStartScan = async () => {
   startElapsedTimeTimer()  // 【UI优化】启动耗时更新定时器
 
   // 将Proxy对象转换为普通对象，以便通过IPC传递
+  const expr = searchExpression.value.trim()
   const scanConfig = {
     selectedPaths: effectivePaths,
     selectedExtensions: [...config.value.selectedExtensions],
@@ -592,26 +573,36 @@ const onExpressionInput = () => {
   }, 500)
 }
 
-// 【新增】保存表达式
+// 【修复】保存表达式（仅在验证通过时保存）
 const handleSaveExpression = async () => {
   const expr = searchExpression.value.trim()
   
+  // 如果为空，直接保存空字符串
+  if (!expr) {
+    try {
+      await setSearchExpression('')
+      expressionValidated.value = false
+      expressionValidationError.value = ''
+    } catch (error: any) {
+      console.error('清空表达式失败:', error)
+    }
+    return
+  }
+  
+  // 如果有错误，不保存
+  if (expressionValidationError.value) {
+    // 不弹窗，用户已经看到输入框的红色边框和错误提示
+    return
+  }
+  
+  // 验证通过，保存表达式
   try {
     await setSearchExpression(expr)
     expressionValidated.value = true
     expressionValidationError.value = ''
-    
-    // 如果之前有错误，清除它
-    if (expr === '') {
-      expressionValidationError.value = ''
-      expressionValidated.value = false
-    }
   } catch (error: any) {
-    expressionValidationError.value = error.message || '保存失败'
-    await showMessage(`保存搜索表达式失败：${error.message}`, {
-      title: '错误',
-      type: 'error'
-    })
+    console.error('保存表达式失败:', error)
+    // 不弹窗，避免干扰用户
   }
 }
 
@@ -624,6 +615,29 @@ const expressionValidationStatus = computed(() => {
     return '表达式语法正确'
   }
   return '输入搜索表达式，如：密码 & 身份证'
+})
+
+// 【新增】计算“开始扫描”按钮是否禁用
+const isStartScanDisabled = computed(() => {
+  const expr = searchExpression.value.trim()
+  // 如果用户输入了表达式但验证失败，则禁用
+  if (expr && expressionValidationError.value) {
+    return true
+  }
+  return false
+})
+
+// 【新增】计算“开始扫描”按钮的 title 提示
+const startScanButtonTitle = computed(() => {
+  if (isScanning.value) return '正在扫描中...'
+  if (isCancelling.value) return '正在取消中...'
+  
+  const expr = searchExpression.value.trim()
+  if (expr && expressionValidationError.value) {
+    return `表达式语法错误：${expressionValidationError.value}，请修正后再扫描`
+  }
+  
+  return '开始扫描选中的目录'
 })
 
 // 预览文件
