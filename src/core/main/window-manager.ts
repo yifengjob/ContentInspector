@@ -246,15 +246,21 @@ export function createWindowManager(): WindowManager {
                         // 【修复】添加空值检查
                         if (!scanState || !scanState.isScanning) {
                             clearInterval(checkInterval);
-                            mainLogger.info('[窗口关闭] 扫描已安全取消，现在关闭窗口');
+                            mainLogger.info('[窗口关闭] 扫描已安全取消');
                             
                             // 停止电源阻止器
                             if (powerSaveManagerRef) {
                                 powerSaveManagerRef.stop();
                             }
                             
-                            // 现在可以安全关闭窗口了
-                            mainWindow?.destroy();
+                            // 【macOS 特殊处理】关闭窗口时退出应用
+                            if (process.platform === 'darwin') {
+                                mainLogger.info('[窗口关闭] macOS 平台，退出应用');
+                                app.quit();
+                            } else {
+                                // 其他平台，销毁窗口
+                                mainWindow?.destroy();
+                            }
                         }
                         waitedTime += CANCEL_SCAN_CHECK_INTERVAL;
                     }, CANCEL_SCAN_CHECK_INTERVAL);
@@ -264,7 +270,7 @@ export function createWindowManager(): WindowManager {
                         clearInterval(checkInterval);
                         // 【修复】添加空值检查
                         if (scanState && scanState.isScanning) {
-                            mainLogger.warn('[窗口关闭] 警告: 等待 {} 秒后扫描仍未结束，强制重置状态并关闭窗口', CANCEL_SCAN_MAX_WAIT / 1000);
+                            mainLogger.warn('[窗口关闭] 警告: 等待 {} 秒后扫描仍未结束，强制重置状态', CANCEL_SCAN_MAX_WAIT / 1000);
                             scanState.isScanning = false;
                         }
                         
@@ -273,8 +279,14 @@ export function createWindowManager(): WindowManager {
                             powerSaveManagerRef.stop();
                         }
                         
-                        // 强制关闭窗口
-                        mainWindow?.destroy();
+                        // 【macOS 特殊处理】关闭窗口时退出应用
+                        if (process.platform === 'darwin') {
+                            mainLogger.info('[窗口关闭] macOS 平台，强制退出应用');
+                            app.quit();
+                        } else {
+                            // 其他平台，强制销毁窗口
+                            mainWindow?.destroy();
+                        }
                     }, CANCEL_SCAN_MAX_WAIT);
                 } else {
                     // 没有扫描任务，正常关闭窗口
@@ -282,7 +294,13 @@ export function createWindowManager(): WindowManager {
                     if (powerSaveManagerRef) {
                         powerSaveManagerRef.stop();
                     }
-                    // 不阻止，允许正常关闭
+                    
+                    // 【macOS 特殊处理】关闭窗口时退出应用
+                    if (process.platform === 'darwin') {
+                        mainLogger.info('[窗口关闭] macOS 平台，无扫描任务，退出应用');
+                        app.quit();
+                    }
+                    // 其他平台，不阻止，允许正常关闭
                 }
             });
 
