@@ -318,16 +318,14 @@ const hasSearchExpressionColumn = computed(() => {
 })
 
 // 【修复】动态计算 Grid 列模板 - 使用 1fr 自动填充
+// 【关键】保持列数不变，只通过 v-if 控制内容显示，确保 sticky 定位生效
 const gridStyle = computed(() => {
   const countCols = sensitiveTypes.value.length
   // 【关键】所有列使用固定宽度，确保完全对齐
   const countColDefs = `${COLUMN_WIDTHS.count}em `.repeat(countCols)
 
-  // 【需求变更】如果有表达式列且启用内置规则，添加其宽度
-  const expressionColDef = (hasSearchExpressionColumn.value && config.value.enableBuiltinRules !== false) ? `${COLUMN_WIDTHS.count}em ` : ''
-  
-  // 【新增】条件显示总计列
-  const totalColDef = config.value.enableBuiltinRules !== false ? `${COLUMN_WIDTHS.total}em ` : ''
+  // 【需求变更】如果有表达式列，添加其宽度
+  const expressionColDef = hasSearchExpressionColumn.value ? `${COLUMN_WIDTHS.count}em ` : ''
 
   return {
     gridTemplateColumns: `
@@ -337,7 +335,7 @@ const gridStyle = computed(() => {
       ${COLUMN_WIDTHS.time}em                     /* time - 固定 */
       ${countColDefs}                             /* counts - 敏感类型列 */
       ${expressionColDef}                         /* expression - 表达式列（条件显示） */
-      ${totalColDef}                              /* total - 总计列（条件显示） */
+      ${COLUMN_WIDTHS.total}em                    /* total - 固定（可显示11-12位，比counts多1-2位） */
       ${COLUMN_WIDTHS.actions}em                  /* actions - 固定（4个按钮足够） */
     `.trim()
   }
@@ -488,27 +486,15 @@ watch(hasSearchExpressionColumn, () => {
   nextTick(() => updatePathMaxWidth())
 })
 
-// 【新增】监听内置规则开关变化，更新 max-width
-watch(() => config.value.enableBuiltinRules, () => {
-  // 【修复】等待 Grid 布局更新后再计算
-  nextTick(() => {
-    nextTick(() => {  // 双重 nextTick 确保虚拟滚动完全渲染
-      updatePathMaxWidth()
-    })
-  })
-})
-
 // 【优化】响应式计算固定列总宽度（基于 Grid 模板配置）
+// 【关键】保持与 gridStyle 一致，不根据 enableBuiltinRules 变化
 const fixedColumnsTotalPx = computed(() => {
   const countCols = sensitiveTypes.value.length
   // 【优化】获取基础字体大小（使用辅助方法）
   const baseFontSize = getBaseFontSize()
 
-  // 【需求变更】如果有表达式列且启用内置规则，添加其宽度
-  const expressionColWidth = (hasSearchExpressionColumn.value && config.value.enableBuiltinRules !== false) ? COLUMN_WIDTHS.count * baseFontSize : 0
-  
-  // 【新增】条件显示总计列
-  const totalColWidth = config.value.enableBuiltinRules !== false ? COLUMN_WIDTHS.total * baseFontSize : 0
+  // 【需求变更】如果有表达式列，添加其宽度
+  const expressionColWidth = hasSearchExpressionColumn.value ? COLUMN_WIDTHS.count * baseFontSize : 0
 
   return (
       COLUMN_WIDTHS.checkbox * baseFontSize +   // checkbox
@@ -516,7 +502,7 @@ const fixedColumnsTotalPx = computed(() => {
       COLUMN_WIDTHS.time * baseFontSize +       // time
       (COLUMN_WIDTHS.count * baseFontSize * countCols) +  // counts
       expressionColWidth +                      // expression（条件显示）
-      totalColWidth +                           // total（条件显示）
+      COLUMN_WIDTHS.total * baseFontSize +      // total
       COLUMN_WIDTHS.actions * baseFontSize      // actions
   )
 })
