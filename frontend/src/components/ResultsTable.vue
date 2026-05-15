@@ -4,8 +4,9 @@
     <div class="table-header">
       <h3>扫描结果</h3>
       <div class="table-actions">
+        <!-- 【新增】条件显示 -->
         <button
-            v-if="selectedFiles.size > 0 && config.enableBuiltinRules !== false"  <!-- 【新增】条件显示 -->
+            v-if="selectedFiles.size > 0 && config.enableBuiltinRules !== false"
             class="btn-batch-delete"
             @click="handleBatchDelete"
         >
@@ -83,7 +84,9 @@
                 </span>
               </div>
             </template>
+            <!-- 【新增】条件显示总计列 -->
             <div
+                v-if="config.enableBuiltinRules !== false"
                 class="cell header-cell sortable number-header"
                 :class="{ 'sorted-asc': sortField === 'total' && sortOrder === 'asc', 'sorted-desc': sortField === 'total' && sortOrder === 'desc' }"
                 @click="sortBy('total')"
@@ -95,8 +98,9 @@
               </span>
             </div>
             <!-- 【需求变更】表达式列表头单独放置，支持排序 -->
+            <!-- 【新增】条件显示表达式列（仅在启用内置规则时） -->
             <div
-                v-if="hasSearchExpressionColumn"
+                v-if="hasSearchExpressionColumn && config.enableBuiltinRules !== false"
                 class="cell header-cell sortable center-header"
                 :class="{ 'sorted-asc': sortField === 'expressionMatched' && sortOrder === 'asc', 'sorted-desc': sortField === 'expressionMatched' && sortOrder === 'desc' }"
                 @click="sortBy('expressionMatched')"
@@ -152,7 +156,8 @@
                 </template>
                 <div class="cell total-cell mono-font" v-if="config.enableBuiltinRules !== false">{{ item.total.toLocaleString() }}</div>
                 <!-- 【需求变更】表达式列单独放置，显示图标 -->
-                <div v-if="hasSearchExpressionColumn" class="cell expression-column-center">
+                <!-- 【新增】条件显示表达式列（仅在启用内置规则时） -->
+                <div v-if="hasSearchExpressionColumn && config.enableBuiltinRules !== false" class="cell expression-column-center">
                   <svg v-if="(item.expressionMatched || 0) > 0" class="check-icon-svg">
                     <use href="#icon-check-fill"></use>
                   </svg>
@@ -318,8 +323,11 @@ const gridStyle = computed(() => {
   // 【关键】所有列使用固定宽度，确保完全对齐
   const countColDefs = `${COLUMN_WIDTHS.count}em `.repeat(countCols)
 
-  // 【需求变更】如果有表达式列，添加其宽度
-  const expressionColDef = hasSearchExpressionColumn.value ? `${COLUMN_WIDTHS.count}em ` : ''
+  // 【需求变更】如果有表达式列且启用内置规则，添加其宽度
+  const expressionColDef = (hasSearchExpressionColumn.value && config.value.enableBuiltinRules !== false) ? `${COLUMN_WIDTHS.count}em ` : ''
+  
+  // 【新增】条件显示总计列
+  const totalColDef = config.value.enableBuiltinRules !== false ? `${COLUMN_WIDTHS.total}em ` : ''
 
   return {
     gridTemplateColumns: `
@@ -329,7 +337,7 @@ const gridStyle = computed(() => {
       ${COLUMN_WIDTHS.time}em                     /* time - 固定 */
       ${countColDefs}                             /* counts - 敏感类型列 */
       ${expressionColDef}                         /* expression - 表达式列（条件显示） */
-      ${COLUMN_WIDTHS.total}em                    /* total - 固定（可显示11-12位，比counts多1-2位） */
+      ${totalColDef}                              /* total - 总计列（条件显示） */
       ${COLUMN_WIDTHS.actions}em                  /* actions - 固定（4个按钮足够） */
     `.trim()
   }
@@ -480,14 +488,22 @@ watch(hasSearchExpressionColumn, () => {
   nextTick(() => updatePathMaxWidth())
 })
 
+// 【新增】监听内置规则开关变化，更新 max-width
+watch(() => config.value.enableBuiltinRules, () => {
+  nextTick(() => updatePathMaxWidth())
+})
+
 // 【优化】响应式计算固定列总宽度（基于 Grid 模板配置）
 const fixedColumnsTotalPx = computed(() => {
   const countCols = sensitiveTypes.value.length
   // 【优化】获取基础字体大小（使用辅助方法）
   const baseFontSize = getBaseFontSize()
 
-  // 【需求变更】如果有表达式列，添加其宽度
-  const expressionColWidth = hasSearchExpressionColumn.value ? COLUMN_WIDTHS.count * baseFontSize : 0
+  // 【需求变更】如果有表达式列且启用内置规则，添加其宽度
+  const expressionColWidth = (hasSearchExpressionColumn.value && config.value.enableBuiltinRules !== false) ? COLUMN_WIDTHS.count * baseFontSize : 0
+  
+  // 【新增】条件显示总计列
+  const totalColWidth = config.value.enableBuiltinRules !== false ? COLUMN_WIDTHS.total * baseFontSize : 0
 
   return (
       COLUMN_WIDTHS.checkbox * baseFontSize +   // checkbox
@@ -495,7 +511,7 @@ const fixedColumnsTotalPx = computed(() => {
       COLUMN_WIDTHS.time * baseFontSize +       // time
       (COLUMN_WIDTHS.count * baseFontSize * countCols) +  // counts
       expressionColWidth +                      // expression（条件显示）
-      COLUMN_WIDTHS.total * baseFontSize +      // total
+      totalColWidth +                           // total（条件显示）
       COLUMN_WIDTHS.actions * baseFontSize      // actions
   )
 })
