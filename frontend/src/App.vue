@@ -598,13 +598,31 @@ const expressionValidationStatus = computed(() => {
   return '输入搜索表达式，如：密码 & 身份证'
 })
 
-// 【新增】计算“开始扫描”按钮是否禁用
+// 【新增】计算"开始扫描"按钮是否禁用
 const isStartScanDisabled = computed(() => {
-  const expr = searchExpression.value.trim()
-  // 如果用户输入了表达式但验证失败，则禁用
-  if (expr && expressionValidationError.value) {
+  // 如果正在扫描或取消中，禁用
+  if (isScanning.value || isCancelling.value) {
     return true
   }
+  
+  // 如果没有选择路径，禁用
+  if (appStore.selectedPaths.size === 0) {
+    return true
+  }
+  
+  // 如果禁用内置规则，必须有有效的表达式
+  if (config.value.enableBuiltinRules === false) {
+    const expr = searchExpression.value.trim()
+    // 表达式为空，禁用
+    if (!expr) {
+      return true
+    }
+    // 表达式有错误，禁用
+    if (expressionValidationError.value) {
+      return true
+    }
+  }
+  
   return false
 })
 
@@ -613,12 +631,23 @@ const startScanButtonTitle = computed(() => {
   if (isScanning.value) return '正在扫描中...'
   if (isCancelling.value) return '正在取消中...'
   
-  const expr = searchExpression.value.trim()
-  if (expr && expressionValidationError.value) {
-    // 截断错误信息，避免 tooltip 过长
-    const errorMsg = expressionValidationError.value
-    const truncatedMsg = errorMsg.length > 50 ? errorMsg.substring(0, 50) + '...' : errorMsg
-    return `表达式语法错误：${truncatedMsg}`
+  // 如果没有选择路径
+  if (appStore.selectedPaths.size === 0) {
+    return '请至少选择一个扫描路径'
+  }
+  
+  // 如果禁用内置规则，检查表达式状态
+  if (config.value.enableBuiltinRules === false) {
+    const expr = searchExpression.value.trim()
+    if (!expr) {
+      return '请输入自定义表达式'
+    }
+    if (expressionValidationError.value) {
+      // 截断错误信息，避免 tooltip 过长
+      const errorMsg = expressionValidationError.value
+      const truncatedMsg = errorMsg.length > 50 ? errorMsg.substring(0, 50) + '...' : errorMsg
+      return `表达式语法错误：${truncatedMsg}`
+    }
   }
   
   return '开始扫描选中的目录'
