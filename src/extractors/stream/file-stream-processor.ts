@@ -343,6 +343,8 @@ export class FileStreamProcessor {
 
   /**
    * 带重叠区的敏感词检测
+   * 
+   * 【优化】当 enableBuiltinRules=true 且有 searchExpression 时，在同一轮中处理两者
    */
   private detectWithOverlap(
     chunk: string,
@@ -352,16 +354,18 @@ export class FileStreamProcessor {
   ): HighlightRange[] {
     let allHighlights: HighlightRange[] = [];
     
-    // 【新增】条件执行内置规则检测
-    if (enableBuiltinRules) {
+    // 【优化】条件执行检测
+    if (enableBuiltinRules && enabledTypes.length > 0) {
       // ✅ 执行内置规则检测
       allHighlights = getHighlights(chunk, enabledTypes);
-    } else if (searchExpression && searchExpression.trim()) {
-      // ❌ 禁用内置规则，但需要高亮表达式关键词
-      allHighlights = this.getExpressionKeywordHighlights(chunk, searchExpression);
     }
-    // ❌ 否则跳过检测，allHighlights 保持为空数组
-
+    
+    // 【优化】如果同时有表达式，合并高亮结果
+    if (searchExpression && searchExpression.trim()) {
+      const expressionHighlights = this.getExpressionKeywordHighlights(chunk, searchExpression);
+      allHighlights = allHighlights.concat(expressionHighlights);
+    }
+    
     // 【修复】过滤掉重叠区的重复结果
     // 【优化】表达式关键词和内置规则使用相同的过滤逻辑
     const overlapLength = this.previousOverlap.length;
