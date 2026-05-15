@@ -227,10 +227,14 @@ export function createWindowManager(): WindowManager {
                 }
             }
 
-            mainWindow.on('closed', async () => {
-                // 【修复】如果窗口关闭时正在扫描，先执行完整的取消扫描逻辑
+            // 【修复】使用 close 事件（窗口关闭前），而不是 closed 事件（窗口关闭后）
+            mainWindow.on('close', (event) => {
+                // 如果正在扫描，阻止关闭窗口，先执行取消扫描
                 if (scanState && scanState.isScanning) {
-                    mainLogger.info('[窗口关闭] 检测到扫描进行中，执行取消扫描逻辑...');
+                    mainLogger.info('[窗口关闭] 检测到扫描进行中，阻止关闭并执行取消扫描...');
+                    
+                    // 阻止默认关闭窗口行为
+                    event.preventDefault();
                     
                     // 设置取消标志
                     cancelScan(scanState);
@@ -238,48 +242,48 @@ export function createWindowManager(): WindowManager {
                     // 异步等待扫描停止（与 IPC handler 保持一致）
                     let waitedTime = 0;
                     
-                    await new Promise<void>((resolve) => {
-                        const checkInterval = setInterval(() => {
-                            // 【修复】添加空值检查
-                            if (!scanState || !scanState.isScanning) {
-                                clearInterval(checkInterval);
-                                mainLogger.info('[窗口关闭] 扫描已安全取消');
-                                
-                                // 停止电源阻止器
-                                if (powerSaveManagerRef) {
-                                    powerSaveManagerRef.stop();
-                                }
-                                
-                                resolve();
-                            }
-                            waitedTime += CANCEL_SCAN_CHECK_INTERVAL;
-                        }, CANCEL_SCAN_CHECK_INTERVAL);
-                        
-                        // 超时强制 resolve
-                        setTimeout(() => {
+                    const checkInterval = setInterval(() => {
+                        // 【修复】添加空值检查
+                        if (!scanState || !scanState.isScanning) {
                             clearInterval(checkInterval);
-                            // 【修复】添加空值检查
-                            if (scanState && scanState.isScanning) {
-                                mainLogger.warn('[窗口关闭] 警告: 等待 {} 秒后扫描仍未结束，强制重置状态', CANCEL_SCAN_MAX_WAIT / 1000);
-                                scanState.isScanning = false;
-                            }
+                            mainLogger.info('[窗口关闭] 扫描已安全取消，现在关闭窗口');
                             
                             // 停止电源阻止器
                             if (powerSaveManagerRef) {
                                 powerSaveManagerRef.stop();
                             }
                             
-                            resolve();
-                        }, CANCEL_SCAN_MAX_WAIT);
-                    });
+                            // 现在可以安全关闭窗口了
+                            mainWindow?.destroy();
+                        }
+                        waitedTime += CANCEL_SCAN_CHECK_INTERVAL;
+                    }, CANCEL_SCAN_CHECK_INTERVAL);
+                    
+                    // 超时强制关闭窗口
+                    setTimeout(() => {
+                        clearInterval(checkInterval);
+                        // 【修复】添加空值检查
+                        if (scanState && scanState.isScanning) {
+                            mainLogger.warn('[窗口关闭] 警告: 等待 {} 秒后扫描仍未结束，强制重置状态并关闭窗口', CANCEL_SCAN_MAX_WAIT / 1000);
+                            scanState.isScanning = false;
+                        }
+                        
+                        // 停止电源阻止器
+                        if (powerSaveManagerRef) {
+                            powerSaveManagerRef.stop();
+                        }
+                        
+                        // 强制关闭窗口
+                        mainWindow?.destroy();
+                    }, CANCEL_SCAN_MAX_WAIT);
                 } else {
-                    // 没有扫描任务，直接停止电源阻止器
+                    // 没有扫描任务，正常关闭窗口
+                    // 停止电源阻止器
                     if (powerSaveManagerRef) {
                         powerSaveManagerRef.stop();
                     }
+                    // 不阻止，允许正常关闭
                 }
-
-                mainWindow = null;
             });
 
             // 【新增】设置扫描完成监听器
