@@ -464,6 +464,27 @@ const handleStartScan = async () => {
     return
   }
 
+  // 【新增】如果用户输入了表达式，无论 enableBuiltinRules 是什么值，都验证表达式语法
+  const expr = searchExpression.value.trim()
+  if (expr) {
+    try {
+      const result = await validateExpression(expr)
+      if (!result.valid) {
+        await showMessage(`搜索表达式语法错误：${result.error || '请检查表达式语法'}`, {
+          title: '表达式错误',
+          type: 'error'
+        })
+        return
+      }
+    } catch (error: any) {
+      await showMessage(`搜索表达式验证失败：${error.message || '未知错误'}`, {
+        title: '验证错误',
+        type: 'error'
+      })
+      return
+    }
+  }
+
   // 获取有效的扫描路径（只保留叶子节点）
   const effectivePaths = appStore.getEffectiveScanPaths()
 
@@ -482,7 +503,7 @@ const handleStartScan = async () => {
     maxFileSizeMb: config.value.maxFileSizeMb,
     maxPdfSizeMb: config.value.maxPdfSizeMb,
     scanConcurrency: config.value.scanConcurrency,
-    searchExpression: searchExpression.value.trim() || undefined,  // 【新增】搜索表达式
+    searchExpression: expr || undefined,  // 【新增】搜索表达式
     enableBuiltinRules: config.value.enableBuiltinRules,  // 【新增】内置规则开关
   }
 
