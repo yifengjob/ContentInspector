@@ -55,6 +55,24 @@
         </div>
         
         <div class="settings-section">
+          <h4>敏感词规则</h4>
+          
+          <div class="setting-item">
+            <label>
+              <input 
+                type="checkbox" 
+                v-model="config.enableBuiltinRules"
+              />
+              <span>启用内置敏感词扫描规则</span>
+            </label>
+            <p class="setting-hint">
+              启用后将检测身份证号、手机号、邮箱、银行卡号等敏感信息。<br/>
+              取消勾选则仅使用关键字搜索功能。
+            </p>
+          </div>
+        </div>
+        
+        <div class="settings-section">
           <h4>文件操作</h4>
           
           <div class="setting-item">

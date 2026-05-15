@@ -59,6 +59,14 @@ export interface AppConfig {
   ignoreOtherDrivesSystemDirs: boolean // 是否忽略其他磁盘的系统目录（仅 Windows）
   
   /**
+   * 是否启用内置敏感词扫描规则
+   * - true: 检测身份证号、手机号、邮箱等 8 种内置规则
+   * - false: 跳过所有内置规则检测，仅使用搜索表达式
+   * @default true
+   */
+  enableBuiltinRules: boolean
+  
+  /**
    * 搜索表达式（支持逻辑运算符：&、|、!、()）
    * @default '' - 空字符串表示不启用表达式搜索
    */
