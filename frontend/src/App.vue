@@ -535,7 +535,7 @@ const handleOpenDevTools = () => {
 
 // ==================== 搜索表达式相关 ====================
 
-// 【新增】实时验证表达式（带防抖）
+// 【修复】实时验证表达式并自动保存（带防抖）
 const validateExpressionDebounced = async () => {
   const expr = searchExpression.value.trim()
   
@@ -543,6 +543,12 @@ const validateExpressionDebounced = async () => {
   if (!expr) {
     expressionValidationError.value = ''
     expressionValidated.value = false
+    // 清空时也保存
+    try {
+      await setSearchExpression('')
+    } catch (error: any) {
+      console.error('清空表达式失败:', error)
+    }
     return
   }
   
@@ -552,11 +558,19 @@ const validateExpressionDebounced = async () => {
     
     if (!result.valid) {
       expressionValidationError.value = result.error || '语法错误'
+      // 验证失败，不保存
     } else {
       expressionValidationError.value = ''
+      // 验证通过，自动保存
+      try {
+        await setSearchExpression(expr)
+      } catch (error: any) {
+        console.error('保存表达式失败:', error)
+      }
     }
   } catch (error: any) {
     expressionValidationError.value = error.message || '验证失败'
+    // 验证失败，不保存
   }
 }
 
@@ -571,39 +585,6 @@ const onExpressionInput = () => {
   validationTimer = window.setTimeout(() => {
     validateExpressionDebounced()
   }, 500)
-}
-
-// 【修复】保存表达式（仅在验证通过时保存）
-const handleSaveExpression = async () => {
-  const expr = searchExpression.value.trim()
-  
-  // 如果为空，直接保存空字符串
-  if (!expr) {
-    try {
-      await setSearchExpression('')
-      expressionValidated.value = false
-      expressionValidationError.value = ''
-    } catch (error: any) {
-      console.error('清空表达式失败:', error)
-    }
-    return
-  }
-  
-  // 如果有错误，不保存
-  if (expressionValidationError.value) {
-    // 不弹窗，用户已经看到输入框的红色边框和错误提示
-    return
-  }
-  
-  // 验证通过，保存表达式
-  try {
-    await setSearchExpression(expr)
-    expressionValidated.value = true
-    expressionValidationError.value = ''
-  } catch (error: any) {
-    console.error('保存表达式失败:', error)
-    // 不弹窗，避免干扰用户
-  }
 }
 
 // 【新增】获取表达式验证状态提示
