@@ -315,6 +315,7 @@ export class WorkerPool {
             filePath: task.filePath,
             enabledSensitiveTypes: this.config.enabledSensitiveTypes,
             searchExpression: this.config.searchExpression,  // 【新增】搜索表达式
+            enableBuiltinRules: this.config.enableBuiltinRules,  // 【新增】内置规则开关
             config: {
                 enabledSensitiveTypes: this.config.enabledSensitiveTypes,
                 maxFileSizeMb: this.config.maxFileSizeMb,

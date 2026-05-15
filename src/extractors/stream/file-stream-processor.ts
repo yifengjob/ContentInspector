@@ -55,6 +55,7 @@ export interface StreamProcessorOptions {
   mode: 'detect' | 'preview';           // 处理模式
   enabledTypes: string[];               // 启用的敏感词类型
   searchExpression?: string;            // 自定义逻辑表达式
+  enableBuiltinRules?: boolean;         // 【新增】是否启用内置敏感词规则（默认 true）
   
   // 回调函数
   onChunk?: (chunkData: ChunkData) => void;           // 每块就绪回调
@@ -202,7 +203,7 @@ export class FileStreamProcessor {
     while (offset < text.length) {
       iterations++;
       if (iterations > MAX_ITERATIONS) {
-        console.error(`[FileStreamProcessor] 警告: processExtractedText 迭代次数过多 (${iterations}/${MAX_ITERATIONS})，强制退出`);
+        mainLogger.warn('[FileStreamProcessor] processExtractedText 迭代次数过多 ({} / {})，强制退出', iterations, MAX_ITERATIONS);
         break;
       }
       
@@ -227,7 +228,7 @@ export class FileStreamProcessor {
 
       // 检测敏感词 (带重叠区)
       const fullChunk = this.previousOverlap + chunkText;
-      const localHighlights = this.detectWithOverlap(fullChunk, options.enabledTypes, options.searchExpression);
+      const localHighlights = this.detectWithOverlap(fullChunk, options.enabledTypes, options.searchExpression, options.enableBuiltinRules);
       
       // 【修复】将局部偏移转换为全局偏移（基于字符数）
       const charsBefore = this.totalChars;  // 当前块之前的总字符数
@@ -279,7 +280,7 @@ export class FileStreamProcessor {
     const currentChunk = this.previousOverlap + this.buffer.slice(0, splitPos);
 
     // 检测敏感词
-    const localHighlights = this.detectWithOverlap(currentChunk, options.enabledTypes, options.searchExpression);
+    const localHighlights = this.detectWithOverlap(currentChunk, options.enabledTypes, options.searchExpression, options.enableBuiltinRules);
     
     // 【修复】将局部偏移转换为全局偏移（基于字符数）
     const charsBefore = this.totalChars;  // 当前块之前的总字符数
@@ -342,22 +343,37 @@ export class FileStreamProcessor {
 
   /**
    * 带重叠区的敏感词检测
+   * 
+   * 【优化】当 enableBuiltinRules=true 且有 searchExpression 时，在同一轮中处理两者
    */
   private detectWithOverlap(
     chunk: string,
     enabledTypes: string[],
-    searchExpression?: string
+    searchExpression?: string,
+    enableBuiltinRules: boolean = true // 【新增】是否启用内置规则
   ): HighlightRange[] {
-    // 【优化】一次性获取内置规则的高亮
-    const allHighlights = getHighlights(chunk, enabledTypes);
-
-    // 过滤掉重叠区的重复结果
+    let allHighlights: HighlightRange[] = [];
+    
+    // 【优化】条件执行检测
+    if (enableBuiltinRules && enabledTypes.length > 0) {
+      // ✅ 执行内置规则检测
+      allHighlights = getHighlights(chunk, enabledTypes);
+    }
+    
+    // 【优化】如果同时有表达式，合并高亮结果
+    if (searchExpression && searchExpression.trim()) {
+      const expressionHighlights = this.getExpressionKeywordHighlights(chunk, searchExpression);
+      allHighlights = allHighlights.concat(expressionHighlights);
+    }
+    
+    // 【修复】过滤掉重叠区的重复结果
+    // 【优化】表达式关键词和内置规则使用相同的过滤逻辑
     const overlapLength = this.previousOverlap.length;
     const newHighlights = allHighlights.filter(h => h.start >= overlapLength);
 
     // 【扫描模式】累加计数（在一次调用中完成）
-    if (enabledTypes.length > 0 || (searchExpression && searchExpression.trim())) {
-      this.accumulateCounts(newHighlights, chunk, searchExpression);
+    if ((enableBuiltinRules && enabledTypes.length > 0) || (searchExpression && searchExpression.trim())) {
+      this.accumulateCounts(newHighlights, chunk, searchExpression, enableBuiltinRules);
     }
 
     return newHighlights;
@@ -371,13 +387,16 @@ export class FileStreamProcessor {
   private accumulateCounts(
     highlights: HighlightRange[],
     chunkText: string,
-    searchExpression?: string
+    searchExpression?: string,
+    enableBuiltinRules: boolean = true // 【新增】是否启用内置规则
   ): void {
     // 1. 累加内置规则的计数（基于已有的高亮结果，无需再次扫描）
-    for (const highlight of highlights) {
-      this.accumulatedCounts[highlight.typeId] = 
-        (this.accumulatedCounts[highlight.typeId] || 0) + 1;
-      this.totalCount++;
+    if (enableBuiltinRules) {
+      for (const highlight of highlights) {
+        this.accumulatedCounts[highlight.typeId] = 
+          (this.accumulatedCounts[highlight.typeId] || 0) + 1;
+        this.totalCount++;
+      }
     }
     
     // 2. 【新方案】记录自定义表达式中关键词的出现状态
@@ -398,7 +417,7 @@ export class FileStreamProcessor {
    * 【新增】从表达式中提取所有关键词
    * 
    * 【注意】此函数仅提取关键词文本，不保留逻辑运算符语义
-   * 例如："密码 & !身份证" → ["密码", "身份证"]
+   * 例如：“密码 & !身份证” → ["密码", "身份证"]
    * 用途：仅用于记录关键词是否在chunk中出现，不用于表达式评估
    * 
    * @param expression 自定义表达式
@@ -409,9 +428,46 @@ export class FileStreamProcessor {
     const cleaned = expression
       .replace(/[&|!()]/g, ' ')  // 替换运算符为空格
       .trim();
-    
+      
     // 按空格分割，过滤空字符串
     return cleaned.split(/\s+/).filter(k => k.length > 0);
+  }
+    
+  /**
+   * 【新增】获取表达式关键词的高亮位置
+   * 
+   * 【优化】复用内置规则的 matchAll 逻辑，确保准确性
+   * 
+   * @param text 文本内容
+   * @param searchExpression 搜索表达式
+   * @returns 高亮范围数组
+   */
+  private getExpressionKeywordHighlights(text: string, searchExpression: string): HighlightRange[] {
+    const highlights: HighlightRange[] = [];
+    const keywords = this.extractKeywordsFromExpression(searchExpression);
+      
+    // 【优化】对每个关键词使用 matchAll，与内置规则保持一致
+    for (const keyword of keywords) {
+      // 转义特殊字符，创建安全的正则表达式
+      const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = new RegExp(escapedKeyword, 'g');
+      
+      const matches = Array.from(text.matchAll(pattern));
+      
+      for (const match of matches) {
+        highlights.push({
+          start: match.index!,
+          end: match.index! + keyword.length,
+          typeId: 'expression_keyword',  // 【标记】这是表达式关键词
+          typeName: '表达式关键词'
+        });
+      }
+    }
+      
+    // 按起始位置排序
+    highlights.sort((a, b) => a.start - b.start);
+      
+    return highlights;
   }
   
   /**

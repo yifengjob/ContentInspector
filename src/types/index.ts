@@ -64,7 +64,15 @@ export interface AppConfig {
   enableOfficeParsers: boolean;
   deleteToTrash: boolean;
   ignoreOtherDrivesSystemDirs: boolean; // 是否忽略其他磁盘的系统目录（仅 Windows）
-  
+    
+  /**
+   * 是否启用内置敏感词扫描规则
+   * - true: 检测身份证号、手机号、邮箱等 8 种内置规则
+   * - false: 跳过所有内置规则检测，仅使用搜索表达式
+   * @default true
+   */
+  enableBuiltinRules: boolean;
+    
   /**
    * 搜索表达式（支持逻辑运算符：&、|、!、()）
    * 
@@ -73,9 +81,9 @@ export interface AppConfig {
    * - 禁用内置规则时：作为唯一搜索条件
    * 
    * 示例：
-   * - "密码 & 身份证" - 同时包含"密码"和"身份证"
-   * - "信息安全 | 数据" - 包含"信息安全"或"数据"
-   * - "!密码 & (身份证 | 银行卡)" - 不包含"密码"，但包含"身份证"或"银行卡"
+   * - "密码 & 身份证" - 同时包含“密码”和“身份证”
+   * - "信息安全 | 数据" - 包含“信息安全”或“数据”
+   * - "!密码 & (身份证 | 银行卡)" - 不包含“密码”，但包含“身份证”或“银行卡”
    * 
    * @default '' - 空字符串表示不启用表达式搜索
    */

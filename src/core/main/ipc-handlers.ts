@@ -20,7 +20,7 @@ import {getSensitiveRules} from '../../detection/sensitive-detector';
 import {validateExpression} from '../../utils/expression-parser';
 import {calculateRecommendedConcurrency, loadConfig, saveConfig} from '../config/manager';
 import {checkEnvironment} from '../infra';
-import {BYTES_TO_MB, LOG_RETENTION_DAYS, MS_TO_DAYS} from '../config/constants';
+import {BYTES_TO_MB, CANCEL_SCAN_CHECK_INTERVAL, CANCEL_SCAN_MAX_WAIT, LOG_RETENTION_DAYS, MS_TO_DAYS} from '../config/constants';
 import {PowerSaveManager} from './power-save-manager';
 import {PreviewWorkerManager} from './preview-worker-manager';
 import {getDirectorySize} from './utils';
@@ -81,9 +81,6 @@ export function setupIpcHandlers(
 
         // 【优化】改为异步通知机制，不阻塞 IPC
         return new Promise((resolve) => {
-            const CANCEL_SCAN_CHECK_INTERVAL = 100;
-            const CANCEL_SCAN_MAX_WAIT = 5000;
-
             const checkInterval = setInterval(() => {
                 if (!scanState.isScanning) {
                     clearInterval(checkInterval);

@@ -96,15 +96,19 @@ export class WorkerMessageHandler {
                 this.callbacks.onErrorLog(result.error);
                 pending.reject(new Error(result.error));
             } else {
-                if (result.total && result.total > 0) {
-                    this.callbacks.onResultLog(result.total, result);
+                // 【修复】当启用内置规则时，检查 total > 0；当禁用内置规则时，检查 expressionMatched > 0
+                const hasBuiltinResult = result.total && result.total > 0;
+                const hasExpressionResult = result.expressionMatched && result.expressionMatched > 0;
+                
+                if (hasBuiltinResult || hasExpressionResult) {
+                    this.callbacks.onResultLog(result.total || 0, result);
 
                     const resultItem = {
                         filePath: result.filePath,
                         fileSize: result.fileSize || 0,
                         modifiedTime: result.modifiedTime || new Date().toISOString(),
                         counts: result.counts || {},
-                        total: result.total,
+                        total: result.total || 0,
                         expressionMatched: result.expressionMatched, // 【需求变更】自定义表达式匹配状态
                         unsupportedPreview: false
                     };

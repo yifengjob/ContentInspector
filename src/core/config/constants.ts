@@ -228,7 +228,7 @@ export const MAX_IDLE_TIME = 120000; //  120 秒
 // --- 5.2 取消扫描配置 ---
 
 /** 取消扫描时最大等待时间（毫秒） */
-export const CANCEL_SCAN_MAX_WAIT = 10000; // 10 秒
+export const CANCEL_SCAN_MAX_WAIT = 5000; // 5 秒
 
 /** 取消扫描时检查间隔（毫秒） */
 export const CANCEL_SCAN_CHECK_INTERVAL = 100; // 100ms

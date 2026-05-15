@@ -17,6 +17,8 @@ import {LogManager} from '../infra/log-manager';
 import {ScanState} from '../state/scan-state';
 import {cancelScan} from '../scanner';
 import {
+    CANCEL_SCAN_CHECK_INTERVAL,
+    CANCEL_SCAN_MAX_WAIT,
     WINDOW_DEFAULT_HEIGHT,
     WINDOW_DEFAULT_WIDTH,
     WINDOW_MAX_HEIGHT,
@@ -169,7 +171,7 @@ export function createWindowManager(): WindowManager {
                     contextIsolation: true,
                     preload: path.join(__dirname, '..', '..', 'preload.js')
                 },
-                title: 'DataGuard Scanner - 敏感数据扫描工具',
+                title: '内容审查官 - ContentInspector',
                 icon: icon
             });
 
@@ -225,19 +227,81 @@ export function createWindowManager(): WindowManager {
                 }
             }
 
-            mainWindow.on('closed', () => {
-                // 如果窗口关闭时正在扫描，取消扫描并重置状态
+            // 【修复】使用 close 事件（窗口关闭前），而不是 closed 事件（窗口关闭后）
+            mainWindow.on('close', (event) => {
+                // 如果正在扫描，阻止关闭窗口，先执行取消扫描
                 if (scanState && scanState.isScanning) {
+                    mainLogger.info('[窗口关闭] 检测到扫描进行中，阻止关闭并执行取消扫描...');
+                    
+                    // 阻止默认关闭窗口行为
+                    event.preventDefault();
+                    
+                    // 设置取消标志
                     cancelScan(scanState);
-                    scanState.isScanning = false;
+                    
+                    // 异步等待扫描停止（与 IPC handler 保持一致）
+                    let waitedTime = 0;
+                    
+                    const checkInterval = setInterval(() => {
+                        // 【修复】添加空值检查
+                        if (!scanState || !scanState.isScanning) {
+                            clearInterval(checkInterval);
+                            mainLogger.info('[窗口关闭] 扫描已安全取消');
+                            
+                            // 停止电源阻止器
+                            if (powerSaveManagerRef) {
+                                powerSaveManagerRef.stop();
+                            }
+                            
+                            // 【macOS 特殊处理】关闭窗口时退出应用
+                            if (process.platform === 'darwin') {
+                                mainLogger.info('[窗口关闭] macOS 平台，退出应用');
+                                app.quit();
+                            } else {
+                                // 其他平台，销毁窗口
+                                mainWindow?.destroy();
+                            }
+                        }
+                        waitedTime += CANCEL_SCAN_CHECK_INTERVAL;
+                    }, CANCEL_SCAN_CHECK_INTERVAL);
+                    
+                    // 超时强制关闭窗口
+                    setTimeout(() => {
+                        clearInterval(checkInterval);
+                        // 【修复】添加空值检查
+                        if (scanState && scanState.isScanning) {
+                            mainLogger.warn('[窗口关闭] 警告: 等待 {} 秒后扫描仍未结束，强制重置状态', CANCEL_SCAN_MAX_WAIT / 1000);
+                            scanState.isScanning = false;
+                        }
+                        
+                        // 停止电源阻止器
+                        if (powerSaveManagerRef) {
+                            powerSaveManagerRef.stop();
+                        }
+                        
+                        // 【macOS 特殊处理】关闭窗口时退出应用
+                        if (process.platform === 'darwin') {
+                            mainLogger.info('[窗口关闭] macOS 平台，强制退出应用');
+                            app.quit();
+                        } else {
+                            // 其他平台，强制销毁窗口
+                            mainWindow?.destroy();
+                        }
+                    }, CANCEL_SCAN_MAX_WAIT);
+                } else {
+                    // 没有扫描任务，正常关闭窗口
+                    // 停止电源阻止器
+                    if (powerSaveManagerRef) {
+                        powerSaveManagerRef.stop();
+                    }
+                    
+                    // 【macOS 特殊处理】关闭窗口时退出应用
+                    if (process.platform === 'darwin') {
+                        mainLogger.info('[窗口关闭] macOS 平台，无扫描任务，退出应用');
+                        app.quit();
+                    }
+                    // 其他平台，不阻止，允许正常关闭
                 }
-
-                // 【新增】窗口关闭时停止电源阻止器
-                if (powerSaveManagerRef) {
-                    powerSaveManagerRef.stop();
-                }
-
-                mainWindow = null;
             });
 
             // 【新增】设置扫描完成监听器

@@ -5,7 +5,7 @@
       <h3>扫描结果</h3>
       <div class="table-actions">
         <button
-            v-if="selectedFiles.size > 0"
+            v-if="config.enableBuiltinRules !== false && selectedFiles.size > 0"
             class="btn-batch-delete"
             @click="handleBatchDelete"
         >
@@ -29,6 +29,7 @@
             <div class="cell checkbox-col header-cell center-header frozen-left">
               <input
                   type="checkbox"
+                  :disabled="config.enableBuiltinRules === false"
                   ref="selectAllCheckbox"
                   :checked="isAllSelected"
                   @change="toggleSelectAll"
@@ -68,43 +69,45 @@
                 {{ sortOrder === 'asc' ? '↑' : '↓' }}
               </span>
             </div>
-            <div
-                v-for="type in sensitiveTypes"
-                :key="type.id"
-                class="cell header-cell sortable number-header"
-                :class="{ 'sorted-asc': sortField === `counts.${type.id}` && sortOrder === 'asc', 'sorted-desc': sortField === `counts.${type.id}` && sortOrder === 'desc' }"
-                @click="sortBy(`counts.${type.id}`)"
-                title="点击排序"
-            >
-              {{ type.name }}
-              <span v-if="sortField === `counts.${type.id}`" class="sort-indicator">
-                {{ sortOrder === 'asc' ? '↑' : '↓' }}
-              </span>
-            </div>
-            <div
-                class="cell header-cell sortable number-header"
-                :class="{ 'sorted-asc': sortField === 'total' && sortOrder === 'asc', 'sorted-desc': sortField === 'total' && sortOrder === 'desc' }"
-                @click="sortBy('total')"
-                title="点击排序"
-            >
-              总计
-              <span v-if="sortField === 'total'" class="sort-indicator">
-                {{ sortOrder === 'asc' ? '↑' : '↓' }}
-              </span>
-            </div>
-            <!-- 【需求变更】表达式列表头单独放置，支持排序 -->
-            <div
-                v-if="hasSearchExpressionColumn"
-                class="cell header-cell sortable center-header"
-                :class="{ 'sorted-asc': sortField === 'expressionMatched' && sortOrder === 'asc', 'sorted-desc': sortField === 'expressionMatched' && sortOrder === 'desc' }"
-                @click="sortBy('expressionMatched')"
-                title="点击排序"
-            >
-              表达式
-              <span v-if="sortField === 'expressionMatched'" class="sort-indicator">
-                {{ sortOrder === 'asc' ? '↑' : '↓' }}
-              </span>
-            </div>
+            <template v-if="config.enableBuiltinRules !== false">
+              <div
+                  v-for="type in sensitiveTypes"
+                  :key="type.id"
+                  class="cell header-cell sortable number-header"
+                  :class="{ 'sorted-asc': sortField === `counts.${type.id}` && sortOrder === 'asc', 'sorted-desc': sortField === `counts.${type.id}` && sortOrder === 'desc' }"
+                  @click="sortBy(`counts.${type.id}`)"
+                  title="点击排序"
+              >
+                {{ type.name }}
+                <span v-if="sortField === `counts.${type.id}`" class="sort-indicator">
+                  {{ sortOrder === 'asc' ? '↑' : '↓' }}
+                </span>
+              </div>
+              <div
+                  class="cell header-cell sortable number-header"
+                  :class="{ 'sorted-asc': sortField === 'total' && sortOrder === 'asc', 'sorted-desc': sortField === 'total' && sortOrder === 'desc' }"
+                  @click="sortBy('total')"
+                  title="点击排序"
+              >
+                总计
+                <span v-if="sortField === 'total'" class="sort-indicator">
+                  {{ sortOrder === 'asc' ? '↑' : '↓' }}
+                </span>
+              </div>
+              <!-- 【需求变更】表达式列表头单独放置，支持排序 -->
+              <div
+                  v-if="hasSearchExpressionColumn"
+                  class="cell header-cell sortable center-header"
+                  :class="{ 'sorted-asc': sortField === 'expressionMatched' && sortOrder === 'asc', 'sorted-desc': sortField === 'expressionMatched' && sortOrder === 'desc' }"
+                  @click="sortBy('expressionMatched')"
+                  title="点击排序"
+              >
+                表达式
+                <span v-if="sortField === 'expressionMatched'" class="sort-indicator">
+                  {{ sortOrder === 'asc' ? '↑' : '↓' }}
+                </span>
+              </div>
+            </template>
             <div class="cell actions-col header-cell actions-header frozen-right">操作</div>
           </div>
         </div>
@@ -135,6 +138,7 @@
                 <div class="cell checkbox-col frozen-left">
                   <input
                       type="checkbox"
+                      :disabled="config.enableBuiltinRules === false"
                       :checked="selectedFiles.has(item.filePath)"
                       @change="toggleSelectFile(item.filePath)"
                   />
@@ -142,18 +146,20 @@
                 <div class="cell path-cell frozen-left" :title="item.filePath">{{ getFileName(item.filePath) }}</div>
                 <div class="cell size-cell mono-font">{{ formatFileSize(item.fileSize) }}</div>
                 <div class="cell mono-font time-cell">{{ formatTime(item.modifiedTime) }}</div>
-                <div v-for="type in sensitiveTypes" :key="type.id" class="cell number-cell mono-font"
-                     :class="{ 'highlight-count': (item.counts[type.id] || 0) > 0 }">
-                  {{ (item.counts[type.id] || 0) > 0 ? Number(item.counts[type.id]).toLocaleString() : '-' }}
-                </div>
-                <div class="cell total-cell mono-font">{{ item.total.toLocaleString() }}</div>
-                <!-- 【需求变更】表达式列单独放置，显示图标 -->
-                <div v-if="hasSearchExpressionColumn" class="cell expression-column-center">
-                  <svg v-if="(item.expressionMatched || 0) > 0" class="check-icon-svg">
-                    <use href="#icon-check-fill"></use>
-                  </svg>
-                  <span v-else>-</span>
-                </div>
+                <template v-if="config.enableBuiltinRules !== false">
+                  <div v-for="type in sensitiveTypes" :key="type.id" class="cell number-cell mono-font"
+                       :class="{ 'highlight-count': (item.counts[type.id] || 0) > 0 }">
+                    {{ (item.counts[type.id] || 0) > 0 ? Number(item.counts[type.id]).toLocaleString() : '-' }}
+                  </div>
+                  <div class="cell total-cell mono-font">{{ item.total.toLocaleString() }}</div>
+                  <!-- 【需求变更】表达式列单独放置，显示图标 -->
+                  <div v-if="hasSearchExpressionColumn" class="cell expression-column-center">
+                    <svg v-if="(item.expressionMatched || 0) > 0" class="check-icon-svg">
+                      <use href="#icon-check-fill"></use>
+                    </svg>
+                    <span v-else>-</span>
+                  </div>
+                </template>
                 <div class="cell actions-col frozen-right">
                   <div class="actions-cell">
                     <button class="btn-action" @click="handlePreview(item)" title="预览">
@@ -171,7 +177,7 @@
                         <use href="#icon-directory"></use>
                       </svg>
                     </button>
-                    <button class="btn-action btn-delete" @click="handleDelete(item)" title="删除">
+                    <button v-if="config.enableBuiltinRules !== false" class="btn-action btn-delete" @click="handleDelete(item)" title="删除">
                       <svg class="action-icon delete-icon">
                         <use href="#icon-delete"></use>
                       </svg>
@@ -231,7 +237,8 @@ const COLUMN_WIDTHS = {
   time: 12,
   count: 6.15,  // 每个敏感类型列
   total: 7,
-  actions: 9,
+  actionsWithDelete: 9,   // 有删除按钮时的操作列宽度
+  actionsWithoutDelete: 7, // 无删除按钮时的操作列宽度
 } as const
 
 // 【辅助方法】获取基础字体大小（带缓存和错误处理）
@@ -307,14 +314,24 @@ const hasSearchExpressionColumn = computed(() => {
   )
 })
 
+// 【新增】动态计算操作列宽度（根据 enableBuiltinRules 判断是否显示删除按钮）
+const actionsColWidth = computed(() => {
+  return config.value.enableBuiltinRules !== false ? COLUMN_WIDTHS.actionsWithDelete : COLUMN_WIDTHS.actionsWithoutDelete
+})
+
 // 【修复】动态计算 Grid 列模板 - 使用 1fr 自动填充
 const gridStyle = computed(() => {
-  const countCols = sensitiveTypes.value.length
+  // 【关键】如果禁用内置规则，敏感类型列数为0
+  const countCols = config.value.enableBuiltinRules !== false ? sensitiveTypes.value.length : 0
   // 【关键】所有列使用固定宽度，确保完全对齐
   const countColDefs = `${COLUMN_WIDTHS.count}em `.repeat(countCols)
 
   // 【需求变更】如果有表达式列，添加其宽度
   const expressionColDef = hasSearchExpressionColumn.value ? `${COLUMN_WIDTHS.count}em ` : ''
+
+  // 【新增】条件显示总计列和表达式列（仅在启用内置规则时）
+  const totalColDef = config.value.enableBuiltinRules !== false ? `${COLUMN_WIDTHS.total}em ` : ''
+  const expressionColWithCondition = (config.value.enableBuiltinRules !== false && hasSearchExpressionColumn.value) ? expressionColDef : ''
 
   return {
     gridTemplateColumns: `
@@ -323,9 +340,9 @@ const gridStyle = computed(() => {
       ${COLUMN_WIDTHS.size}em                     /* size - 固定 */
       ${COLUMN_WIDTHS.time}em                     /* time - 固定 */
       ${countColDefs}                             /* counts - 敏感类型列 */
-      ${expressionColDef}                         /* expression - 表达式列（条件显示） */
-      ${COLUMN_WIDTHS.total}em                    /* total - 固定（可显示11-12位，比counts多1-2位） */
-      ${COLUMN_WIDTHS.actions}em                  /* actions - 固定（4个按钮足够） */
+      ${expressionColWithCondition}               /* expression - 表达式列（条件显示） */
+      ${totalColDef}                              /* total - 总计列（条件显示） */
+      ${actionsColWidth.value}em                  /* actions - 固定（根据是否有删除按钮动态调整） */
     `.trim()
   }
 })
@@ -475,23 +492,47 @@ watch(hasSearchExpressionColumn, () => {
   nextTick(() => updatePathMaxWidth())
 })
 
+// 【新增】监听内置规则开关变化，更新 max-width
+watch(() => config.value.enableBuiltinRules, () => {
+  // 【修复】等待 Grid 布局更新后再计算
+  nextTick(() => {
+    nextTick(() => {  // 双重 nextTick 确保虚拟滚动完全渲染
+      updatePathMaxWidth()
+      // 【关键】强制触发重排，确保 sticky 定位正确
+      const tableElement = document.querySelector('.results-table') as HTMLElement
+      if (tableElement) {
+        // 强制浏览器重新计算布局
+        void tableElement.offsetHeight
+      }
+    })
+  })
+})
+
 // 【优化】响应式计算固定列总宽度（基于 Grid 模板配置）
 const fixedColumnsTotalPx = computed(() => {
-  const countCols = sensitiveTypes.value.length
+  // 【关键】如果禁用内置规则，敏感类型列数为0
+  const countCols = config.value.enableBuiltinRules !== false ? sensitiveTypes.value.length : 0
   // 【优化】获取基础字体大小（使用辅助方法）
   const baseFontSize = getBaseFontSize()
 
   // 【需求变更】如果有表达式列，添加其宽度
   const expressionColWidth = hasSearchExpressionColumn.value ? COLUMN_WIDTHS.count * baseFontSize : 0
 
+  // 【新增】条件显示总计列和表达式列（仅在启用内置规则时）
+  const totalColWidth = config.value.enableBuiltinRules !== false ? COLUMN_WIDTHS.total * baseFontSize : 0
+  const expressionColWithCondition = (config.value.enableBuiltinRules !== false && hasSearchExpressionColumn.value) ? expressionColWidth : 0
+
+  // 【新增】动态计算操作列宽度（根据是否有删除按钮）
+  const actionsColWidthPx = actionsColWidth.value * baseFontSize
+
   return (
       COLUMN_WIDTHS.checkbox * baseFontSize +   // checkbox
       COLUMN_WIDTHS.size * baseFontSize +       // size
       COLUMN_WIDTHS.time * baseFontSize +       // time
       (COLUMN_WIDTHS.count * baseFontSize * countCols) +  // counts
-      expressionColWidth +                      // expression（条件显示）
-      COLUMN_WIDTHS.total * baseFontSize +      // total
-      COLUMN_WIDTHS.actions * baseFontSize      // actions
+      expressionColWithCondition +              // expression（条件显示）
+      totalColWidth +                           // total（条件显示）
+      actionsColWidthPx                         // actions（动态宽度）
   )
 })
 

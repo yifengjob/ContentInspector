@@ -42,6 +42,7 @@ export const useAppStore = defineStore('app', () => {
     enableOfficeParsers: true,
     deleteToTrash: false, // 默认永久删除
     ignoreOtherDrivesSystemDirs: false, // 默认不忽略其他磁盘的系统目录（即会扫描）
+    enableBuiltinRules: true, // 【新增】默认启用内置敏感词规则
     searchExpression: '', // 默认为空，表示不启用搜索表达式
   })
   

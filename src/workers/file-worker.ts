@@ -60,6 +60,7 @@ interface WorkerTask {
     filePath: string;
     enabledSensitiveTypes: string[];
     searchExpression?: string; // 搜索表达式
+    enableBuiltinRules?: boolean; // 【新增】是否启用内置敏感词规则（默认 true）
     previewMode?: boolean; // 预览模式：只提取文本，不检测敏感数据
     config?: {
         maxFileSizeMb?: number;
@@ -102,11 +103,7 @@ process.on('uncaughtException', (error) => {
 
 // 【事件驱动】Worker任务处理器 - 使用Promise链式处理
 async function processTask(task: WorkerTask): Promise<void> {
-    const {taskId, filePath, enabledSensitiveTypes, searchExpression, previewMode = false} = task;
-    
-    // 【调试日志】记录接收到的任务参数
-    workerLogger.info('[Worker TID:{}] 收到任务: taskId={}, file={}, searchExpression="{}"',
-        threadId, taskId, filePath, searchExpression || '(空)');
+    const {taskId, filePath, enabledSensitiveTypes, searchExpression, enableBuiltinRules = true, previewMode = false} = task;
 
     // 【优化】设置超时保护（使用配置常量）
     let timeoutId: NodeJS.Timeout | null = null;
@@ -230,6 +227,7 @@ async function processTask(task: WorkerTask): Promise<void> {
                         mode: previewMode ? 'preview' : 'detect',
                         enabledTypes: enabledSensitiveTypes,
                         searchExpression,
+                        enableBuiltinRules, // 【新增】传递内置规则开关
                         ...createCallbacks()
                     }),
                     timeoutPromise
@@ -261,6 +259,7 @@ async function processTask(task: WorkerTask): Promise<void> {
                     mode: previewMode ? 'preview' : 'detect',
                     enabledTypes: enabledSensitiveTypes,
                     searchExpression,
+                    enableBuiltinRules, // 【新增】传递内置规则开关
                     ...createCallbacks()
                 }, text); // 传入预提取的文本
             }

@@ -50,8 +50,6 @@
               }"
               placeholder="关键字搜索，支持表达式（如：密码 & 身份证）"
               @input="onExpressionInput"
-              @blur="handleSaveExpression"
-              @keyup.enter="handleSaveExpression"
           />
         </div>
         
@@ -60,8 +58,8 @@
           <button
               class="btn btn-primary"
               @click="handleStartScan"
-              :disabled="isScanning || isCancelling"
-              title="开始扫描选中的目录"
+              :disabled="isScanning || isCancelling || isStartScanDisabled"
+              :title="startScanButtonTitle"
           >
             <svg class="btn-icon">
               <use href="#icon-play"/>
@@ -201,16 +199,30 @@
         <span class="status-label">进度：</span>
         <span class="status-value mono-font">{{ formatNumber(scannedCount + filteredCount + skippedCount) }}{{ totalCount > 0 ? ' / ' + formatNumber(totalCount) : '' }}</span>
       </div>
-      <div class="status-divider"></div>
-      <div class="status-item">
-        <span class="status-label">敏感文件：</span>
-        <span class="status-value warning mono-font">{{ formatNumber(sensitiveFilesCount) }}</span>
-      </div>
-      <div class="status-divider"></div>
-      <div class="status-item">
-        <span class="status-label">敏感信息：</span>
-        <span class="status-value danger mono-font">{{ formatNumber(totalSensitiveItems) }} 条</span>
-      </div>
+      
+      <!-- 【条件渲染】启用内置规则时显示敏感文件和敏感信息统计 -->
+      <template v-if="config.enableBuiltinRules !== false">
+        <div class="status-divider"></div>
+        <div class="status-item">
+          <span class="status-label">敏感文件：</span>
+          <span class="status-value warning mono-font">{{ formatNumber(sensitiveFilesCount) }}</span>
+        </div>
+        <div class="status-divider"></div>
+        <div class="status-item">
+          <span class="status-label">敏感信息：</span>
+          <span class="status-value danger mono-font">{{ formatNumber(totalSensitiveItems) }} 条</span>
+        </div>
+      </template>
+      
+      <!-- 【新增】禁用内置规则时，扫描完成后显示搜索到的文件数量 -->
+      <template v-else-if="!isScanning && scanResults.length > 0">
+        <div class="status-divider"></div>
+        <div class="status-item">
+          <span class="status-label">搜索结果：</span>
+          <span class="status-value success mono-font">{{ formatNumber(scanResults.length) }} 个文件</span>
+        </div>
+      </template>
+      
       <div class="status-divider"></div>
       <div class="status-item status-elapsed">
         <span class="status-label">耗时：</span>
@@ -450,6 +462,9 @@ const handleStartScan = async () => {
     return
   }
 
+  // 【修复】表达式验证已在输入框实时进行，此处无需再次验证
+  // 如果表达式有误，按钮会被禁用，无法点击
+
   // 获取有效的扫描路径（只保留叶子节点）
   const effectivePaths = appStore.getEffectiveScanPaths()
 
@@ -459,6 +474,7 @@ const handleStartScan = async () => {
   startElapsedTimeTimer()  // 【UI优化】启动耗时更新定时器
 
   // 将Proxy对象转换为普通对象，以便通过IPC传递
+  const expr = searchExpression.value.trim()
   const scanConfig = {
     selectedPaths: effectivePaths,
     selectedExtensions: [...config.value.selectedExtensions],
@@ -468,7 +484,8 @@ const handleStartScan = async () => {
     maxFileSizeMb: config.value.maxFileSizeMb,
     maxPdfSizeMb: config.value.maxPdfSizeMb,
     scanConcurrency: config.value.scanConcurrency,
-    searchExpression: searchExpression.value.trim() || undefined,  // 【新增】搜索表达式
+    searchExpression: expr || undefined,  // 【新增】搜索表达式
+    enableBuiltinRules: config.value.enableBuiltinRules,  // 【新增】内置规则开关
   }
 
   try {
@@ -518,7 +535,7 @@ const handleOpenDevTools = () => {
 
 // ==================== 搜索表达式相关 ====================
 
-// 【新增】实时验证表达式（带防抖）
+// 【修复】实时验证表达式并自动保存（带防抖）
 const validateExpressionDebounced = async () => {
   const expr = searchExpression.value.trim()
   
@@ -526,6 +543,12 @@ const validateExpressionDebounced = async () => {
   if (!expr) {
     expressionValidationError.value = ''
     expressionValidated.value = false
+    // 清空时也保存
+    try {
+      await setSearchExpression('')
+    } catch (error: any) {
+      console.error('清空表达式失败:', error)
+    }
     return
   }
   
@@ -535,11 +558,19 @@ const validateExpressionDebounced = async () => {
     
     if (!result.valid) {
       expressionValidationError.value = result.error || '语法错误'
+      // 验证失败，不保存
     } else {
       expressionValidationError.value = ''
+      // 验证通过，自动保存
+      try {
+        await setSearchExpression(expr)
+      } catch (error: any) {
+        console.error('保存表达式失败:', error)
+      }
     }
   } catch (error: any) {
     expressionValidationError.value = error.message || '验证失败'
+    // 验证失败，不保存
   }
 }
 
@@ -556,29 +587,6 @@ const onExpressionInput = () => {
   }, 500)
 }
 
-// 【新增】保存表达式
-const handleSaveExpression = async () => {
-  const expr = searchExpression.value.trim()
-  
-  try {
-    await setSearchExpression(expr)
-    expressionValidated.value = true
-    expressionValidationError.value = ''
-    
-    // 如果之前有错误，清除它
-    if (expr === '') {
-      expressionValidationError.value = ''
-      expressionValidated.value = false
-    }
-  } catch (error: any) {
-    expressionValidationError.value = error.message || '保存失败'
-    await showMessage(`保存搜索表达式失败：${error.message}`, {
-      title: '错误',
-      type: 'error'
-    })
-  }
-}
-
 // 【新增】获取表达式验证状态提示
 const expressionValidationStatus = computed(() => {
   if (expressionValidationError.value) {
@@ -588,6 +596,61 @@ const expressionValidationStatus = computed(() => {
     return '表达式语法正确'
   }
   return '输入搜索表达式，如：密码 & 身份证'
+})
+
+// 【新增】计算"开始扫描"按钮是否禁用
+const isStartScanDisabled = computed(() => {
+  // 如果正在扫描或取消中，禁用
+  if (isScanning.value || isCancelling.value) {
+    return true
+  }
+  
+  // 如果没有选择路径，禁用
+  if (appStore.selectedPaths.size === 0) {
+    return true
+  }
+  
+  // 如果禁用内置规则，必须有有效的表达式
+  if (config.value.enableBuiltinRules === false) {
+    const expr = searchExpression.value.trim()
+    // 表达式为空，禁用
+    if (!expr) {
+      return true
+    }
+    // 表达式有错误，禁用
+    if (expressionValidationError.value) {
+      return true
+    }
+  }
+  
+  return false
+})
+
+// 【新增】计算"开始扫描"按钮的 title 提示
+const startScanButtonTitle = computed(() => {
+  if (isScanning.value) return '正在扫描中...'
+  if (isCancelling.value) return '正在取消中...'
+  
+  // 如果没有选择路径
+  if (appStore.selectedPaths.size === 0) {
+    return '请至少选择一个扫描路径'
+  }
+  
+  // 如果禁用内置规则，检查表达式状态
+  if (config.value.enableBuiltinRules === false) {
+    const expr = searchExpression.value.trim()
+    if (!expr) {
+      return '请输入自定义表达式'
+    }
+    if (expressionValidationError.value) {
+      // 截断错误信息，避免 tooltip 过长
+      const errorMsg = expressionValidationError.value
+      const truncatedMsg = errorMsg.length > 50 ? errorMsg.substring(0, 50) + '...' : errorMsg
+      return `表达式语法错误：${truncatedMsg}`
+    }
+  }
+  
+  return '开始扫描选中的目录'
 })
 
 // 预览文件
@@ -1087,6 +1150,11 @@ const getThemeTooltip = () => {
   color: #ff4d4f;
   font-weight: 600;
   /* 【UI优化】移除 min-width */
+}
+
+.status-value.success {
+  color: var(--success-color);
+  font-weight: 600;
 }
 
 /* 【UI优化】扫描耗时项靠右显示 */
