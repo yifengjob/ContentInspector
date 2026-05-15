@@ -55,6 +55,7 @@ export interface StreamProcessorOptions {
   mode: 'detect' | 'preview';           // 处理模式
   enabledTypes: string[];               // 启用的敏感词类型
   searchExpression?: string;            // 自定义逻辑表达式
+  enableBuiltinRules?: boolean;         // 【新增】是否启用内置敏感词规则（默认 true）
   
   // 回调函数
   onChunk?: (chunkData: ChunkData) => void;           // 每块就绪回调
@@ -227,7 +228,7 @@ export class FileStreamProcessor {
 
       // 检测敏感词 (带重叠区)
       const fullChunk = this.previousOverlap + chunkText;
-      const localHighlights = this.detectWithOverlap(fullChunk, options.enabledTypes, options.searchExpression);
+      const localHighlights = this.detectWithOverlap(fullChunk, options.enabledTypes, options.searchExpression, options.enableBuiltinRules);
       
       // 【修复】将局部偏移转换为全局偏移（基于字符数）
       const charsBefore = this.totalChars;  // 当前块之前的总字符数
@@ -279,7 +280,7 @@ export class FileStreamProcessor {
     const currentChunk = this.previousOverlap + this.buffer.slice(0, splitPos);
 
     // 检测敏感词
-    const localHighlights = this.detectWithOverlap(currentChunk, options.enabledTypes, options.searchExpression);
+    const localHighlights = this.detectWithOverlap(currentChunk, options.enabledTypes, options.searchExpression, options.enableBuiltinRules);
     
     // 【修复】将局部偏移转换为全局偏移（基于字符数）
     const charsBefore = this.totalChars;  // 当前块之前的总字符数
@@ -346,18 +347,25 @@ export class FileStreamProcessor {
   private detectWithOverlap(
     chunk: string,
     enabledTypes: string[],
-    searchExpression?: string
+    searchExpression?: string,
+    enableBuiltinRules: boolean = true // 【新增】是否启用内置规则
   ): HighlightRange[] {
-    // 【优化】一次性获取内置规则的高亮
-    const allHighlights = getHighlights(chunk, enabledTypes);
+    let allHighlights: HighlightRange[] = [];
+    
+    // 【新增】条件执行内置规则检测
+    if (enableBuiltinRules) {
+      // ✅ 执行内置规则检测
+      allHighlights = getHighlights(chunk, enabledTypes);
+    }
+    // ❌ 否则跳过内置规则检测，allHighlights 保持为空数组
 
     // 过滤掉重叠区的重复结果
     const overlapLength = this.previousOverlap.length;
     const newHighlights = allHighlights.filter(h => h.start >= overlapLength);
 
     // 【扫描模式】累加计数（在一次调用中完成）
-    if (enabledTypes.length > 0 || (searchExpression && searchExpression.trim())) {
-      this.accumulateCounts(newHighlights, chunk, searchExpression);
+    if ((enableBuiltinRules && enabledTypes.length > 0) || (searchExpression && searchExpression.trim())) {
+      this.accumulateCounts(newHighlights, chunk, searchExpression, enableBuiltinRules);
     }
 
     return newHighlights;
@@ -371,13 +379,16 @@ export class FileStreamProcessor {
   private accumulateCounts(
     highlights: HighlightRange[],
     chunkText: string,
-    searchExpression?: string
+    searchExpression?: string,
+    enableBuiltinRules: boolean = true // 【新增】是否启用内置规则
   ): void {
     // 1. 累加内置规则的计数（基于已有的高亮结果，无需再次扫描）
-    for (const highlight of highlights) {
-      this.accumulatedCounts[highlight.typeId] = 
-        (this.accumulatedCounts[highlight.typeId] || 0) + 1;
-      this.totalCount++;
+    if (enableBuiltinRules) {
+      for (const highlight of highlights) {
+        this.accumulatedCounts[highlight.typeId] = 
+          (this.accumulatedCounts[highlight.typeId] || 0) + 1;
+        this.totalCount++;
+      }
     }
     
     // 2. 【新方案】记录自定义表达式中关键词的出现状态
