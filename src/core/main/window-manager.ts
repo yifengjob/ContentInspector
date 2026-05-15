@@ -17,6 +17,8 @@ import {LogManager} from '../infra/log-manager';
 import {ScanState} from '../state/scan-state';
 import {cancelScan} from '../scanner';
 import {
+    CANCEL_SCAN_CHECK_INTERVAL,
+    CANCEL_SCAN_MAX_WAIT,
     WINDOW_DEFAULT_HEIGHT,
     WINDOW_DEFAULT_WIDTH,
     WINDOW_MAX_HEIGHT,
@@ -234,13 +236,12 @@ export function createWindowManager(): WindowManager {
                     cancelScan(scanState);
                     
                     // 异步等待扫描停止（与 IPC handler 保持一致）
-                    const CANCEL_SCAN_CHECK_INTERVAL = 100;
-                    const CANCEL_SCAN_MAX_WAIT = 5000;
                     let waitedTime = 0;
                     
                     await new Promise<void>((resolve) => {
                         const checkInterval = setInterval(() => {
-                            if (!scanState.isScanning) {
+                            // 【修复】添加空值检查
+                            if (!scanState || !scanState.isScanning) {
                                 clearInterval(checkInterval);
                                 mainLogger.info('[窗口关闭] 扫描已安全取消');
                                 
@@ -257,7 +258,8 @@ export function createWindowManager(): WindowManager {
                         // 超时强制 resolve
                         setTimeout(() => {
                             clearInterval(checkInterval);
-                            if (scanState.isScanning) {
+                            // 【修复】添加空值检查
+                            if (scanState && scanState.isScanning) {
                                 mainLogger.warn('[窗口关闭] 警告: 等待 {} 秒后扫描仍未结束，强制重置状态', CANCEL_SCAN_MAX_WAIT / 1000);
                                 scanState.isScanning = false;
                             }
