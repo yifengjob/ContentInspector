@@ -313,7 +313,8 @@ const hasSearchExpressionColumn = computed(() => {
 
 // 【修复】动态计算 Grid 列模板 - 使用 1fr 自动填充
 const gridStyle = computed(() => {
-  const countCols = sensitiveTypes.value.length
+  // 【关键】如果禁用内置规则，敏感类型列数为0
+  const countCols = config.value.enableBuiltinRules !== false ? sensitiveTypes.value.length : 0
   // 【关键】所有列使用固定宽度，确保完全对齐
   const countColDefs = `${COLUMN_WIDTHS.count}em `.repeat(countCols)
 
@@ -501,7 +502,8 @@ watch(() => config.value.enableBuiltinRules, () => {
 
 // 【优化】响应式计算固定列总宽度（基于 Grid 模板配置）
 const fixedColumnsTotalPx = computed(() => {
-  const countCols = sensitiveTypes.value.length
+  // 【关键】如果禁用内置规则，敏感类型列数为0
+  const countCols = config.value.enableBuiltinRules !== false ? sensitiveTypes.value.length : 0
   // 【优化】获取基础字体大小（使用辅助方法）
   const baseFontSize = getBaseFontSize()
 
