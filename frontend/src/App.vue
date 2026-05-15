@@ -627,14 +627,17 @@ const isStartScanDisabled = computed(() => {
   return false
 })
 
-// 【新增】计算“开始扫描”按钮的 title 提示
+// 【新增】计算"开始扫描"按钮的 title 提示
 const startScanButtonTitle = computed(() => {
   if (isScanning.value) return '正在扫描中...'
   if (isCancelling.value) return '正在取消中...'
   
   const expr = searchExpression.value.trim()
   if (expr && expressionValidationError.value) {
-    return `表达式语法错误：${expressionValidationError.value}，请修正后再扫描`
+    // 截断错误信息，避免 tooltip 过长
+    const errorMsg = expressionValidationError.value
+    const truncatedMsg = errorMsg.length > 50 ? errorMsg.substring(0, 50) + '...' : errorMsg
+    return `表达式语法错误：${truncatedMsg}`
   }
   
   return '开始扫描选中的目录'
