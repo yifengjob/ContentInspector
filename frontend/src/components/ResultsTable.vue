@@ -5,7 +5,7 @@
       <h3>扫描结果</h3>
       <div class="table-actions">
         <button
-            v-if="selectedFiles.size > 0"
+            v-if="config.enableBuiltinRules !== false && selectedFiles.size > 0"
             class="btn-batch-delete"
             @click="handleBatchDelete"
         >
