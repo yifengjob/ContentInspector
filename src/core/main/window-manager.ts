@@ -225,38 +225,56 @@ export function createWindowManager(): WindowManager {
                 }
             }
 
-            mainWindow.on('closed', () => {
-                // 【修复】如果窗口关闭时正在扫描，取消扫描并等待停止
+            mainWindow.on('closed', async () => {
+                // 【修复】如果窗口关闭时正在扫描，先执行完整的取消扫描逻辑
                 if (scanState && scanState.isScanning) {
-                    mainLogger.info('[窗口关闭] 检测到扫描进行中，正在取消...');
+                    mainLogger.info('[窗口关闭] 检测到扫描进行中，执行取消扫描逻辑...');
+                    
+                    // 设置取消标志
                     cancelScan(scanState);
                     
-                    // 【修复】不立即重置 isScanning，让 cleanup() 自然处理
-                    // 原来的代码：scanState.isScanning = false; ❌ 这会导致状态不一致
-                    
-                    // 异步等待扫描停止（最多等待 10 秒）
-                    const MAX_WAIT_TIME = 10000;
-                    const CHECK_INTERVAL = 100;
+                    // 异步等待扫描停止（与 IPC handler 保持一致）
+                    const CANCEL_SCAN_CHECK_INTERVAL = 100;
+                    const CANCEL_SCAN_MAX_WAIT = 5000;
                     let waitedTime = 0;
                     
-                    const checkInterval = setInterval(() => {
-                        if (!scanState.isScanning || waitedTime >= MAX_WAIT_TIME) {
-                            clearInterval(checkInterval);
-                            
-                            if (scanState.isScanning) {
-                                mainLogger.warn('[窗口关闭] 警告: 等待 {} 秒后扫描仍未结束，强制重置', MAX_WAIT_TIME / 1000);
-                                scanState.isScanning = false;
-                            } else {
-                                mainLogger.info('[窗口关闭] 扫描已安全停止');
+                    await new Promise<void>((resolve) => {
+                        const checkInterval = setInterval(() => {
+                            if (!scanState.isScanning) {
+                                clearInterval(checkInterval);
+                                mainLogger.info('[窗口关闭] 扫描已安全取消');
+                                
+                                // 停止电源阻止器
+                                if (powerSaveManagerRef) {
+                                    powerSaveManagerRef.stop();
+                                }
+                                
+                                resolve();
                             }
-                        }
-                        waitedTime += CHECK_INTERVAL;
-                    }, CHECK_INTERVAL);
-                }
-
-                // 【新增】窗口关闭时停止电源阻止器
-                if (powerSaveManagerRef) {
-                    powerSaveManagerRef.stop();
+                            waitedTime += CANCEL_SCAN_CHECK_INTERVAL;
+                        }, CANCEL_SCAN_CHECK_INTERVAL);
+                        
+                        // 超时强制 resolve
+                        setTimeout(() => {
+                            clearInterval(checkInterval);
+                            if (scanState.isScanning) {
+                                mainLogger.warn('[窗口关闭] 警告: 等待 {} 秒后扫描仍未结束，强制重置状态', CANCEL_SCAN_MAX_WAIT / 1000);
+                                scanState.isScanning = false;
+                            }
+                            
+                            // 停止电源阻止器
+                            if (powerSaveManagerRef) {
+                                powerSaveManagerRef.stop();
+                            }
+                            
+                            resolve();
+                        }, CANCEL_SCAN_MAX_WAIT);
+                    });
+                } else {
+                    // 没有扫描任务，直接停止电源阻止器
+                    if (powerSaveManagerRef) {
+                        powerSaveManagerRef.stop();
+                    }
                 }
 
                 mainWindow = null;
