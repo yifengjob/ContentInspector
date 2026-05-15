@@ -363,17 +363,9 @@ export class FileStreamProcessor {
     // ❌ 否则跳过检测，allHighlights 保持为空数组
 
     // 【修复】过滤掉重叠区的重复结果
+    // 【优化】表达式关键词和内置规则使用相同的过滤逻辑
     const overlapLength = this.previousOverlap.length;
-    let newHighlights: HighlightRange[];
-    
-    if (enableBuiltinRules) {
-      // 内置规则：过滤重叠区，避免重复计数
-      newHighlights = allHighlights.filter(h => h.start >= overlapLength);
-    } else {
-      // 表达式关键词：只过滤完全在重叠区内的高亮
-      // 保留部分或全部在新 chunk 中的高亮
-      newHighlights = allHighlights.filter(h => h.end > overlapLength);
-    }
+    const newHighlights = allHighlights.filter(h => h.start >= overlapLength);
 
     // 【扫描模式】累加计数（在一次调用中完成）
     if ((enableBuiltinRules && enabledTypes.length > 0) || (searchExpression && searchExpression.trim())) {
@@ -440,6 +432,8 @@ export class FileStreamProcessor {
   /**
    * 【新增】获取表达式关键词的高亮位置
    * 
+   * 【优化】复用内置规则的 matchAll 逻辑，确保准确性
+   * 
    * @param text 文本内容
    * @param searchExpression 搜索表达式
    * @returns 高亮范围数组
@@ -448,22 +442,21 @@ export class FileStreamProcessor {
     const highlights: HighlightRange[] = [];
     const keywords = this.extractKeywordsFromExpression(searchExpression);
       
+    // 【优化】对每个关键词使用 matchAll，与内置规则保持一致
     for (const keyword of keywords) {
-      let startIndex = 0;
-        
-      // 查找所有匹配的关键词位置
-      while (startIndex < text.length) {
-        const index = text.indexOf(keyword, startIndex);
-        if (index === -1) break;
-          
+      // 转义特殊字符，创建安全的正则表达式
+      const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = new RegExp(escapedKeyword, 'g');
+      
+      const matches = Array.from(text.matchAll(pattern));
+      
+      for (const match of matches) {
         highlights.push({
-          start: index,
-          end: index + keyword.length,
+          start: match.index!,
+          end: match.index! + keyword.length,
           typeId: 'expression_keyword',  // 【标记】这是表达式关键词
           typeName: '表达式关键词'
         });
-          
-        startIndex = index + keyword.length;
       }
     }
       
