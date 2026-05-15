@@ -29,6 +29,7 @@
             <div class="cell checkbox-col header-cell center-header frozen-left">
               <input
                   type="checkbox"
+                  :disabled="config.enableBuiltinRules === false"
                   ref="selectAllCheckbox"
                   :checked="isAllSelected"
                   @change="toggleSelectAll"
@@ -137,6 +138,7 @@
                 <div class="cell checkbox-col frozen-left">
                   <input
                       type="checkbox"
+                      :disabled="config.enableBuiltinRules === false"
                       :checked="selectedFiles.has(item.filePath)"
                       @change="toggleSelectFile(item.filePath)"
                   />
@@ -326,7 +328,7 @@ const gridStyle = computed(() => {
 
   // 【需求变更】如果有表达式列，添加其宽度
   const expressionColDef = hasSearchExpressionColumn.value ? `${COLUMN_WIDTHS.count}em ` : ''
-  
+
   // 【新增】条件显示总计列和表达式列（仅在启用内置规则时）
   const totalColDef = config.value.enableBuiltinRules !== false ? `${COLUMN_WIDTHS.total}em ` : ''
   const expressionColWithCondition = (config.value.enableBuiltinRules !== false && hasSearchExpressionColumn.value) ? expressionColDef : ''
@@ -515,11 +517,11 @@ const fixedColumnsTotalPx = computed(() => {
 
   // 【需求变更】如果有表达式列，添加其宽度
   const expressionColWidth = hasSearchExpressionColumn.value ? COLUMN_WIDTHS.count * baseFontSize : 0
-  
+
   // 【新增】条件显示总计列和表达式列（仅在启用内置规则时）
   const totalColWidth = config.value.enableBuiltinRules !== false ? COLUMN_WIDTHS.total * baseFontSize : 0
   const expressionColWithCondition = (config.value.enableBuiltinRules !== false && hasSearchExpressionColumn.value) ? expressionColWidth : 0
-  
+
   // 【新增】动态计算操作列宽度（根据是否有删除按钮）
   const actionsColWidthPx = actionsColWidth.value * baseFontSize
 
