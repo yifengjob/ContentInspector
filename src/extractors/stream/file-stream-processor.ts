@@ -362,9 +362,18 @@ export class FileStreamProcessor {
     }
     // ❌ 否则跳过检测，allHighlights 保持为空数组
 
-    // 过滤掉重叠区的重复结果
+    // 【修复】过滤掉重叠区的重复结果
     const overlapLength = this.previousOverlap.length;
-    const newHighlights = allHighlights.filter(h => h.start >= overlapLength);
+    let newHighlights: HighlightRange[];
+    
+    if (enableBuiltinRules) {
+      // 内置规则：过滤重叠区，避免重复计数
+      newHighlights = allHighlights.filter(h => h.start >= overlapLength);
+    } else {
+      // 表达式关键词：只过滤完全在重叠区内的高亮
+      // 保留部分或全部在新 chunk 中的高亮
+      newHighlights = allHighlights.filter(h => h.end > overlapLength);
+    }
 
     // 【扫描模式】累加计数（在一次调用中完成）
     if ((enableBuiltinRules && enabledTypes.length > 0) || (searchExpression && searchExpression.trim())) {
