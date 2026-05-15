@@ -5,7 +5,7 @@
       <h3>扫描结果</h3>
       <div class="table-actions">
         <button
-            v-if="selectedFiles.size > 0"
+            v-if="selectedFiles.size > 0 && config.enableBuiltinRules !== false"  <!-- 【新增】条件显示 -->
             class="btn-batch-delete"
             @click="handleBatchDelete"
         >
@@ -68,19 +68,21 @@
                 {{ sortOrder === 'asc' ? '↑' : '↓' }}
               </span>
             </div>
-            <div
-                v-for="type in sensitiveTypes"
-                :key="type.id"
-                class="cell header-cell sortable number-header"
-                :class="{ 'sorted-asc': sortField === `counts.${type.id}` && sortOrder === 'asc', 'sorted-desc': sortField === `counts.${type.id}` && sortOrder === 'desc' }"
-                @click="sortBy(`counts.${type.id}`)"
-                title="点击排序"
-            >
-              {{ type.name }}
-              <span v-if="sortField === `counts.${type.id}`" class="sort-indicator">
-                {{ sortOrder === 'asc' ? '↑' : '↓' }}
-              </span>
-            </div>
+            <template v-if="config.enableBuiltinRules !== false">
+              <div
+                  v-for="type in sensitiveTypes"
+                  :key="type.id"
+                  class="cell header-cell sortable number-header"
+                  :class="{ 'sorted-asc': sortField === `counts.${type.id}` && sortOrder === 'asc', 'sorted-desc': sortField === `counts.${type.id}` && sortOrder === 'desc' }"
+                  @click="sortBy(`counts.${type.id}`)"
+                  title="点击排序"
+              >
+                {{ type.name }}
+                <span v-if="sortField === `counts.${type.id}`" class="sort-indicator">
+                  {{ sortOrder === 'asc' ? '↑' : '↓' }}
+                </span>
+              </div>
+            </template>
             <div
                 class="cell header-cell sortable number-header"
                 :class="{ 'sorted-asc': sortField === 'total' && sortOrder === 'asc', 'sorted-desc': sortField === 'total' && sortOrder === 'desc' }"
@@ -142,11 +144,13 @@
                 <div class="cell path-cell frozen-left" :title="item.filePath">{{ getFileName(item.filePath) }}</div>
                 <div class="cell size-cell mono-font">{{ formatFileSize(item.fileSize) }}</div>
                 <div class="cell mono-font time-cell">{{ formatTime(item.modifiedTime) }}</div>
-                <div v-for="type in sensitiveTypes" :key="type.id" class="cell number-cell mono-font"
-                     :class="{ 'highlight-count': (item.counts[type.id] || 0) > 0 }">
-                  {{ (item.counts[type.id] || 0) > 0 ? Number(item.counts[type.id]).toLocaleString() : '-' }}
-                </div>
-                <div class="cell total-cell mono-font">{{ item.total.toLocaleString() }}</div>
+                <template v-if="config.enableBuiltinRules !== false">
+                  <div v-for="type in sensitiveTypes" :key="type.id" class="cell number-cell mono-font"
+                       :class="{ 'highlight-count': (item.counts[type.id] || 0) > 0 }">
+                    {{ (item.counts[type.id] || 0) > 0 ? Number(item.counts[type.id]).toLocaleString() : '-' }}
+                  </div>
+                </template>
+                <div class="cell total-cell mono-font" v-if="config.enableBuiltinRules !== false">{{ item.total.toLocaleString() }}</div>
                 <!-- 【需求变更】表达式列单独放置，显示图标 -->
                 <div v-if="hasSearchExpressionColumn" class="cell expression-column-center">
                   <svg v-if="(item.expressionMatched || 0) > 0" class="check-icon-svg">
@@ -171,7 +175,8 @@
                         <use href="#icon-directory"></use>
                       </svg>
                     </button>
-                    <button class="btn-action btn-delete" @click="handleDelete(item)" title="删除">
+                    <!-- 【新增】条件显示删除按钮 -->
+                    <button v-if="config.enableBuiltinRules !== false" class="btn-action btn-delete" @click="handleDelete(item)" title="删除">
                       <svg class="action-icon delete-icon">
                         <use href="#icon-delete"></use>
                       </svg>
