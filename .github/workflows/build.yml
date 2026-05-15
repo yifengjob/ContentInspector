@@ -127,7 +127,7 @@ jobs:
         if: startsWith(matrix.platform, 'windows')
         uses: actions/upload-artifact@v7
         with:
-          name: dataguard-scanner-${{ matrix.platform }}
+          name: ContentInspector-${{ matrix.platform }}
           path: |
             release/*.exe
           if-no-files-found: error
@@ -136,7 +136,7 @@ jobs:
         if: startsWith(matrix.platform, 'linux')
         uses: actions/upload-artifact@v7
         with:
-          name: dataguard-scanner-${{ matrix.platform }}
+          name: ContentInspector-${{ matrix.platform }}
           path: |
             release/*.AppImage
             release/*.deb
@@ -147,7 +147,7 @@ jobs:
         if: startsWith(matrix.platform, 'macos')
         uses: actions/upload-artifact@v7
         with:
-          name: dataguard-scanner-${{ matrix.platform }}
+          name: ContentInspector-${{ matrix.platform }}
           path: |
             release/*.dmg
             release/*.zip

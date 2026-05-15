@@ -70,10 +70,10 @@
       ]
     },
     "nsis": {
-      "artifactName": "${name}-${platform}-${version}-${arch}-Setup.${ext}"
+      "artifactName": "${productName}-${platform}-${version}-${arch}-Setup.${ext}"
     },
     "portable": {
-      "artifactName": "${name}-${platform}-${version}-${arch}-Portable.${ext}"
+      "artifactName": "${productName}-${platform}-${version}-${arch}-Portable.${ext}"
     },
     "mac": {
       "target": [
@@ -84,7 +84,7 @@
       "icon": "build/icons/icon.icns"
     },
     "dmg": {
-      "artifactName": "${name}-${platform}-${version}-${arch}.${ext}"
+      "artifactName": "${productName}-${platform}-${version}-${arch}.${ext}"
     },
     "linux": {
       "target": [
@@ -119,15 +119,15 @@
       }
     },
     "appImage": {
-      "artifactName": "${name}-${platform}-${version}-${arch}.${ext}"
+      "artifactName": "${productName}-${platform}-${version}-${arch}.${ext}"
     },
     "deb": {
-      "artifactName": "${name}-${platform}-${version}-${arch}.${ext}",
+      "artifactName": "${productName}-${platform}-${version}-${arch}.${ext}",
       "afterInstall": "build/linux-after-install.sh",
       "afterRemove": "build/linux-after-remove.sh"
     },
     "rpm": {
-      "artifactName": "${name}-${platform}-${version}-${arch}.${ext}"
+      "artifactName": "${productName}-${platform}-${version}-${arch}.${ext}"
     }
   },
   "dependencies": {
