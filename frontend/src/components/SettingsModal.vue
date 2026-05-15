@@ -57,19 +57,19 @@
         <div class="settings-section">
           <h4>敏感词规则</h4>
           
-          <div class="setting-item">
-            <label>
+          <div class="setting-item setting-item-checkbox">
+            <label class="checkbox-label">
               <input 
                 type="checkbox" 
                 v-model="config.enableBuiltinRules"
               />
               <span>启用内置敏感词扫描规则</span>
             </label>
-            <p class="setting-hint">
-              启用后将检测身份证号、手机号、邮箱、银行卡号等敏感信息。<br/>
-              取消勾选则仅使用自定义表达式进行关键字搜索。
-            </p>
           </div>
+          <p class="setting-description">
+            启用后将检测身份证号、手机号、邮箱、银行卡号等敏感信息。<br/>
+            取消勾选则仅使用自定义表达式进行关键字搜索。
+          </p>
         </div>
         
         <!-- 【条件渲染】敏感类型管理 -->
@@ -90,23 +90,27 @@
         <div class="settings-section">
           <h4>文件操作</h4>
           
-          <div class="setting-item">
-            <label>删除文件时移入回收站</label>
-            <input 
-              type="checkbox" 
-              v-model="config.deleteToTrash"
-            />
-            <span class="hint">（取消勾选则永久删除）</span>
+          <div class="setting-item setting-item-checkbox">
+            <label class="checkbox-label">
+              <input 
+                type="checkbox" 
+                v-model="config.deleteToTrash"
+              />
+              <span>删除文件时移入回收站</span>
+            </label>
           </div>
+          <p class="setting-description">取消勾选则永久删除</p>
           
-          <div class="setting-item" v-if="isWindows">
-            <label>忽略其他磁盘的系统目录</label>
-            <input 
-              type="checkbox" 
-              v-model="config.ignoreOtherDrivesSystemDirs"
-            />
-            <span class="hint">（启用后将忽略 D-Z 盘的 Windows、Program Files 等系统目录）</span>
+          <div class="setting-item setting-item-checkbox" v-if="isWindows">
+            <label class="checkbox-label">
+              <input 
+                type="checkbox" 
+                v-model="config.ignoreOtherDrivesSystemDirs"
+              />
+              <span>忽略其他磁盘的系统目录</span>
+            </label>
           </div>
+          <p class="setting-description" v-if="isWindows">启用后将忽略 D-Z 盘的 Windows、Program Files 等系统目录</p>
           
           <div class="setting-item">
             <button class="btn-clear-cache" @click="handleClearCache">
@@ -357,6 +361,37 @@ const handleClearCache = async () => {
   margin-bottom: 12px;
 }
 
+/* 【新增】复选框类型的设置项 */
+.setting-item-checkbox {
+  margin-bottom: 4px; /* 减少间距，因为下面有描述文字 */
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  cursor: pointer;
+  margin: 0; /* 移除默认 margin */
+}
+
+.checkbox-label span {
+  user-select: none;
+}
+
+/* 【新增】设置项描述文字 */
+.setting-description {
+  font-size: 12px;
+  color: #999;
+  margin: 0 0 12px 0; /* 上边距为0，下边距保持与其他项一致 */
+  padding-left: 0; /* 如果需要缩进可以设置为 24px */
+  line-height: 1.5;
+}
+
 .setting-item label {
   font-size: 13px;
 }
@@ -381,6 +416,7 @@ const handleClearCache = async () => {
 
 .setting-item input[type="checkbox"] {
   cursor: pointer;
+  margin: 0;
 }
 
 .hint {
