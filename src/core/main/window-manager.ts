@@ -171,7 +171,7 @@ export function createWindowManager(): WindowManager {
                     contextIsolation: true,
                     preload: path.join(__dirname, '..', '..', 'preload.js')
                 },
-                title: 'DataGuard Scanner - 敏感数据扫描工具',
+                title: '内容审查官 - ContentInspector',
                 icon: icon
             });
 

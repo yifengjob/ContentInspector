@@ -2,21 +2,24 @@
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-container">
       <div class="modal-header">
-        <h3>关于 DataGuard Scanner</h3>
+        <h3>关于 内容审查官</h3>
         <button class="close-btn" @click="$emit('close')">×</button>
       </div>
       
       <div class="modal-body">
         <div class="about-content">
-          <img src="../assets/icons/icon.svg" alt="DataGuard Scanner Logo" class="app-icon" />
-          <h2 class="app-name">DataGuard Scanner - 敏感数据扫描工具</h2>
-          <p class="app-version">版本 1.0.12</p>
+          <img src="../assets/icons/icon.svg" alt="ContentInspector Logo" class="app-icon" />
+          <h2 class="app-name">内容审查官</h2>
+          <p class="app-subtitle">ContentInspector v1.0.13</p>
           
           <div class="app-description">
             <h4>软件介绍</h4>
             <p>
-              DataGuard Scanner 是一款专业的敏感数据扫描工具，能够帮助您快速发现文件系统中的敏感信息，
-              包括身份证号、手机号、邮箱地址、银行卡号、地址、IP地址和密码等。
+              内容审查官（ContentInspector）是一款强大的本地内容搜索与审查工具，专注于文件内容的智能搜索与安全审查。
+            </p>
+            <p>
+              它不仅能帮助您快速检索文件中的关键信息，还能智能识别身份证号、手机号、邮箱、银行卡号等敏感数据，
+              并提供可视化的高亮预览和报告导出功能，是您管理文件内容安全的得力助手。
             </p>
             <p>
               采用 Worker Threads 多线程技术和真正的流式处理架构，将 CPU 密集型的文件解析任务放到后台线程执行。
@@ -29,7 +32,7 @@
               支持 Windows 7/10/11、macOS 和 Linux 平台。
             </p>
             <p class="win7-compatible">
-              <img src="../assets/icons/checked.svg" alt="check" class="check-icon" />
+              <svg class="check-icon"><use href="#icon-checked"/></svg>
               完全兼容 Windows 7 SP1+
             </p>
           </div>
@@ -43,8 +46,8 @@
           <div class="features">
             <h4>主要功能</h4>
             <ul>
-              <li><svg class="check-icon"><use href="#icon-checked"/></svg>支持多种敏感数据类型检测（身份证、手机、邮箱、银行卡等）</li>
-              <li><svg class="check-icon"><use href="#icon-checked"/></svg>智能目录树选择与过滤</li>
+              <li><svg class="check-icon"><use href="#icon-checked"/></svg>智能内容搜索（支持自定义表达式）</li>
+              <li><svg class="check-icon"><use href="#icon-checked"/></svg>敏感信息自动检测（身份证、手机、邮箱等）</li>
               <li><svg class="check-icon"><use href="#icon-checked"/></svg>实时扫描进度显示</li>
               <li><svg class="check-icon"><use href="#icon-checked"/></svg>敏感内容高亮预览（Worker 线程处理，界面流畅）</li>
               <li><svg class="check-icon"><use href="#icon-checked"/></svg>支持 PDF、Excel、Word、PPT 等文档解析</li>
@@ -157,6 +160,13 @@ defineEmits<{
   font-size: 14px;
   color: var(--text-secondary);
   margin: 0 0 24px 0;
+}
+
+.app-subtitle {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin: 0 0 24px 0;
+  font-weight: 500;
 }
 
 .app-description,

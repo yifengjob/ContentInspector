@@ -1,7 +1,7 @@
 {
-  "name": "DataGuardScanner",
-  "version": "1.0.12",
-  "description": "个人敏感信息扫描工具",
+  "name": "content-inspector",
+  "version": "1.0.13",
+  "description": "内容审查官 - 一款强大的本地内容搜索与审查工具",
   "main": "dist/main.js",
   "scripts": {
     "start": "electron --max-old-space-size=4096 .",
@@ -28,8 +28,8 @@
   "license": "AGPL-3.0",
   "packageManager": "pnpm@10.33.0",
   "build": {
-    "appId": "com.dataguard.scanner",
-    "productName": "DataGuard Scanner",
+    "appId": "com.contentinspector.app",
+    "productName": "ContentInspector",
     "npmRebuild": false,
     "directories": {
       "output": "release"

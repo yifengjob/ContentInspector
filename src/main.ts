@@ -1,5 +1,5 @@
 /**
- * DataGuard Scanner - 主进程入口
+ * ContentInspector（内容审查官）- 主进程入口
  * 
  * 职责：
  * - 应用初始化

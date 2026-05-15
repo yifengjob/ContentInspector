@@ -1,6 +1,6 @@
 {
-  "name": "dataguard-scanner-frontend",
-  "version": "1.0.12",
+  "name": "content-inspector-frontend",
+  "version": "1.0.13",
   "private": true,
   "scripts": {
     "dev": "vite",
