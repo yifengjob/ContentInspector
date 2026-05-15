@@ -43,18 +43,18 @@
           <div class="features">
             <h4>主要功能</h4>
             <ul>
-              <li><img src="../assets/icons/checked.svg" alt="check" class="check-icon" />支持多种敏感数据类型检测（身份证、手机、邮箱、银行卡等）</li>
-              <li><img src="../assets/icons/checked.svg" alt="check" class="check-icon" />智能目录树选择与过滤</li>
-              <li><img src="../assets/icons/checked.svg" alt="check" class="check-icon" />实时扫描进度显示</li>
-              <li><img src="../assets/icons/checked.svg" alt="check" class="check-icon" />敏感内容高亮预览（Worker 线程处理，界面流畅）</li>
-              <li><img src="../assets/icons/checked.svg" alt="check" class="check-icon" />支持 PDF、Excel、Word、PPT 等文档解析</li>
-              <li><img src="../assets/icons/checked.svg" alt="check" class="check-icon" />扫描结果导出为 XLSX/CSV/JSON</li>
-              <li><img src="../assets/icons/checked.svg" alt="check" class="check-icon" />跨平台支持（Windows 7/10/11、macOS、Linux）</li>
-              <li><img src="../assets/icons/checked.svg" alt="check" class="check-icon" />便携免安装设计</li>
-              <li><img src="../assets/icons/checked.svg" alt="check" class="check-icon" />智能并发控制（根据硬件配置自动调整）</li>
-              <li><img src="../assets/icons/checked.svg" alt="check" class="check-icon" />多线程架构（CPU 密集型任务隔离）</li>
-              <li><img src="../assets/icons/checked.svg" alt="check" class="check-icon" />真正流式处理（滑动窗口重叠策略，无漏检）</li>
-              <li><img src="../assets/icons/checked.svg" alt="check" class="check-icon" />PDF 逐页解析（Mozilla pdf.js，内存优化）</li>
+              <li><svg class="check-icon"><use href="#icon-checked"/></svg>支持多种敏感数据类型检测（身份证、手机、邮箱、银行卡等）</li>
+              <li><svg class="check-icon"><use href="#icon-checked"/></svg>智能目录树选择与过滤</li>
+              <li><svg class="check-icon"><use href="#icon-checked"/></svg>实时扫描进度显示</li>
+              <li><svg class="check-icon"><use href="#icon-checked"/></svg>敏感内容高亮预览（Worker 线程处理，界面流畅）</li>
+              <li><svg class="check-icon"><use href="#icon-checked"/></svg>支持 PDF、Excel、Word、PPT 等文档解析</li>
+              <li><svg class="check-icon"><use href="#icon-checked"/></svg>扫描结果导出为 XLSX/CSV/JSON</li>
+              <li><svg class="check-icon"><use href="#icon-checked"/></svg>跨平台支持（Windows 7/10/11、macOS、Linux）</li>
+              <li><svg class="check-icon"><use href="#icon-checked"/></svg>便携免安装设计</li>
+              <li><svg class="check-icon"><use href="#icon-checked"/></svg>智能并发控制（根据硬件配置自动调整）</li>
+              <li><svg class="check-icon"><use href="#icon-checked"/></svg>多线程架构（CPU 密集型任务隔离）</li>
+              <li><svg class="check-icon"><use href="#icon-checked"/></svg>真正流式处理（滑动窗口重叠策略，无漏检）</li>
+              <li><svg class="check-icon"><use href="#icon-checked"/></svg>PDF 逐页解析（Mozilla pdf.js，内存优化）</li>
             </ul>
           </div>
           
