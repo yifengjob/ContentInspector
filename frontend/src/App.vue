@@ -469,6 +469,7 @@ const handleStartScan = async () => {
     maxPdfSizeMb: config.value.maxPdfSizeMb,
     scanConcurrency: config.value.scanConcurrency,
     searchExpression: searchExpression.value.trim() || undefined,  // 【新增】搜索表达式
+    enableBuiltinRules: config.value.enableBuiltinRules,  // 【新增】内置规则开关
   }
 
   try {

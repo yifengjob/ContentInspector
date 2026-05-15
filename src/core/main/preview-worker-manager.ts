@@ -174,6 +174,8 @@ export function createPreviewWorkerManager(): PreviewWorkerManager {
                         taskId: taskId,
                         filePath: filePath,
                         enabledSensitiveTypes: enabledTypes,  // 【修复】传递用户配置的敏感词类型
+                        searchExpression: config.searchExpression,  // 【新增】传递搜索表达式
+                        enableBuiltinRules: config.enableBuiltinRules,  // 【新增】传递内置规则开关
                         previewMode: true,
                         streamMode: true,  // 【方案 D3】启用流式模式
                         chunkSize: PREVIEW_CHUNK_SIZE,   // 每块行数（配置常量）

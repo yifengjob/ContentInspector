@@ -175,7 +175,7 @@
                         <use href="#icon-directory"></use>
                       </svg>
                     </button>
-                    <button class="btn-action btn-delete" @click="handleDelete(item)" title="删除">
+                    <button v-if="config.enableBuiltinRules !== false" class="btn-action btn-delete" @click="handleDelete(item)" title="删除">
                       <svg class="action-icon delete-icon">
                         <use href="#icon-delete"></use>
                       </svg>
@@ -235,7 +235,8 @@ const COLUMN_WIDTHS = {
   time: 12,
   count: 6.15,  // 每个敏感类型列
   total: 7,
-  actions: 9,
+  actionsWithDelete: 9,   // 有删除按钮时的操作列宽度
+  actionsWithoutDelete: 7, // 无删除按钮时的操作列宽度
 } as const
 
 // 【辅助方法】获取基础字体大小（带缓存和错误处理）
@@ -311,6 +312,11 @@ const hasSearchExpressionColumn = computed(() => {
   )
 })
 
+// 【新增】动态计算操作列宽度（根据 enableBuiltinRules 判断是否显示删除按钮）
+const actionsColWidth = computed(() => {
+  return config.value.enableBuiltinRules !== false ? COLUMN_WIDTHS.actionsWithDelete : COLUMN_WIDTHS.actionsWithoutDelete
+})
+
 // 【修复】动态计算 Grid 列模板 - 使用 1fr 自动填充
 const gridStyle = computed(() => {
   // 【关键】如果禁用内置规则，敏感类型列数为0
@@ -334,7 +340,7 @@ const gridStyle = computed(() => {
       ${countColDefs}                             /* counts - 敏感类型列 */
       ${expressionColWithCondition}               /* expression - 表达式列（条件显示） */
       ${totalColDef}                              /* total - 总计列（条件显示） */
-      ${COLUMN_WIDTHS.actions}em                  /* actions - 固定（4个按钮足够） */
+      ${actionsColWidth.value}em                  /* actions - 固定（根据是否有删除按钮动态调整） */
     `.trim()
   }
 })
@@ -513,6 +519,9 @@ const fixedColumnsTotalPx = computed(() => {
   // 【新增】条件显示总计列和表达式列（仅在启用内置规则时）
   const totalColWidth = config.value.enableBuiltinRules !== false ? COLUMN_WIDTHS.total * baseFontSize : 0
   const expressionColWithCondition = (config.value.enableBuiltinRules !== false && hasSearchExpressionColumn.value) ? expressionColWidth : 0
+  
+  // 【新增】动态计算操作列宽度（根据是否有删除按钮）
+  const actionsColWidthPx = actionsColWidth.value * baseFontSize
 
   return (
       COLUMN_WIDTHS.checkbox * baseFontSize +   // checkbox
@@ -521,7 +530,7 @@ const fixedColumnsTotalPx = computed(() => {
       (COLUMN_WIDTHS.count * baseFontSize * countCols) +  // counts
       expressionColWithCondition +              // expression（条件显示）
       totalColWidth +                           // total（条件显示）
-      COLUMN_WIDTHS.actions * baseFontSize      // actions
+      actionsColWidthPx                         // actions（动态宽度）
   )
 })
 

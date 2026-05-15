@@ -203,7 +203,7 @@ export class FileStreamProcessor {
     while (offset < text.length) {
       iterations++;
       if (iterations > MAX_ITERATIONS) {
-        console.error(`[FileStreamProcessor] 警告: processExtractedText 迭代次数过多 (${iterations}/${MAX_ITERATIONS})，强制退出`);
+        mainLogger.warn('[FileStreamProcessor] processExtractedText 迭代次数过多 ({} / {})，强制退出', iterations, MAX_ITERATIONS);
         break;
       }
       
@@ -356,8 +356,11 @@ export class FileStreamProcessor {
     if (enableBuiltinRules) {
       // ✅ 执行内置规则检测
       allHighlights = getHighlights(chunk, enabledTypes);
+    } else if (searchExpression && searchExpression.trim()) {
+      // ❌ 禁用内置规则，但需要高亮表达式关键词
+      allHighlights = this.getExpressionKeywordHighlights(chunk, searchExpression);
     }
-    // ❌ 否则跳过内置规则检测，allHighlights 保持为空数组
+    // ❌ 否则跳过检测，allHighlights 保持为空数组
 
     // 过滤掉重叠区的重复结果
     const overlapLength = this.previousOverlap.length;
@@ -409,7 +412,7 @@ export class FileStreamProcessor {
    * 【新增】从表达式中提取所有关键词
    * 
    * 【注意】此函数仅提取关键词文本，不保留逻辑运算符语义
-   * 例如："密码 & !身份证" → ["密码", "身份证"]
+   * 例如：“密码 & !身份证” → ["密码", "身份证"]
    * 用途：仅用于记录关键词是否在chunk中出现，不用于表达式评估
    * 
    * @param expression 自定义表达式
@@ -420,9 +423,45 @@ export class FileStreamProcessor {
     const cleaned = expression
       .replace(/[&|!()]/g, ' ')  // 替换运算符为空格
       .trim();
-    
+      
     // 按空格分割，过滤空字符串
     return cleaned.split(/\s+/).filter(k => k.length > 0);
+  }
+    
+  /**
+   * 【新增】获取表达式关键词的高亮位置
+   * 
+   * @param text 文本内容
+   * @param searchExpression 搜索表达式
+   * @returns 高亮范围数组
+   */
+  private getExpressionKeywordHighlights(text: string, searchExpression: string): HighlightRange[] {
+    const highlights: HighlightRange[] = [];
+    const keywords = this.extractKeywordsFromExpression(searchExpression);
+      
+    for (const keyword of keywords) {
+      let startIndex = 0;
+        
+      // 查找所有匹配的关键词位置
+      while (startIndex < text.length) {
+        const index = text.indexOf(keyword, startIndex);
+        if (index === -1) break;
+          
+        highlights.push({
+          start: index,
+          end: index + keyword.length,
+          typeId: 'expression_keyword',  // 【标记】这是表达式关键词
+          typeName: '表达式关键词'
+        });
+          
+        startIndex = index + keyword.length;
+      }
+    }
+      
+    // 按起始位置排序
+    highlights.sort((a, b) => a.start - b.start);
+      
+    return highlights;
   }
   
   /**
