@@ -201,16 +201,30 @@
         <span class="status-label">进度：</span>
         <span class="status-value mono-font">{{ formatNumber(scannedCount + filteredCount + skippedCount) }}{{ totalCount > 0 ? ' / ' + formatNumber(totalCount) : '' }}</span>
       </div>
-      <div class="status-divider"></div>
-      <div class="status-item">
-        <span class="status-label">敏感文件：</span>
-        <span class="status-value warning mono-font">{{ formatNumber(sensitiveFilesCount) }}</span>
-      </div>
-      <div class="status-divider"></div>
-      <div class="status-item">
-        <span class="status-label">敏感信息：</span>
-        <span class="status-value danger mono-font">{{ formatNumber(totalSensitiveItems) }} 条</span>
-      </div>
+      
+      <!-- 【条件渲染】启用内置规则时显示敏感文件和敏感信息统计 -->
+      <template v-if="config.enableBuiltinRules !== false">
+        <div class="status-divider"></div>
+        <div class="status-item">
+          <span class="status-label">敏感文件：</span>
+          <span class="status-value warning mono-font">{{ formatNumber(sensitiveFilesCount) }}</span>
+        </div>
+        <div class="status-divider"></div>
+        <div class="status-item">
+          <span class="status-label">敏感信息：</span>
+          <span class="status-value danger mono-font">{{ formatNumber(totalSensitiveItems) }} 条</span>
+        </div>
+      </template>
+      
+      <!-- 【新增】禁用内置规则时，扫描完成后显示搜索到的文件数量 -->
+      <template v-else-if="!isScanning && scanResults.length > 0">
+        <div class="status-divider"></div>
+        <div class="status-item">
+          <span class="status-label">搜索结果：</span>
+          <span class="status-value success mono-font">{{ formatNumber(scanResults.length) }} 个文件</span>
+        </div>
+      </template>
+      
       <div class="status-divider"></div>
       <div class="status-item status-elapsed">
         <span class="status-label">耗时：</span>
@@ -1088,6 +1102,11 @@ const getThemeTooltip = () => {
   color: #ff4d4f;
   font-weight: 600;
   /* 【UI优化】移除 min-width */
+}
+
+.status-value.success {
+  color: var(--success-color);
+  font-weight: 600;
 }
 
 /* 【UI优化】扫描耗时项靠右显示 */

@@ -67,8 +67,23 @@
             </label>
             <p class="setting-hint">
               启用后将检测身份证号、手机号、邮箱、银行卡号等敏感信息。<br/>
-              取消勾选则仅使用关键字搜索功能。
+              取消勾选则仅使用自定义表达式进行关键字搜索。
             </p>
+          </div>
+        </div>
+        
+        <!-- 【条件渲染】敏感类型管理 -->
+        <div v-if="config.enableBuiltinRules !== false" class="settings-section">
+          <h4>敏感类型管理</h4>
+          <div class="sensitive-types">
+            <label v-for="type in sensitiveTypes" :key="type.id" class="type-item">
+              <input 
+                type="checkbox"
+                :checked="config.enabledSensitiveTypes.includes(type.id)"
+                @change="toggleSensitiveType(type.id, $event)"
+              />
+              {{ type.name }}
+            </label>
           </div>
         </div>
         
@@ -99,20 +114,6 @@
               清理应用缓存
             </button>
             <span class="hint">（清理 Chromium 缓存和临时文件）</span>
-          </div>
-        </div>
-        
-        <div class="settings-section">
-          <h4>敏感类型管理</h4>
-          <div class="sensitive-types">
-            <label v-for="type in sensitiveTypes" :key="type.id" class="type-item">
-              <input 
-                type="checkbox"
-                :checked="config.enabledSensitiveTypes.includes(type.id)"
-                @change="toggleSensitiveType(type.id, $event)"
-              />
-              {{ type.name }}
-            </label>
           </div>
         </div>
         
