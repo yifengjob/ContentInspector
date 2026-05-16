@@ -6,4 +6,11 @@
 export * from './constants';
 
 // 配置管理器
-export { loadConfig, saveConfig, calculateRecommendedConcurrency, getConfigSync } from './manager';
+export { 
+    loadConfig, 
+    saveConfig, 
+    calculateRecommendedConcurrency, 
+    calculateActualConcurrency,
+    calculateMaxLargeFilesConcurrent,
+    getConfigSync 
+} from './manager';

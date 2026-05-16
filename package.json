@@ -1,6 +1,6 @@
 {
   "name": "content-inspector",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "内容审查官 - 一款强大的本地内容搜索与审查工具",
   "main": "dist/main.js",
   "scripts": {

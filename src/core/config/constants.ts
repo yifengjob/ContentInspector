@@ -42,20 +42,35 @@ export const WORKER_MAX_YOUNG_GENERATION_MB = 128;
 /** 每个 Worker 预估内存占用（GB） */
 export const MEMORY_PER_WORKER_GB = 0.3;
 
+/** 大文件处理时每个 Worker 预估内存占用（GB）- 比普通文件高，用于限制大文件并发 */
+export const MEMORY_PER_LARGE_FILE_WORKER_GB = 0.8;
+
 /** 并发数绝对最大值 */
 export const CONCURRENCY_ABSOLUTE_MAX = 6;
+
+/** 大文件并发数绝对最大值 - 即使内存充足也不超过此值，防止其他资源瓶颈 */
+export const LARGE_FILES_CONCURRENT_ABSOLUTE_MAX = 4;
 
 /** 并发数计算时使用的安全内存比例 - 提高到 0.7，充分利用可用内存 */
 export const CONCURRENCY_MEMORY_RATIO = 0.7;
 
+/** 大文件并发计算时使用的安全内存比例 - 预留更多内存给小文件和其他开销 */
+export const LARGE_FILES_MEMORY_RATIO = 0.4;
+
 /** 默认并发数的 CPU 核心数比例 */
 export const DEFAULT_CONCURRENCY_CPU_RATIO = 0.5;
+
+/** 大文件并发计算的 CPU 核心数比例 - 更保守，避免CPU过载 */
+export const LARGE_FILES_CPU_RATIO = 0.3;
 
 /** 默认并发数最大值 */
 export const DEFAULT_CONCURRENCY_MAX = 4;
 
 /** 默认并发数最小值 */
 export const DEFAULT_CONCURRENCY_MIN = 2;
+
+/** 大文件并发数最小值 - 保证基本性能 */
+export const LARGE_FILES_CONCURRENT_MIN = 1;
 
 // --- 2.3 Worker 重启配置 ---
 
@@ -240,9 +255,6 @@ export const ENABLE_SMART_SCHEDULING = true;
 
 /** 大文件大小阈值（MB）- 超过此值视为大文件 */
 export const LARGE_FILE_THRESHOLD_MB = 10;
-
-/** 最大并发大文件数 - 防止多个大文件同时处理导致 OOM */
-export const MAX_LARGE_FILES_CONCURRENT = 2;
 
 /** 类型互斥超时时间（毫秒）- 如果超过此时间找不到不同类型，允许同类型 */
 export const TYPE_MUTEX_TIMEOUT_MS = 2000;

@@ -15,7 +15,6 @@ import type {ScanState} from '../state';
 import {
     ENABLE_SMART_SCHEDULING,
     LARGE_FILE_THRESHOLD_MB,
-    MAX_LARGE_FILES_CONCURRENT,
     TYPE_MUTEX_TIMEOUT_MS,
     BYTES_TO_MB
 } from '../config';
@@ -57,6 +56,9 @@ export class SmartScheduler {
     private largeFilesProcessing = 0;
     private lastTypeScheduleTime = new Map<string, number>();
 
+    // 【新增】大文件并发限制（通过构造函数注入）
+    private readonly maxLargeFilesConcurrent: number;
+
     // 【新架构】轮询索引
     private nextTypeIndex = 0;
     private typeOrder: string[] = [];
@@ -90,7 +92,8 @@ export class SmartScheduler {
         queueManager: TaskQueueManager,
         workerPool: WorkerPool,
         assignTaskToConsumer: (consumer: Consumer, task: Task) => void,
-        scanState?: ScanState  // 【新增】ScanState 引用，用于状态同步
+        scanState?: ScanState,
+        maxLargeFilesConcurrent: number = 2  // 【新增】大文件并发限制，默认值为2保持兼容
     ) {
         this.log = createLogger('SmartScheduler');
         this.eventBus = eventBus;
@@ -98,6 +101,7 @@ export class SmartScheduler {
         this.workerPool = workerPool;
         this.assignTaskToConsumer = assignTaskToConsumer;
         this.scanState = scanState;
+        this.maxLargeFilesConcurrent = maxLargeFilesConcurrent;
     }
 
     /**
@@ -231,7 +235,7 @@ export class SmartScheduler {
         }
 
         // ==================== 策略 1: 优先处理大文件（类型不冲突）====================
-        if (this.largeFilesProcessing < MAX_LARGE_FILES_CONCURRENT) {
+        if (this.largeFilesProcessing < this.maxLargeFilesConcurrent) {
             // 轮询所有类型，找到第一个未被阻塞的大文件
             for (let i = 0; i < this.typeOrder.length; i++) {
                 const idx = (this.nextTypeIndex + i) % this.typeOrder.length;
@@ -257,7 +261,7 @@ export class SmartScheduler {
             if (!info) continue;
 
             // 优先大文件（如果未达上限且类型未被阻塞）
-            if (info.largeCount > 0 && this.largeFilesProcessing < MAX_LARGE_FILES_CONCURRENT) {
+            if (info.largeCount > 0 && this.largeFilesProcessing < this.maxLargeFilesConcurrent) {
                 if (!this.isTypeBlocked(fileType, true)) {
                     this.nextTypeIndex = (idx + 1) % this.typeOrder.length;
                     return this.queueManager.dequeueTask(fileType, true);
@@ -279,7 +283,7 @@ export class SmartScheduler {
 
         // ==================== 策略 4: 兜底 - 违反类型互斥，但遵守大文件限制 ====================
         // 优先选择大文件（如果未达上限）
-        if (this.largeFilesProcessing < MAX_LARGE_FILES_CONCURRENT) {
+        if (this.largeFilesProcessing < this.maxLargeFilesConcurrent) {
             for (const fileType of this.typeOrder) {
                 const info = this.queueManager.getTypeQueueInfo(fileType);
                 if (info && info.largeCount > 0) {

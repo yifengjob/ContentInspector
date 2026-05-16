@@ -13,7 +13,12 @@ import {
     DEFAULT_CONCURRENCY_MIN,
     DEFAULT_MAX_FILE_SIZE_MB,
     DEFAULT_MAX_PDF_SIZE_MB,
-    MEMORY_PER_WORKER_GB
+    MEMORY_PER_WORKER_GB,
+    MEMORY_PER_LARGE_FILE_WORKER_GB,
+    LARGE_FILES_CONCURRENT_ABSOLUTE_MAX,
+    LARGE_FILES_CONCURRENT_MIN,
+    LARGE_FILES_MEMORY_RATIO,
+    LARGE_FILES_CPU_RATIO
 } from './constants';
 // 【D3 优化】导入错误处理工具
 import {createConfigSaveError,} from '../../utils/error-utils';
@@ -329,4 +334,61 @@ export function calculateActualConcurrency(configuredConcurrency: number): {
         cpuCount,
         freeMemoryGB
     };
+}
+
+/**
+ * 根据系统资源动态计算最大大文件并发数
+ * 
+ * 设计原则：
+ * 1. 大文件比普通文件消耗更多内存和CPU
+ * 2. 需要预留足够资源给小文件和其他系统进程
+ * 3. 避免过多大文件同时解析导致GC压力过大
+ * 
+ * @param workerCount 当前Worker池大小
+ * @param freeMemoryGB 系统可用内存（GB）
+ * @param cpuCount CPU核心数
+ * @returns 推荐的大文件最大并发数
+ */
+export function calculateMaxLargeFilesConcurrent(
+    workerCount: number,
+    freeMemoryGB: number,
+    cpuCount: number
+): number {
+    // ===== 1. 基于内存的限制 =====
+    // 只使用一部分可用内存（留余量给小文件、系统、其他进程）
+    const availableMemoryForLargeFiles = freeMemoryGB * LARGE_FILES_MEMORY_RATIO;
+    const maxByMemory = Math.floor(
+        availableMemoryForLargeFiles / MEMORY_PER_LARGE_FILE_WORKER_GB
+    );
+    
+    // ===== 2. 基于CPU的限制 =====
+    // 大文件解析更耗CPU，使用更保守的比例
+    const maxByCPU = Math.max(
+        Math.floor(cpuCount * LARGE_FILES_CPU_RATIO), 
+        LARGE_FILES_CONCURRENT_MIN
+    );
+    
+    // ===== 3. 不超过Worker总数 =====
+    const maxByWorkers = workerCount;
+    
+    // ===== 4. 综合计算 =====
+    const calculated = Math.min(maxByMemory, maxByCPU, maxByWorkers);
+    
+    // ===== 5. 应用上下限 =====
+    const result = Math.min(
+        Math.max(calculated, LARGE_FILES_CONCURRENT_MIN),
+        LARGE_FILES_CONCURRENT_ABSOLUTE_MAX
+    );
+    
+    // 【调试日志】仅在开发环境输出
+    if (process.env.NODE_ENV === 'development') {
+        logger.info('[大文件并发计算]');
+        logger.info('  可用内存: {}GB, 大文件可用: {}GB', 
+            freeMemoryGB.toFixed(1), availableMemoryForLargeFiles.toFixed(1));
+        logger.info('  内存限制: {}, CPU限制: {}, Worker限制: {}', 
+            maxByMemory, maxByCPU, maxByWorkers);
+        logger.info('  计算结果: {}, 最终值: {}', calculated, result);
+    }
+    
+    return result;
 }

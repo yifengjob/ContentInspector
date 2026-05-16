@@ -29,7 +29,7 @@ import {Consumer, WorkerPool} from '../worker';
 import {SmartScheduler} from '../scheduler';
 import {getScannerLogger} from "../../logger/logger";
 import {LogThrottler} from './helpers/scanner-helpers';
-import {calculateActualConcurrency} from "../config/manager";
+import {calculateActualConcurrency, calculateMaxLargeFilesConcurrent} from "../config/manager";
 
 export interface ScannerContext {
     state: ScanState;
@@ -143,6 +143,20 @@ export async function initializeScanner(
     }
 
     log.info('使用 {} 个 Consumer Workers (CPU: {}核, 可用内存: {}GB)', poolSize, concurrencyInfo.cpuCount, concurrencyInfo.freeMemoryGB.toFixed(1));
+
+    // 【新增】计算大文件并发数
+    const maxLargeFilesConcurrent = calculateMaxLargeFilesConcurrent(
+        poolSize,
+        concurrencyInfo.freeMemoryGB,
+        concurrencyInfo.cpuCount
+    );
+
+    log.info('大文件并发限制: {} (Worker总数: {}, 可用内存: {}GB, CPU: {}核)', 
+        maxLargeFilesConcurrent, 
+        poolSize, 
+        concurrencyInfo.freeMemoryGB.toFixed(1),
+        concurrencyInfo.cpuCount
+    );
 
     // 根据扫描路径数智能配置 BatchSender
     const estimatedTotalFiles = config.selectedPaths.length * 1000;
@@ -263,7 +277,8 @@ export async function initializeScanner(
             state.incrementActiveWorkers();
             workerPool.incrementNextTaskId();
         },
-        state  // 【新增】传递 scanState，用于状态同步
+        state,  // 【新增】传递 scanState，用于状态同步
+        maxLargeFilesConcurrent  // 【新增】传入动态计算的大文件并发限制
     );
 
     // 【关键】更新 cleanupConsumerState 回调为 scheduler 的实际实现
