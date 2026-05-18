@@ -43,6 +43,10 @@ declare global {
         cancelId?: number;
       }) => Promise<{ response: number }>;
       clearCache: () => Promise<{ success: boolean; cleanedSize?: number; error?: string }>;
+
+      // 【新增】打开开发者工具
+      openDevTools: () => Promise<void>;
+
       onScanProgress: (callback: (data: any) => void) => () => void;
       onScanResult: (callback: (data: any) => void, batchMode?: boolean) => () => void; // 【P3优化】支持批量模式
       onScanFinished: (callback: () => void) => () => void;

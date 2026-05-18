@@ -25,7 +25,9 @@ export interface ErrorInfo {
  * 分类错误并提供友好提示
  */
 export function classifyError(error: unknown): ErrorInfo {
-  const errorMessage = String(error?.message || error || '').toLowerCase();
+  const errorMessage = String(
+    error instanceof Error ? error.message : error || ''
+  ).toLowerCase();
 
   // 超时错误
   if (

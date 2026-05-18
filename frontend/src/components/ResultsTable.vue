@@ -192,11 +192,13 @@
           bVal = b.counts[typeId] || 0;
         } else {
           // 普通字段（前后端统一使用驼峰命名）
-          aVal = a[sortField.value as keyof typeof a] ?? 0;
-          bVal = b[sortField.value as keyof typeof b] ?? 0;
+          const rawA = a[sortField.value as keyof typeof a];
+          const rawB = b[sortField.value as keyof typeof b];
+          aVal = typeof rawA === 'number' || typeof rawA === 'string' ? rawA : 0;
+          bVal = typeof rawB === 'number' || typeof rawB === 'string' ? rawB : 0;
         }
 
-        if (typeof aVal === 'string') {
+        if (typeof aVal === 'string' && typeof bVal === 'string') {
           aVal = aVal.toLowerCase();
           bVal = bVal.toLowerCase();
         }
