@@ -124,7 +124,7 @@ class PdfExtractor extends BaseExtractor {
   protected async doExtract(filePath: string): Promise<ExtractorResult> {
     let pdfDocument: any = null;
     let totalText = '';
-    let totalPages = 0;
+    let totalPages: number;
     let processedPages = 0;
     let imageOnlyPages = 0;
 
