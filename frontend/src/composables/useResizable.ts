@@ -5,7 +5,7 @@
  * 支持 8 个方向的调整：上、下、左、右、四个角
  */
 
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onUnmounted, type Ref } from 'vue'
 
 export interface ResizeOptions {
   minWidth: number      // 最小宽度

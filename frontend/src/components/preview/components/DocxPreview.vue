@@ -105,13 +105,8 @@ function handleError(e: any) {
  * 销毁组件，释放资源
  */
 function destroy() {
-  // 释放 Blob URL
-  if (docxBlob.value) {
-    URL.revokeObjectURL(URL.createObjectURL(docxBlob.value))
-    docxBlob.value = null
-  }
-  
   // 重置状态
+  docxBlob.value = null
   loading.value = false
   error.value = null
   scale.value = 1.0
