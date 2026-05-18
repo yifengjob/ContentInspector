@@ -264,6 +264,7 @@ async function startWalking(config: WalkerConfig) {
             const fd = fs.openSync(filePath, 'r');
             fs.closeSync(fd);
           }
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (accessError: any) {
           skippedCount++; // 【保持】权限问题属于系统跳过
           return;
