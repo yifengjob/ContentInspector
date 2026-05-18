@@ -32,7 +32,7 @@
     "email": "yifengjob@qq.com"
   },
   "license": "AGPL-3.0",
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@11.1.2",
   "build": {
     "appId": "com.contentinspector.app",
     "productName": "ContentInspector",
