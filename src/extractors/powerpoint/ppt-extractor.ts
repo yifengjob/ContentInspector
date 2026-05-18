@@ -49,6 +49,7 @@ class PptxExtractor extends BaseExtractor {
               textChunks.push(texts.join(' '));
             }
           }
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e) {
           // 忽略单个幻灯片的解析错误
         }

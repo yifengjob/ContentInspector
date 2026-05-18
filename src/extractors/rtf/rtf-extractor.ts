@@ -101,7 +101,7 @@ class RtfExtractor extends BaseExtractor {
       });
 
       // 复用 Buffer，减少临时对象创建
-      let decoded = '';
+      let decoded;
       try {
         const buffer = Buffer.from(bytes);
         decoded = iconv.decode(buffer, encoding as any);
@@ -111,6 +111,7 @@ class RtfExtractor extends BaseExtractor {
         try {
           const gbkBuffer = Buffer.from(bytes);
           decoded = iconv.decode(gbkBuffer, 'gbk');
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e2) {
           return '';
         }
