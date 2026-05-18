@@ -1,6 +1,16 @@
 <template>
   <div class="modal-overlay" @click.self="$emit('close')" :class="{ visible: visible }">
-    <div class="modal-container">
+    <div class="modal-container" ref="modalContainerRef">
+      <!-- 【新增】8个拖拽手柄 -->
+      <div class="resize-handle resize-n" @mousedown="handleResizeMouseDown('n', $event)"></div>
+      <div class="resize-handle resize-s" @mousedown="handleResizeMouseDown('s', $event)"></div>
+      <div class="resize-handle resize-e" @mousedown="handleResizeMouseDown('e', $event)"></div>
+      <div class="resize-handle resize-w" @mousedown="handleResizeMouseDown('w', $event)"></div>
+      <div class="resize-handle resize-ne" @mousedown="handleResizeMouseDown('ne', $event)"></div>
+      <div class="resize-handle resize-nw" @mousedown="handleResizeMouseDown('nw', $event)"></div>
+      <div class="resize-handle resize-se" @mousedown="handleResizeMouseDown('se', $event)"></div>
+      <div class="resize-handle resize-sw" @mousedown="handleResizeMouseDown('sw', $event)"></div>
+      
       <div class="modal-header">
         <h3>文件预览</h3>
         <button class="close-btn" @click="$emit('close')">×</button>
@@ -91,6 +101,8 @@ import { previewFileStream, openFile, cancelPreview, showMessage, onPreviewChunk
 import { getFriendlyErrorMessage, getErrorSeverity } from '@/utils/error-handler'
 import { PreviewVirtualScroller, GlobalHighlight, LineHighlight } from '@/utils/preview-virtual-scroller'
 import { useEventListener } from '@/composables/useEventListener'
+// 【新增】导入可调整大小 composable
+import { useResizable } from '@/composables/useResizable'
 // 【新增】导入原生预览容器
 import NativePreviewContainer from './preview/NativePreviewContainer.vue'
 
@@ -121,6 +133,15 @@ const errorSeverity = ref<'info' | 'warning' | 'error'>('error')  // 【C2优化
 const useNativePreview = ref(false)  // 是否使用原生预览
 const nativePreviewError = ref<string | null>(null)  // 原生预览错误
 const nativePreviewRef = ref<any>(null)  // 原生预览组件引用
+
+// 【新增】窗口调整大小
+const modalContainerRef = ref<HTMLElement | null>(null)
+const { handleMouseDown: handleResizeMouseDown, resetSize } = useResizable(modalContainerRef, {
+  minWidth: 900,
+  minHeight: 600,
+  maxWidth: window.innerWidth * 0.95,
+  maxHeight: window.innerHeight * 0.95
+})
 
 // 【方案 D3】流式接收状态
 interface PreviewChunk {
@@ -541,6 +562,9 @@ const handleClose = () => {
     // 【优化】正常关闭前，先停止渲染调度，防止竞态条件
     renderScheduled = false
     
+    // 【新增】重置窗口大小为默认值
+    resetSize()
+    
     // 【优化】异步清空大数据
     setTimeout(() => {
       allLines.length = 0
@@ -593,10 +617,10 @@ useEventListener(scrollContainer, 'scroll', {
   background-color: var(--modal-bg);
   color: var(--text-color);
   border-radius: 8px;
-  width: min(80%, 900px);
-  height: min(80%, 700px);
-  min-width: 600px;
-  min-height: 400px;
+  width: min(90%, 1024px);
+  height: min(90%, 768px);
+  min-width: 900px;
+  min-height: 600px;
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
@@ -605,6 +629,86 @@ useEventListener(scrollContainer, 'scroll', {
   opacity: 0;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), 
               opacity 0.2s ease-out;
+  /* 【新增】支持定位，用于调整大小时更新位置 */
+  position: relative;
+}
+
+/* 【新增】拖拽手柄基础样式 */
+.resize-handle {
+  position: absolute;
+  z-index: 100;
+  transition: background-color 0.2s ease;
+}
+
+/* 四个边 */
+.resize-n {
+  top: -5px;
+  left: 20px;
+  right: 20px;
+  height: 10px;
+  cursor: n-resize;
+}
+
+.resize-s {
+  bottom: -5px;
+  left: 20px;
+  right: 20px;
+  height: 10px;
+  cursor: s-resize;
+}
+
+.resize-e {
+  right: -5px;
+  top: 20px;
+  bottom: 20px;
+  width: 10px;
+  cursor: e-resize;
+}
+
+.resize-w {
+  left: -5px;
+  top: 20px;
+  bottom: 20px;
+  width: 10px;
+  cursor: w-resize;
+}
+
+/* 四个角 */
+.resize-ne {
+  top: -5px;
+  right: -5px;
+  width: 20px;
+  height: 20px;
+  cursor: ne-resize;
+}
+
+.resize-nw {
+  top: -5px;
+  left: -5px;
+  width: 20px;
+  height: 20px;
+  cursor: nw-resize;
+}
+
+.resize-se {
+  bottom: -5px;
+  right: -5px;
+  width: 20px;
+  height: 20px;
+  cursor: se-resize;
+}
+
+.resize-sw {
+  bottom: -5px;
+  left: -5px;
+  width: 20px;
+  height: 20px;
+  cursor: sw-resize;
+}
+
+/* 悬停时显示视觉反馈 */
+.resize-handle:hover {
+  background-color: rgba(24, 144, 255, 0.2);
 }
 
 .modal-overlay.visible .modal-container {
