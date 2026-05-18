@@ -48,38 +48,34 @@ function getWorkerPdfJsLib() {
     return workerPdfJsLib;
   }
 
-  try {
-    // 禁用所有日志输出
-    if ((pdfjsLib as any).VerbosityLevel) {
-      (pdfjsLib as any).VerbosityLevel.INFOS = 0;
-      (pdfjsLib as any).VerbosityLevel.WARNINGS = 0;
-      (pdfjsLib as any).verbosity = 0;
-    }
-
-    // 设置 worker
-
-    (pdfjsLib as any).GlobalWorkerOptions.workerSrc =
-      require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
-
-    // 配置 CMap 和字体路径
-    const pdfjsDistPath = path.dirname(require.resolve('pdfjs-dist'));
-
-    (pdfjsLib as any).GlobalWorkerOptions.cMapUrl = path.join(pdfjsDistPath, 'cmaps/') + '/';
-    (pdfjsLib as any).GlobalWorkerOptions.cMapPacked = true;
-    (pdfjsLib as any).GlobalWorkerOptions.standardFontDataUrl =
-      path.join(pdfjsDistPath, 'standard_fonts/') + '/';
-
-    // 【性能优化】完全禁用字体渲染和 canvas，减少内存占用
-    (pdfjsLib as any).GlobalWorkerOptions.disableFontFace = true;
-    (pdfjsLib as any).GlobalWorkerOptions.useSystemFonts = true;
-    (pdfjsLib as any).GlobalWorkerOptions.disableRange = true;
-    (pdfjsLib as any).GlobalWorkerOptions.disableStream = true;
-
-    workerPdfJsLib = pdfjsLib;
-    return pdfjsLib;
-  } catch (error) {
-    throw error;
+  // 禁用所有日志输出
+  if ((pdfjsLib as any).VerbosityLevel) {
+    (pdfjsLib as any).VerbosityLevel.INFOS = 0;
+    (pdfjsLib as any).VerbosityLevel.WARNINGS = 0;
+    (pdfjsLib as any).verbosity = 0;
   }
+
+  // 设置 worker
+
+  (pdfjsLib as any).GlobalWorkerOptions.workerSrc =
+    require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
+
+  // 配置 CMap 和字体路径
+  const pdfjsDistPath = path.dirname(require.resolve('pdfjs-dist'));
+
+  (pdfjsLib as any).GlobalWorkerOptions.cMapUrl = path.join(pdfjsDistPath, 'cmaps/') + '/';
+  (pdfjsLib as any).GlobalWorkerOptions.cMapPacked = true;
+  (pdfjsLib as any).GlobalWorkerOptions.standardFontDataUrl =
+    path.join(pdfjsDistPath, 'standard_fonts/') + '/';
+
+  // 【性能优化】完全禁用字体渲染和 canvas，减少内存占用
+  (pdfjsLib as any).GlobalWorkerOptions.disableFontFace = true;
+  (pdfjsLib as any).GlobalWorkerOptions.useSystemFonts = true;
+  (pdfjsLib as any).GlobalWorkerOptions.disableRange = true;
+  (pdfjsLib as any).GlobalWorkerOptions.disableStream = true;
+
+  workerPdfJsLib = pdfjsLib;
+  return pdfjsLib;
 }
 
 // PDF 文件大小限制（MB）
@@ -273,6 +269,7 @@ class PdfExtractor extends BaseExtractor {
       if (pdfDocument) {
         try {
           pdfDocument.destroy();
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e) {
           // 忽略销毁错误
         }
