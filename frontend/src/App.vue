@@ -1,21 +1,21 @@
 <script setup lang="ts">
-  import { onMounted, ref, computed } from 'vue';
+  import { computed, onMounted, ref } from 'vue';
   import { useAppStore } from '@/stores/app';
   import { storeToRefs } from 'pinia';
   import {
     cancelScan,
     getRecommendedConcurrency,
+    getSearchExpression,
     loadConfig,
     onScanError,
     onScanFinished,
-    onScanLog, // 【P1优化】用于 ERROR 级别立即显示
-    onScanLogBatch, // 用于普通日志批量显示
+    onScanLog,
+    onScanLogBatch,
     onScanProgress,
     onScanResult,
+    setSearchExpression,
     showMessage,
     startScan,
-    setSearchExpression,
-    getSearchExpression,
     validateExpression,
   } from './utils/electron-api';
   import DirectoryTree from './components/DirectoryTree.vue';
@@ -308,8 +308,7 @@
         }
       }
     } catch (_error) {
-      const errorMessage = _error instanceof Error ? _error.message : '验证失败';
-      expressionValidationError.value = errorMessage;
+      expressionValidationError.value = _error instanceof Error ? _error.message : '验证失败';
       // 验证失败，不保存
     }
   };

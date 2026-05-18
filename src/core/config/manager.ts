@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { execSync } from 'child_process';
 import { app } from 'electron';
 import { AppConfig } from '../../types/';
 // 【优化】导入配置常量
@@ -237,6 +238,7 @@ export function getConfigSync(): AppConfig {
     let configPath: string;
     try {
       configPath = path.join(app.getPath('userData'), 'config.json');
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       // 如果 app.getPath 不可用（非 Electron 环境），返回默认配置
       logger.warn('[getConfigSync] app.getPath 不可用，使用默认配置');
@@ -279,7 +281,6 @@ function getAvailableMemoryGB(): number {
   if (process.platform === 'darwin') {
     try {
       // macOS: 使用 vm_stat 获取真实的可用内存
-      const { execSync } = require('child_process');
       const output = execSync('vm_stat', { encoding: 'utf-8' });
 
       // 解析 vm_stat 输出
