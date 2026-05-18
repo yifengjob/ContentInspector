@@ -5,6 +5,7 @@
  * 此模块提供完整的 polyfill，确保 pdf.js 能正常工作
  */
 
+import { ReadableStream } from 'stream/web';
 import { logger } from '../../../logger/logger';
 
 /**
@@ -36,7 +37,6 @@ export function setupPdfJsPolyfills(context: any = global): void {
     // ReadableStream（pdf.js 需要）
     if (typeof context.ReadableStream === 'undefined') {
       try {
-        const { ReadableStream } = require('stream/web');
         context.ReadableStream = ReadableStream;
       } catch (e) {
         // 在开发环境下输出警告，帮助诊断问题
