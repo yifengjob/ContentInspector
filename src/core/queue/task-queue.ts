@@ -8,6 +8,7 @@
  */
 
 import { EventBus } from '../infra';
+import { logger } from '../../logger/logger';
 
 /**
  * 任务接口
@@ -74,7 +75,7 @@ export class TaskQueueManager {
 
     // 【修复】添加空值检查，虽然理论上不会为 null
     if (!queues) {
-      console.error('[TaskQueueManager] 队列初始化失败:', task.fileType);
+      logger.error('[TaskQueueManager] 队列初始化失败: {}', task.fileType);
       return;
     }
 
