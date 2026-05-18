@@ -217,7 +217,7 @@ export class WorkerMessageHandler {
 
     const pending = this.pendingTasks.get(consumer.taskId);
     if (pending) {
-      this.pendingTasks.delete(consumer.taskId!);
+      this.pendingTasks.delete(consumer.taskId);
 
       // 【状态同步】通知待处理任务数变化
       this.eventBus.emit('pending-tasks-size-changed', this.pendingTasks.size);
