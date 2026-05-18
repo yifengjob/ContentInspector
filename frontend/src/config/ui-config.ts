@@ -9,7 +9,7 @@
 export const UI_BATCH_UPDATE_INTERVAL = 100;
 
 /** 日志批量更新间隔（毫秒） */
-export const UI_LOG_BATCH_INTERVAL = 300;  // 【优化】从 200ms 增加到 300ms，减少 IPC 压力
+export const UI_LOG_BATCH_INTERVAL = 300; // 【优化】从 200ms 增加到 300ms，减少 IPC 压力
 
 /** 搜索防抖延迟（毫秒） */
 export const UI_SEARCH_DEBOUNCE_DELAY = 300;

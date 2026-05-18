@@ -1,14 +1,14 @@
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
-import App from '@/App.vue'
-import '@/style.css'
-import { applyTheme, loadTheme } from '@/utils/theme'
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+import App from '@/App.vue';
+import '@/style.css';
+import { applyTheme, loadTheme } from '@/utils/theme';
 // 导入 SVG Sprite 虚拟模块（自动生成）
-import 'virtual:svg-icons-register'
+import 'virtual:svg-icons-register';
 
 // 初始化主题
-const initialTheme = loadTheme()
-applyTheme(initialTheme)
+const initialTheme = loadTheme();
+applyTheme(initialTheme);
 
 // 检测平台并添加对应的类名
 const getPlatform = (): 'macos' | 'windows' | 'linux' | 'unknown' => {
@@ -16,7 +16,7 @@ const getPlatform = (): 'macos' | 'windows' | 'linux' | 'unknown' => {
   if (ua.includes('mac')) return 'macos';
   if (ua.includes('win')) return 'windows';
   if (ua.includes('linux')) return 'linux';
-  
+
   return 'unknown';
 };
 
@@ -29,8 +29,8 @@ if (platform === 'macos') {
   document.body.classList.add('platform-linux');
 }
 
-const app = createApp(App)
-const pinia = createPinia()
+const app = createApp(App);
+const pinia = createPinia();
 
-app.use(pinia)
-app.mount('#app')
+app.use(pinia);
+app.mount('#app');

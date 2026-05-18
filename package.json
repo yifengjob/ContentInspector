@@ -13,7 +13,13 @@
     "build:renderer": "cd frontend && pnpm build",
     "generate-icons": "node scripts/generate-icons.js",
     "postinstall": "node scripts/fix-readable-stream.js",
-    "version:update": "node scripts/update-version.js"
+    "version:update": "node scripts/update-version.js",
+    
+    "lint": "eslint . --ext .js,.ts,.vue",
+    "lint:fix": "eslint . --ext .js,.ts,.vue --fix",
+    "lint:frontend": "cd frontend && eslint . --ext .js,.ts,.vue --fix",
+    "format": "prettier --write \"**/*.{js,ts,vue,json,md}\"",
+    "format:check": "prettier --check \"**/*.{js,ts,vue,json,md}\""
   },
   "keywords": [
     "security",
@@ -149,6 +155,7 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^20.19.39",
     "@types/sax": "^1.2.7",
     "@vitest/ui": "^4.1.6",
@@ -156,7 +163,14 @@
     "cross-env": "^10.1.0",
     "electron": "^22.3.27",
     "electron-builder": "^24.13.3",
+    "eslint": "^10.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-vue": "^10.9.1",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.59.3",
     "vitest": "^4.1.6",
     "wait-on": "^9.0.5"
   }

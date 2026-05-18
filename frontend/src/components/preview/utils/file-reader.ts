@@ -2,7 +2,7 @@
  * 文件读取工具函数
  */
 
-import { FileReadResult, FileStatsResult } from '@/types/preview'
+import { FileReadResult, FileStatsResult } from '@/types/preview';
 
 /**
  * 读取文件为 ArrayBuffer
@@ -11,13 +11,13 @@ import { FileReadResult, FileStatsResult } from '@/types/preview'
  */
 export async function readFileAsBlob(filePath: string): Promise<FileReadResult> {
   try {
-    const result = await window.electronAPI.readFileAsBlob(filePath)
-    return result
+    const result = await window.electronAPI.readFileAsBlob(filePath);
+    return result;
   } catch (error: any) {
     return {
       success: false,
-      error: error.message || '读取文件失败'
-    }
+      error: error.message || '读取文件失败',
+    };
   }
 }
 
@@ -28,13 +28,13 @@ export async function readFileAsBlob(filePath: string): Promise<FileReadResult> 
  */
 export async function getFileStats(filePath: string): Promise<FileStatsResult> {
   try {
-    const result = await window.electronAPI.getFileStats(filePath)
-    return result
+    const result = await window.electronAPI.getFileStats(filePath);
+    return result;
   } catch (error: any) {
     return {
       success: false,
-      error: error.message || '获取文件信息失败'
-    }
+      error: error.message || '获取文件信息失败',
+    };
   }
 }
 
@@ -50,54 +50,50 @@ export async function readFileWithProgress(
   onProgress?: (progress: number) => void,
   chunkSize: number = 1024 * 1024 // 1MB
 ): Promise<ArrayBuffer> {
-  const statsResult = await getFileStats(filePath)
-  
+  const statsResult = await getFileStats(filePath);
+
   if (!statsResult.success || !statsResult.data) {
-    throw new Error(statsResult.error || '无法获取文件信息')
+    throw new Error(statsResult.error || '无法获取文件信息');
   }
-  
-  const totalSize = statsResult.data.size
-  const chunks: ArrayBuffer[] = []
-  let offset = 0
-  
+
+  const totalSize = statsResult.data.size;
+  const chunks: ArrayBuffer[] = [];
+  let offset = 0;
+
   while (offset < totalSize) {
-    const currentChunkSize = Math.min(chunkSize, totalSize - offset)
-    
+    const currentChunkSize = Math.min(chunkSize, totalSize - offset);
+
     // 注意：这里需要后端提供 readFileChunk 接口
     // 如果后端没有实现，可以改用 readFileAsBlob 一次性读取
-    const result = await window.electronAPI.readFileChunk?.(
-      filePath,
-      offset,
-      currentChunkSize
-    )
-    
+    const result = await window.electronAPI.readFileChunk?.(filePath, offset, currentChunkSize);
+
     if (!result || !result.success) {
-      throw new Error(result?.error || '读取文件块失败')
+      throw new Error(result?.error || '读取文件块失败');
     }
-    
-    chunks.push(result.chunk)
-    offset += result.chunk.byteLength
-    
+
+    chunks.push(result.chunk);
+    offset += result.chunk.byteLength;
+
     // 更新进度
     if (onProgress) {
-      onProgress((offset / totalSize) * 100)
+      onProgress((offset / totalSize) * 100);
     }
-    
+
     // 让出主线程，避免阻塞 UI
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0));
   }
-  
+
   // 合并所有分块
-  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0)
-  const merged = new Uint8Array(totalLength)
-  let position = 0
-  
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  const merged = new Uint8Array(totalLength);
+  let position = 0;
+
   for (const chunk of chunks) {
-    merged.set(new Uint8Array(chunk), position)
-    position += chunk.byteLength
+    merged.set(new Uint8Array(chunk), position);
+    position += chunk.byteLength;
   }
-  
-  return merged.buffer
+
+  return merged.buffer;
 }
 
 /**
@@ -106,11 +102,11 @@ export async function readFileWithProgress(
  * @returns 格式化后的文件大小字符串
  */
 export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
+  if (bytes === 0) return '0 B';
+
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 }
