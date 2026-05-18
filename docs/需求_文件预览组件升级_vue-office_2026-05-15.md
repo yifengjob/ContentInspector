@@ -707,6 +707,71 @@ interface ElectronAPI {
 
 ---
 
+## 🚧 故障排除
+
+### 常见问题：postinstall 脚本未执行
+
+**问题现象**：
+```
+Failed to resolve entry for package "@vue-office/docx"
+The package may have incorrect main/module/exports specified in its package.json
+```
+
+**原因分析**：
+- `@vue-office` 包需要通过 `postinstall` 脚本来生成入口文件（`lib/index.js`）
+- pnpm 在某些情况下可能不会自动执行 postinstall 脚本
+- 导致 `lib/index.js` 文件不存在，Vite 无法解析包入口
+
+**解决方案**：
+
+手动运行所有 `@vue-office` 包的 postinstall 脚本：
+
+```bash
+cd frontend
+for pkg in docx excel pdf pptx; do
+  node node_modules/@vue-office/$pkg/lib/script/postinstall.js
+done
+```
+
+**验证修复**：
+```bash
+# 检查是否生成了 index.js 文件
+ls -lh node_modules/@vue-office/*/lib/index.js
+```
+
+应该看到类似输出：
+```
+@vue-office/docx:   170K lib/index.js
+@vue-office/excel:  1.6M lib/index.js
+@vue-office/pdf:    2.7M lib/index.js
+@vue-office/pptx:   1.3M lib/index.js
+```
+
+**预防措施**：
+在 `vite.config.ts` 中添加 `optimizeDeps` 配置，强制 Vite 预构建这些依赖：
+
+```typescript
+export default defineConfig({
+  // ...
+  optimizeDeps: {
+    include: [
+      '@vue-office/docx',
+      '@vue-office/excel',
+      '@vue-office/pdf',
+      '@vue-office/pptx',
+      'vue-demi'
+    ],
+  },
+})
+```
+
+**为什么需要这样做**：
+1. **首次安装时**：pnpm 会执行 postinstall，但可能因为网络或其他原因失败
+2. **切换分支时**：node_modules 可能被缓存，postinstall 不会重新执行
+3. **CI/CD 环境**：某些 CI 环境可能跳过 postinstall 以提高速度
+
+---
+
 ## 📅 版本历史
 
 | 版本 | 日期 | 作者 | 变更说明 |
@@ -715,6 +780,7 @@ interface ElectronAPI {
 | v1.1 | 2026-05-15 | AI Assistant | 修复审查问题，移除不必要的并发控制和 async-sema |
 | v2.0 | 2026-05-15 | AI Assistant | 重写文档，聚焦与现有系统集成，简化实现方案，强调零破坏性 |
 | v2.1 | 2026-05-15 | AI Assistant | 补充 vue-demi 依赖（必需），指定版本为 0.14.6，添加 pnpm 配置说明 |
+| v2.2 | 2026-05-18 | AI Assistant | 添加故障排除章节，解决 postinstall 脚本问题 |
 
 ---
 
