@@ -48,7 +48,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import DocxPreview from './components/DocxPreview.vue'
 import ExcelPreview from './components/ExcelPreview.vue'
 import PdfPreview from './components/PdfPreview.vue'
@@ -62,6 +62,8 @@ const emit = defineEmits<{
   rendered: []
   error: [message: string]
 }>()
+
+console.log('[NativePreviewContainer] 组件挂载，文件路径:', props.filePath)
 
 // 获取文件扩展名
 const fileType = computed(() => {
@@ -108,12 +110,18 @@ function destroy() {
 }
 
 // 【新增】监听 filePath 变化，重新加载
-watch(() => props.filePath, (newPath) => {
-  console.log('[NativePreviewContainer] 文件路径变化:', newPath)
+watch(() => props.filePath, (newPath, oldPath) => {
+  console.log('[NativePreviewContainer] 文件路径变化:', oldPath, '->', newPath)
   if (previewComponent.value?.loadDocument) {
     previewComponent.value.loadDocument(newPath)
   }
 }, { immediate: false })
+
+// 组件卸载时清理
+onUnmounted(() => {
+  console.log('[NativePreviewContainer] 组件卸载')
+  destroy()
+})
 
 // 暴露接口给父组件
 defineExpose({

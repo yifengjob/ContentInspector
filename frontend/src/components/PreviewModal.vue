@@ -10,6 +10,7 @@
         <!-- 【新增】原生预览模式 -->
         <NativePreviewContainer
           v-if="useNativePreview && !nativePreviewError"
+          :key="filePath"  
           ref="nativePreviewRef"
           :file-path="filePath"
           @rendered="handleNativePreviewRendered"
@@ -385,6 +386,10 @@ watch([() => props.visible, () => props.filePath], async ([isVisible, newPath]) 
     if (nativePreviewRef.value?.destroy) {
       nativePreviewRef.value.destroy()
     }
+    
+    // 【关键修复】重置原生预览状态，确保下次打开时能正确加载
+    useNativePreview.value = false
+    nativePreviewError.value = null
     
     // 【优化】如果 handleClose 已经异步清空了数据，这里不需要再清空
     // 只重置 loading 和 error 状态即可
