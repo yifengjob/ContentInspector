@@ -131,9 +131,21 @@ defineExpose({
 .excel-preview-container {
   width: 100%;
   height: 100%;
-  overflow: hidden;  /* 隐藏多余的滚动条 */
+  overflow: auto;
   background-color: #fff;
   transition: transform 0.2s ease;
+}
+
+/* 【修复】消除工作表标签区域的多余垂直滚动条 */
+.excel-preview-container :deep(.x-spreadsheet) {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+
+/* 【修复】工作表标签区域不应该有垂直滚动 */
+.excel-preview-container :deep(.x-spreadsheet .bottombar) {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
 }
 
 .loading-state,

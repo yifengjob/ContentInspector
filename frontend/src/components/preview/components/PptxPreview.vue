@@ -120,7 +120,7 @@ defineExpose({
 .pptx-preview-container {
   width: 100%;
   height: 100%;
-  overflow: hidden;  /* 隐藏多余的滚动条 */
+  overflow: auto;
   background-color: #000;
   transition: transform 0.2s ease;
 }
