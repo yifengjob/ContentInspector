@@ -166,6 +166,7 @@ async function exportToExcel(filePath: string, results: ScanResultItem[]): Promi
             // 保持为文本，但居中对齐
             cell.alignment = { horizontal: 'center' };
           }
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e) {
           // 忽略解析错误
         }

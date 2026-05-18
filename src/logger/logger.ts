@@ -11,6 +11,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { parentPort } from 'worker_threads';
+import { EventBus } from '../core/infra/event-bus';
 import { LogLevel } from '../types';
 import {
   LOG_FILE_LEVEL,
@@ -277,7 +279,6 @@ export function createLogger(config: string | LogConfig): Logger {
  */
 function bridgeWorkerLogToMain(level: LogLevel, message: string, context: string): void {
   try {
-    const { parentPort } = require('worker_threads');
     if (parentPort) {
       parentPort.postMessage({
         type: 'log',
@@ -302,8 +303,6 @@ function bridgeWorkerLogToMain(level: LogLevel, message: string, context: string
  */
 function emitLogToEventBus(level: LogLevel, message: string, context: string): void {
   try {
-    // 【修复】直接使用 EventBus 单例，不依赖全局变量
-    const { EventBus } = require('../core/infra/event-bus');
     const eventBus = EventBus.getInstance();
     if (eventBus) {
       eventBus.emit('log:message', {
