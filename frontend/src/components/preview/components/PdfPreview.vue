@@ -83,7 +83,6 @@ function handleError(e: any) {
   loading.value = false
   error.value = 'PDF 渲染失败，请尝试切换到文本预览模式'
   emit('error', error.value)
-  console.error('[PdfPreview] Render error:', e)
 }
 
 /**
