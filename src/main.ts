@@ -15,7 +15,7 @@ initializeApp();
 
 // 导入必要的模块
 import { app, BrowserWindow, dialog } from 'electron';
-import { createWindowManager } from './core/main/window-manager';
+import { createWindowManager, type WindowManager } from './core/main/window-manager';
 import { createPowerSaveManager } from './core/main/power-save-manager';
 import { createPreviewWorkerManager } from './core/main/preview-worker-manager';
 import { setupIpcHandlers } from './core/main/ipc-handlers';
@@ -30,7 +30,7 @@ const powerSaveManager = createPowerSaveManager();
 const previewWorkerManager = createPreviewWorkerManager();
 
 // 【重构】使用窗口管理器
-let windowManager: any = null;
+let windowManager: WindowManager | null = null;
 
 function createWindow() {
   const wm = createWindowManager();
