@@ -373,6 +373,7 @@
         if (currentTaskId.value !== null) {
           try {
             await cancelPreview(currentTaskId.value); // ✅ 传入 taskId
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
           } catch (err) {
             // 忽略错误
           }

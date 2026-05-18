@@ -64,8 +64,6 @@ export interface GlobalEventListenerConfig {
 
 // ===================== 内部工具函数 =====================
 
-type AnyFunction = (...args: any[]) => any;
-
 /** 带取消方法的频率限制函数 */
 interface RateLimitedFunction extends EventListener {
   cancel?: () => void;
@@ -78,14 +76,14 @@ interface RateLimitedFunction extends EventListener {
  * @param driver 驱动类型
  * @returns 包装后的防抖函数（带 cancel 方法）
  */
-function debounce<T extends AnyFunction>(
-  fn: T,
+function debounce(
+  fn: EventListener,
   delay: number,
   driver: EventDriver
 ): RateLimitedFunction {
   let timer: number | ReturnType<typeof setTimeout> | null = null;
 
-  const wrapped = ((...args: Parameters<T>) => {
+  const wrapped = ((...args: Parameters<EventListener>) => {
     if (timer !== null) {
       if (driver === 'raf') {
         cancelAnimationFrame(timer as number);
@@ -94,7 +92,7 @@ function debounce<T extends AnyFunction>(
       }
     }
     const execute = () => {
-      fn(...args);
+      fn(...(args as unknown as [Event]));
       timer = null;
     };
     if (driver === 'raf') {
@@ -126,8 +124,8 @@ function debounce<T extends AnyFunction>(
  * @param driver 驱动类型
  * @returns 包装后的节流函数（带 cancel 方法）
  */
-function throttle<T extends AnyFunction>(
-  fn: T,
+function throttle(
+  fn: EventListener,
   delay: number,
   driver: EventDriver
 ): RateLimitedFunction {
@@ -135,11 +133,11 @@ function throttle<T extends AnyFunction>(
     let ticking = false;
     let rafId: number | null = null;
 
-    const wrapped = ((...args: Parameters<T>) => {
+    const wrapped = ((...args: Parameters<EventListener>) => {
       if (!ticking) {
         ticking = true;
         rafId = requestAnimationFrame(() => {
-          fn(...args);
+          fn(...(args as unknown as [Event]));
           ticking = false;
           rafId = null;
         });
@@ -160,7 +158,7 @@ function throttle<T extends AnyFunction>(
     let lastRun = 0;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
-    const wrapped = ((...args: Parameters<T>) => {
+    const wrapped = ((...args: Parameters<EventListener>) => {
       const now = Date.now();
       const remaining = delay - (now - lastRun);
       if (remaining <= 0) {
@@ -168,11 +166,11 @@ function throttle<T extends AnyFunction>(
           clearTimeout(timer);
           timer = null;
         }
-        fn(...args);
+        fn(...(args as unknown as [Event]));
         lastRun = now;
       } else if (!timer) {
         timer = setTimeout(() => {
-          fn(...args);
+          fn(...(args as unknown as [Event]));
           lastRun = Date.now();
           timer = null;
         }, remaining);
