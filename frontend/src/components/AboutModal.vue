@@ -10,7 +10,7 @@
         <div class="about-content">
           <img src="../assets/icons/icon.svg" alt="ContentInspector Logo" class="app-icon" />
           <h2 class="app-name">内容审查官</h2>
-          <p class="app-subtitle">ContentInspector v1.0.13</p>
+          <p class="app-subtitle">ContentInspector v1.0.14</p>
           
           <div class="app-description">
             <h4>软件介绍</h4>
