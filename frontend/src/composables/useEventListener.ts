@@ -76,11 +76,7 @@ interface RateLimitedFunction extends EventListener {
  * @param driver 驱动类型
  * @returns 包装后的防抖函数（带 cancel 方法）
  */
-function debounce(
-  fn: EventListener,
-  delay: number,
-  driver: EventDriver
-): RateLimitedFunction {
+function debounce(fn: EventListener, delay: number, driver: EventDriver): RateLimitedFunction {
   let timer: number | ReturnType<typeof setTimeout> | null = null;
 
   const wrapped = ((...args: Parameters<EventListener>) => {
@@ -124,11 +120,7 @@ function debounce(
  * @param driver 驱动类型
  * @returns 包装后的节流函数（带 cancel 方法）
  */
-function throttle(
-  fn: EventListener,
-  delay: number,
-  driver: EventDriver
-): RateLimitedFunction {
+function throttle(fn: EventListener, delay: number, driver: EventDriver): RateLimitedFunction {
   if (driver === 'raf') {
     let ticking = false;
     let rafId: number | null = null;

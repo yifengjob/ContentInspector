@@ -142,18 +142,16 @@ export const useAppStore = defineStore('app', () => {
 
     // 递归检查每个直接子节点的状态
     let checkedCount = 0;
-    let uncheckedCount = 0;
 
     for (const child of directChildren) {
       const childState = getNodeCheckState(child.path, allNodes);
       if (childState === 'checked') {
         checkedCount++;
-      } else if (childState === 'unchecked') {
-        uncheckedCount++;
-      } else {
+      } else if (childState === 'indeterminate') {
         // 有子节点是半选，父节点也应该是半选
         return 'indeterminate';
       }
+      // unchecked 状态不需要计数，只需知道不是 checked 或 indeterminate
     }
 
     // 根据直接子节点的状态决定
