@@ -97,6 +97,7 @@ async function isImageOnlyPage(page: any): Promise<boolean> {
     });
 
     return !hasText;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
     return false;
   }
@@ -125,7 +126,7 @@ class PdfExtractor extends BaseExtractor {
     let pdfDocument: any = null;
     let totalText = '';
     let totalPages: number;
-    let processedPages = 0;
+    let _processedPages = 0; // 【保留】用于未来可能的统计需求
     let imageOnlyPages = 0;
 
     try {
@@ -204,7 +205,7 @@ class PdfExtractor extends BaseExtractor {
             totalText += pageText + '\n';
           }
 
-          processedPages++;
+          _processedPages++;
 
           // 检查文本大小限制
           if (totalText.length > MAX_TEXT_CONTENT_SIZE_MB * BYTES_TO_MB) {
@@ -225,6 +226,7 @@ class PdfExtractor extends BaseExtractor {
             try {
               page.cleanup();
               page.destroy?.();
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
             } catch (e) {
               // 忽略清理错误
             }
@@ -273,6 +275,7 @@ class PdfExtractor extends BaseExtractor {
         } catch (e) {
           // 忽略销毁错误
         }
+        // eslint-disable-next-line no-useless-assignment
         pdfDocument = null;
       }
     }
