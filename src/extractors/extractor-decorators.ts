@@ -77,6 +77,7 @@ export function withTimeout(
       try {
         const stat = await fs.promises.stat(filePath);
         actualTimeoutMs = timeoutMs || calculateParserTimeout(stat.size);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         // 如果无法获取文件大小，使用默认值
         actualTimeoutMs = timeoutMs || 30000;
@@ -98,6 +99,7 @@ export function withTimeout(
           if ((extractor as any).cancel) {
             try {
               (extractor as any).cancel();
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
             } catch (e) {
               // 忽略取消错误
             }

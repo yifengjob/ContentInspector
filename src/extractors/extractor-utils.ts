@@ -21,8 +21,8 @@ import type { ExtractorResult } from './types';
 export interface StreamReadOptions {
   /** 文件路径 */
   filePath: string;
-  /** 数据块处理回调 */
-  onData: (chunk: string | Buffer, totalSize: number) => void | boolean;
+  /** 数据块处理回调（返回 false 停止读取，不返回或返回 true 继续） */
+  onData: (chunk: string | Buffer, totalSize: number) => boolean | undefined;
   /** 结束回调 */
   onEnd: () => void;
   /** 错误回调 */
