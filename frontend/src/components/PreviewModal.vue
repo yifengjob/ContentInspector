@@ -416,6 +416,9 @@ watch([() => props.visible, () => props.filePath], async ([isVisible, newPath]) 
       highlights.value = []
       nativePreviewError.value = null
       
+      // 【新增】每次打开时重置窗口大小为默认值
+      resetSize()
+      
       // 判断是否使用原生预览
       if (shouldUseNativePreview.value) {
         useNativePreview.value = true
@@ -561,9 +564,6 @@ const handleClose = () => {
   } else {
     // 【优化】正常关闭前，先停止渲染调度，防止竞态条件
     renderScheduled = false
-    
-    // 【新增】重置窗口大小为默认值
-    resetSize()
     
     // 【优化】异步清空大数据
     setTimeout(() => {
