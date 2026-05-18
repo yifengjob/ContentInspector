@@ -109,7 +109,10 @@ export abstract class BaseExtractor {
       // 子类可以重写此方法进行额外验证
       await this.doValidateFile(filePath, stat);
     } catch (error: any) {
-      throw new Error(`文件验证失败: ${error.message}`);
+      // 【修复】保留原始错误的 cause 属性
+      const newError = new Error(`文件验证失败: ${error.message}`);
+      (newError as any).cause = error;
+      throw newError;
     }
   }
 
