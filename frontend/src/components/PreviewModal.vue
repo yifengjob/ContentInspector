@@ -7,38 +7,50 @@
       </div>
       
       <div class="modal-body">
-        <div v-if="loading" class="loading-container">
-          <div class="loading-spinner"></div>
-          <div class="loading-text">加载中...</div>
-          <div class="loading-hint">正在读取文件内容，请稍候</div>
-        </div>
-        <div v-else-if="error" class="error" :class="errorSeverity">
-          <svg class="error-icon-svg">
-            <use :href="errorIconId"/>
-          </svg>
-          <div class="error-title">{{ errorTitle }}</div>
-          <div class="error-text">{{ errorSuggestion }}</div>
-          <!-- 【方案 C】文件过大时显示“打开文件”按钮 -->
-          <button v-if="isFileSizeError" class="btn btn-primary" @click="handleOpenFile" style="margin-top: 16px;">
-            用外部应用打开
-          </button>
-        </div>
-        <div v-else class="preview-content">
-          <!-- 【方案 D3】虚拟滚动容器 -->
-          <div 
-            class="virtual-scroll-container"
-            ref="scrollContainer"
-          >
-            <div class="virtual-spacer" :style="{ height: scroller.getTotalHeight() + 'px' }">
-              <div 
-                class="virtual-content"
-                :style="{ transform: `translateY(${scroller.getOffsetTop()}px)` }"
-                v-html="visibleContent"
-              >
+        <!-- 【新增】原生预览模式 -->
+        <NativePreviewContainer
+          v-if="useNativePreview && !nativePreviewError"
+          ref="nativePreviewRef"
+          :file-path="filePath"
+          @rendered="handleNativePreviewRendered"
+          @error="handleNativePreviewError"
+        />
+        
+        <!-- 【现有】文本预览模式 -->
+        <template v-else>
+          <div v-if="loading" class="loading-container">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">加载中...</div>
+            <div class="loading-hint">正在读取文件内容，请稍候</div>
+          </div>
+          <div v-else-if="error" class="error" :class="errorSeverity">
+            <svg class="error-icon-svg">
+              <use :href="errorIconId"/>
+            </svg>
+            <div class="error-title">{{ errorTitle }}</div>
+            <div class="error-text">{{ errorSuggestion }}</div>
+            <!-- 【方案 C】文件过大时显示“打开文件”按钮 -->
+            <button v-if="isFileSizeError" class="btn btn-primary" @click="handleOpenFile" style="margin-top: 16px;">
+              用外部应用打开
+            </button>
+          </div>
+          <div v-else class="preview-content">
+            <!-- 【方案 D3】虚拟滚动容器 -->
+            <div 
+              class="virtual-scroll-container"
+              ref="scrollContainer"
+            >
+              <div class="virtual-spacer" :style="{ height: scroller.getTotalHeight() + 'px' }">
+                <div 
+                  class="virtual-content"
+                  :style="{ transform: `translateY(${scroller.getOffsetTop()}px)` }"
+                  v-html="visibleContent"
+                >
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </template>
       </div>
       
       <div class="modal-footer">
@@ -67,6 +79,8 @@ import { previewFileStream, openFile, cancelPreview, showMessage, onPreviewChunk
 import { getFriendlyErrorMessage, getErrorSeverity } from '@/utils/error-handler'
 import { PreviewVirtualScroller, GlobalHighlight, LineHighlight } from '@/utils/preview-virtual-scroller'
 import { useEventListener } from '@/composables/useEventListener'
+// 【新增】导入原生预览容器
+import NativePreviewContainer from './preview/NativePreviewContainer.vue'
 
 // 【配置常量】UI 渲染参数（与后端独立管理）
 const PREVIEW_CONFIG = {
@@ -90,6 +104,11 @@ const content = ref('')
 const highlights = ref<Array<{start: number, end: number, type_id: string, type_name: string}>>([])
 const currentTaskId = ref<number | null>(null)  // 当前任务 ID
 const errorSeverity = ref<'info' | 'warning' | 'error'>('error')  // 【C2优化】错误严重程度
+
+// 【新增】原生预览相关
+const useNativePreview = ref(false)  // 是否使用原生预览
+const nativePreviewError = ref<string | null>(null)  // 原生预览错误
+const nativePreviewRef = ref<any>(null)  // 原生预览组件引用
 
 // 【方案 D3】流式接收状态
 interface PreviewChunk {
@@ -147,6 +166,30 @@ const errorSuggestion = computed(() => {
 const isFileSizeError = computed(() => {
   return error.value.includes('文件过大') || error.value.includes('无法预览')
 })
+
+// 【新增】判断是否支持原生预览
+const supportedNativeFormats = ['docx', 'xlsx', 'xls', 'pdf', 'pptx']
+
+const shouldUseNativePreview = computed(() => {
+  const ext = props.filePath.split('.').pop()?.toLowerCase() || ''
+  return supportedNativeFormats.includes(ext)
+})
+
+// 【新增】处理原生预览错误，自动降级到文本预览
+function handleNativePreviewError(errorMessage: string) {
+  console.warn('[PreviewModal] 原生预览失败，降级到文本预览:', errorMessage)
+  nativePreviewError.value = errorMessage
+  useNativePreview.value = false
+  
+  // 触发文本预览加载
+  loadFile(props.filePath)
+}
+
+// 【新增】处理原生预览渲染完成
+function handleNativePreviewRendered() {
+  loading.value = false
+  error.value = ''
+}
 
 // 【方案 D3】渲染调度器
 function scheduleRender() {
@@ -314,7 +357,15 @@ watch([() => props.visible, () => props.filePath], async ([isVisible, newPath]) 
       error.value = ''
       content.value = ''
       highlights.value = []
-      loadFile(newPath)
+      nativePreviewError.value = null
+      
+      // 【新增】判断是否使用原生预览
+      if (shouldUseNativePreview.value) {
+        useNativePreview.value = true
+      } else {
+        useNativePreview.value = false
+        loadFile(newPath)
+      }
     })
   } else if (!isVisible) {
     // 窗口关闭时，取消当前任务并清空状态
@@ -326,6 +377,11 @@ watch([() => props.visible, () => props.filePath], async ([isVisible, newPath]) 
         // 忽略错误
       }
       currentTaskId.value = null
+    }
+    
+    // 【新增】清理原生预览组件
+    if (nativePreviewRef.value?.destroy) {
+      nativePreviewRef.value.destroy()
     }
     
     // 【优化】如果 handleClose 已经异步清空了数据，这里不需要再清空
