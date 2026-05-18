@@ -186,6 +186,7 @@ export async function startScan(
     // 【关键修复】使用异步检查，防止阻塞主线程
     try {
       await fs.promises.access(rootPath, fs.constants.F_OK);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error: any) {
       log.info('路径不存在或无权限: {}', rootPath);
       continue;

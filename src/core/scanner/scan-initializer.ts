@@ -263,7 +263,7 @@ export async function initializeScanner(
     },
     calculateTimeout: calculateTimeout,
     // 【新增】重启 Worker 回调 - 稍后设置
-    onRestartWorker: (consumer: Consumer) => {}, // 临时占位
+    onRestartWorker: (_consumer: Consumer) => {}, // 临时占位
   };
 
   // 创建 Worker 池

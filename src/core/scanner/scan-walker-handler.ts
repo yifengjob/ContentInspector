@@ -12,6 +12,7 @@ import { ScanState } from '../state';
 import { ScannerContext } from './scan-initializer';
 import { getFileType } from '../../utils/file-type-utils';
 import { LARGE_FILE_THRESHOLD_MB, BYTES_TO_MB, WORKER_RESTART_DELAY } from '../config';
+import { calculateSmartMemoryLimits, getFreeMemoryMB } from './scan-initializer';
 
 export interface WalkerHandlerOptions {
   state: ScanState;
@@ -168,8 +169,6 @@ export class WalkerHandler {
         stats.totalCount > 0 ? stats.totalSize / stats.totalCount / BYTES_TO_MB : 0;
 
       if (stats.totalCount > 0) {
-        // 导入智能内存计算函数和可用内存函数
-        const { calculateSmartMemoryLimits, getFreeMemoryMB } = require('./scan-initializer');
         const freeMemoryMB = getFreeMemoryMB();
 
         // 计算新的内存限制
