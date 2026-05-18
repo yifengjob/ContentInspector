@@ -1447,6 +1447,7 @@ DataGuard Scanner v1.0.9 引入了全新的模块化架构，将原本扁平的 
 
 ### 文件解析
 - [pdf.js](https://mozilla.github.io/pdf.js/) - Mozilla 官方 PDF 解析引擎
+- [@vue-office](https://github.com/501351981/vue-office) - Vue 3 文档预览组件库（DOCX/Excel/PDF/PPTX）
 - [exceljs](https://www.npmjs.com/package/exceljs) - Excel 文件读写库
 - [SheetJS](https://sheetjs.com/) - 高性能 Excel 解析库
 - [word-extractor](https://www.npmjs.com/package/word-extractor) - Word/PPT 文档解析库
@@ -1459,6 +1460,7 @@ DataGuard Scanner v1.0.9 引入了全新的模块化架构，将原本扁平的 
 - [fflate](https://www.npmjs.com/package/fflate) - 高性能 ZIP 解压库
 - [iconv-lite](https://www.npmjs.com/package/iconv-lite) - 编码转换库
 - [chrono-node](https://www.npmjs.com/package/chrono-node) - 自然语言时间解析
+- [expr-eval](https://www.npmjs.com/package/expr-eval) - 表达式求值库（搜索表达式）
 - [vite-plugin-svg-icons](https://github.com/vbenjs/vite-plugin-svg-icons) - SVG 雪碧图插件
 
 ### 开发工具
@@ -1466,6 +1468,10 @@ DataGuard Scanner v1.0.9 引入了全新的模块化架构，将原本扁平的 
 - [concurrently](https://www.npmjs.com/package/concurrently) - 并行运行命令
 - [cross-env](https://www.npmjs.com/package/cross-env) - 跨平台环境变量
 - [wait-on](https://www.npmjs.com/package/wait-on) - 等待资源就绪
+- [ESLint](https://eslint.org/) - JavaScript/TypeScript 代码检查工具
+- [Prettier](https://prettier.io/) - 代码格式化工具
+- [Vitest](https://vitest.dev/) - Vite 原生单元测试框架
+- [@typescript-eslint](https://typescript-eslint.io/) - TypeScript ESLint 插件
 
 ---
 
