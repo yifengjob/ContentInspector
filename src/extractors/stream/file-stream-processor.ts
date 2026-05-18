@@ -466,9 +466,14 @@ export class FileStreamProcessor {
       const matches = Array.from(text.matchAll(pattern));
 
       for (const match of matches) {
+        // 【修复】添加 index 空值检查
+        if (match.index === undefined || match.index === null) {
+          continue;
+        }
+
         highlights.push({
-          start: match.index!,
-          end: match.index! + keyword.length,
+          start: match.index,
+          end: match.index + keyword.length,
           typeId: 'expression_keyword', // 【标记】这是表达式关键词
           typeName: '表达式关键词',
         });

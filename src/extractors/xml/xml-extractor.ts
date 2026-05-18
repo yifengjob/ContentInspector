@@ -35,6 +35,7 @@ class XmlExtractor extends BaseExtractor {
     if (this.stream) {
       try {
         this.stream.destroy();
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (e) {
         // 忽略错误
       }
@@ -42,6 +43,7 @@ class XmlExtractor extends BaseExtractor {
     if (this.parser) {
       try {
         this.parser.destroy();
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (e) {
         // 忽略错误
       }

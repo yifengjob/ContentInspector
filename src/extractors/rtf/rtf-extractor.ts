@@ -105,6 +105,7 @@ class RtfExtractor extends BaseExtractor {
       try {
         const buffer = Buffer.from(bytes);
         decoded = iconv.decode(buffer, encoding as any);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (e) {
         this.logger.warn(`[${this.config.name}] ${encoding} 解码失败，尝试 GBK`);
         // 降级到 GBK
