@@ -8,6 +8,7 @@
  */
 
 import * as os from 'os';
+import { execSync } from 'child_process';
 import { BrowserWindow } from 'electron';
 import { ScanConfig } from '../../types';
 import { ScanState } from '../state';
@@ -105,7 +106,6 @@ export function calculateSmartMemoryLimits(
 export function getFreeMemoryMB(): number {
   if (process.platform === 'darwin') {
     try {
-      const { execSync } = require('child_process');
       const output = execSync('vm_stat', { encoding: 'utf-8' });
       const pageSizeMatch = output.match(/page size of (\d+) bytes/);
       const freeMatch = output.match(/Pages free:\s+(\d+)/);
