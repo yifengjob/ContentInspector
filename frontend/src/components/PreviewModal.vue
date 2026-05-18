@@ -361,8 +361,10 @@ watch([() => props.visible, () => props.filePath], async ([isVisible, newPath]) 
       
       // 【新增】判断是否使用原生预览
       if (shouldUseNativePreview.value) {
+        console.log('[PreviewModal] 检测到支持的格式，使用原生预览:', newPath)
         useNativePreview.value = true
       } else {
+        console.log('[PreviewModal] 不支持的格式，使用文本预览:', newPath)
         useNativePreview.value = false
         loadFile(newPath)
       }

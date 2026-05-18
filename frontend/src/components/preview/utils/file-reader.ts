@@ -10,10 +10,13 @@ import { FileReadResult, FileStatsResult } from '@/types/preview'
  * @returns Promise<FileReadResult>
  */
 export async function readFileAsBlob(filePath: string): Promise<FileReadResult> {
+  console.log('[file-reader] 调用 readFileAsBlob:', filePath)
   try {
     const result = await window.electronAPI.readFileAsBlob(filePath)
+    console.log('[file-reader] Electron API 返回结果:', result.success ? '成功' : '失败')
     return result
   } catch (error: any) {
+    console.error('[file-reader] 调用 Electron API 异常:', error)
     return {
       success: false,
       error: error.message || '读取文件失败'

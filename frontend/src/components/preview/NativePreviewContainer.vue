@@ -48,7 +48,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import DocxPreview from './components/DocxPreview.vue'
 import ExcelPreview from './components/ExcelPreview.vue'
 import PdfPreview from './components/PdfPreview.vue'
@@ -85,6 +85,7 @@ const error = computed(() => {
  * 渲染完成处理
  */
 function handleRendered() {
+  console.log('[NativePreviewContainer] 渲染完成')
   emit('rendered')
 }
 
@@ -92,6 +93,7 @@ function handleRendered() {
  * 错误处理
  */
 function handleError(message: string) {
+  console.error('[NativePreviewContainer] 预览错误:', message)
   emit('error', message)
 }
 
@@ -99,10 +101,19 @@ function handleError(message: string) {
  * 销毁组件，释放资源
  */
 function destroy() {
+  console.log('[NativePreviewContainer] 销毁组件')
   if (previewComponent.value?.destroy) {
     previewComponent.value.destroy()
   }
 }
+
+// 【新增】监听 filePath 变化，重新加载
+watch(() => props.filePath, (newPath) => {
+  console.log('[NativePreviewContainer] 文件路径变化:', newPath)
+  if (previewComponent.value?.loadDocument) {
+    previewComponent.value.loadDocument(newPath)
+  }
+}, { immediate: false })
 
 // 暴露接口给父组件
 defineExpose({

@@ -16,6 +16,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('preview-file-stream', filePath),
     cancelPreview: (taskId: number) =>
         ipcRenderer.invoke('cancel-preview', taskId),
+    
+    // 【新增】文件预览相关（vue-office）
+    readFileAsBlob: (filePath: string) =>
+        ipcRenderer.invoke('read-file-as-blob', filePath),
+    getFileStats: (filePath: string) =>
+        ipcRenderer.invoke('get-file-stats', filePath),
+    readFileChunk: (filePath: string, offset: number, length: number) =>
+        ipcRenderer.invoke('read-file-chunk', filePath, offset, length),
 
     // 文件操作
     openFile: (filePath: string) =>
@@ -157,6 +165,9 @@ declare global {
             scanCancel: () => Promise<any>;
             previewFileStream: (filePath: string) => Promise<any>;  // 流式预览
             cancelPreview: (taskId: number) => Promise<any>;
+            readFileAsBlob: (filePath: string) => Promise<{ success: boolean; data?: ArrayBuffer; error?: string }>;
+            getFileStats: (filePath: string) => Promise<{ success: boolean; stats?: { size: number; mtime: number }; error?: string }>;
+            readFileChunk: (filePath: string, offset: number, length: number) => Promise<{ success: boolean; chunk?: ArrayBuffer; error?: string }>;
             openFile: (filePath: string) => Promise<any>;
             openFileLocation: (filePath: string) => Promise<any>;
             deleteFile: (filePath: string, toTrash: boolean) => Promise<any>;
