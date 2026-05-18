@@ -58,14 +58,12 @@ const docxOptions = {
  * 加载文档
  */
 async function loadDocument(filePath: string): Promise<void> {
-  console.log('[DocxPreview] 开始加载文档:', filePath)
   try {
     loading.value = true
     error.value = null
     progress.value = 0
     
     const result = await readFileAsBlob(filePath)
-    console.log('[DocxPreview] 文件读取结果:', result.success ? '成功' : '失败', result.error || '')
     
     if (!result.success || !result.data) {
       throw new Error(result.error || '读取文件失败')
@@ -76,12 +74,10 @@ async function loadDocument(filePath: string): Promise<void> {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
     })
     docxBlob.value = blob
-    console.log('[DocxPreview] Blob 创建成功，大小:', blob.size, 'bytes')
     
   } catch (err: any) {
     error.value = `加载失败: ${err.message}`
     emit('error', error.value)
-    console.error('[DocxPreview] 加载错误:', err)
   } finally {
     loading.value = false
   }

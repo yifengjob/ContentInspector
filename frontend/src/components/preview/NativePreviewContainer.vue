@@ -63,8 +63,6 @@ const emit = defineEmits<{
   error: [message: string]
 }>()
 
-console.log('[NativePreviewContainer] 组件挂载，文件路径:', props.filePath)
-
 // 获取文件扩展名
 const fileType = computed(() => {
   return props.filePath.split('.').pop()?.toLowerCase() || ''
@@ -87,7 +85,6 @@ const error = computed(() => {
  * 渲染完成处理
  */
 function handleRendered() {
-  console.log('[NativePreviewContainer] 渲染完成')
   emit('rendered')
 }
 
@@ -95,7 +92,6 @@ function handleRendered() {
  * 错误处理
  */
 function handleError(message: string) {
-  console.error('[NativePreviewContainer] 预览错误:', message)
   emit('error', message)
 }
 
@@ -103,15 +99,13 @@ function handleError(message: string) {
  * 销毁组件，释放资源
  */
 function destroy() {
-  console.log('[NativePreviewContainer] 销毁组件')
   if (previewComponent.value?.destroy) {
     previewComponent.value.destroy()
   }
 }
 
-// 【新增】监听 filePath 变化，重新加载
-watch(() => props.filePath, (newPath, oldPath) => {
-  console.log('[NativePreviewContainer] 文件路径变化:', oldPath, '->', newPath)
+// 监听 filePath 变化，重新加载
+watch(() => props.filePath, (newPath) => {
   if (previewComponent.value?.loadDocument) {
     previewComponent.value.loadDocument(newPath)
   }
@@ -119,7 +113,6 @@ watch(() => props.filePath, (newPath, oldPath) => {
 
 // 组件卸载时清理
 onUnmounted(() => {
-  console.log('[NativePreviewContainer] 组件卸载')
   destroy()
 })
 

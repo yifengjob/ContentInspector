@@ -55,7 +55,7 @@
       </div>
       
       <div class="modal-footer">
-        <!-- 【新增】左侧提示信息 -->
+        <!-- 左侧提示信息 -->
         <div class="footer-hint">
           <svg class="hint-icon">
             <use href="#icon-info"/>
@@ -65,8 +65,19 @@
         
         <!-- 右侧按钮组 -->
         <div class="footer-actions">
+          <!-- 【新增】模式切换按钮（仅当支持原生预览时显示） -->
+          <button 
+            v-if="shouldUseNativePreview"
+            class="btn btn-toggle" 
+            :class="{ active: useNativePreview }"
+            @click="togglePreviewMode"
+            title="切换预览模式"
+          >
+            {{ useNativePreview ? '查看高亮版本' : '查看原始格式' }}
+          </button>
+          
           <button class="btn" :disabled="loading" @click="handleOpenFile">打开文件</button>
-          <button class="btn" :disabled="loading" @click="handleCopyContent">复制内容</button>
+          <button class="btn" :disabled="loading || !allLines.length" @click="handleCopyContent">复制内容</button>
           <button class="btn btn-primary" @click="handleClose">{{ loading ? '取消' : '关闭' }}</button>
         </div>
       </div>
@@ -178,7 +189,6 @@ const shouldUseNativePreview = computed(() => {
 
 // 【新增】处理原生预览错误，自动降级到文本预览
 function handleNativePreviewError(errorMessage: string) {
-  console.warn('[PreviewModal] 原生预览失败，降级到文本预览:', errorMessage)
   nativePreviewError.value = errorMessage
   useNativePreview.value = false
   
@@ -190,6 +200,31 @@ function handleNativePreviewError(errorMessage: string) {
 function handleNativePreviewRendered() {
   loading.value = false
   error.value = ''
+}
+
+// 【新增】切换预览模式
+function togglePreviewMode() {
+  // 清理当前预览
+  if (nativePreviewRef.value?.destroy) {
+    nativePreviewRef.value.destroy()
+  }
+  
+  // 切换模式
+  useNativePreview.value = !useNativePreview.value
+  nativePreviewError.value = null
+  
+  // 重置状态
+  loading.value = true
+  error.value = ''
+  
+  // 根据新模式加载内容
+  if (useNativePreview.value) {
+    // 切换到原生预览，不需要额外操作，组件会自动加载
+    loading.value = false
+  } else {
+    // 切换到文本预览
+    loadFile(props.filePath)
+  }
 }
 
 // 【方案 D3】渲染调度器
@@ -360,12 +395,10 @@ watch([() => props.visible, () => props.filePath], async ([isVisible, newPath]) 
       highlights.value = []
       nativePreviewError.value = null
       
-      // 【新增】判断是否使用原生预览
+      // 判断是否使用原生预览
       if (shouldUseNativePreview.value) {
-        console.log('[PreviewModal] 检测到支持的格式，使用原生预览:', newPath)
         useNativePreview.value = true
       } else {
-        console.log('[PreviewModal] 不支持的格式，使用文本预览:', newPath)
         useNativePreview.value = false
         loadFile(newPath)
       }
@@ -844,5 +877,30 @@ useEventListener(scrollContainer, 'scroll', {
   background-color: var(--bg-color);
   transform: none;
   box-shadow: none;
+}
+
+/* 【新增】模式切换按钮样式 */
+.btn-toggle {
+  background-color: #f0f0f0;
+  border-color: #d9d9d9;
+  color: #666;
+  font-weight: 500;
+}
+
+.btn-toggle:hover {
+  background-color: #e6e6e6;
+  border-color: #40a9ff;
+  color: #40a9ff;
+}
+
+.btn-toggle.active {
+  background-color: #40a9ff;
+  border-color: #40a9ff;
+  color: white;
+}
+
+.btn-toggle.active:hover {
+  background-color: #1890ff;
+  border-color: #1890ff;
 }
 </style>
