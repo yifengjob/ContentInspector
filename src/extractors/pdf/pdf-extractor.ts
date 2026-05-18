@@ -24,6 +24,8 @@ import type { ExtractorResult } from '../types';
 import { BaseExtractor } from '../base-extractor';
 import { readFileWithTimeout } from '../../utils/file-utils';
 import { withTimeout, withLogging, composeDecorators } from '../extractor-decorators';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
+import * as path from 'path';
 
 /** PDF 文档配置 */
 const PDF_DOCUMENT_OPTIONS = {
@@ -47,33 +49,24 @@ function getWorkerPdfJsLib() {
   }
 
   try {
-    const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
-
     // 禁用所有日志输出
-    if (pdfjsLib.VerbosityLevel) {
-      pdfjsLib.VerbosityLevel.INFOS = 0;
-      pdfjsLib.VerbosityLevel.WARNINGS = 0;
-      pdfjsLib.verbosity = 0;
+    if ((pdfjsLib as any).VerbosityLevel) {
+      (pdfjsLib as any).VerbosityLevel.INFOS = 0;
+      (pdfjsLib as any).VerbosityLevel.WARNINGS = 0;
+      (pdfjsLib as any).verbosity = 0;
     }
 
     // 设置 worker
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
+    const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
+    (pdfjsLib as any).GlobalWorkerOptions.workerSrc = workerPath;
 
     // 配置 CMap 和字体路径
-    const path = require('path');
     const pdfjsDistPath = path.dirname(require.resolve('pdfjs-dist'));
 
-    pdfjsLib.GlobalWorkerOptions.cMapUrl = path.join(pdfjsDistPath, 'cmaps/') + '/';
-    pdfjsLib.GlobalWorkerOptions.cMapPacked = true;
-    pdfjsLib.GlobalWorkerOptions.standardFontDataUrl =
+    (pdfjsLib as any).GlobalWorkerOptions.cMapUrl = path.join(pdfjsDistPath, 'cmaps/') + '/';
+    (pdfjsLib as any).GlobalWorkerOptions.cMapPacked = true;
+    (pdfjsLib as any).GlobalWorkerOptions.standardFontDataUrl =
       path.join(pdfjsDistPath, 'standard_fonts/') + '/';
-
-    // 完全禁用字体渲染和 canvas，减少内存占用
-    pdfjsLib.GlobalWorkerOptions.disableFontFace = true;
-    pdfjsLib.GlobalWorkerOptions.useSystemFonts = true;
-    pdfjsLib.GlobalWorkerOptions.disableRange = true;
-    pdfjsLib.GlobalWorkerOptions.disableStream = true;
 
     workerPdfJsLib = pdfjsLib;
     return pdfjsLib;
