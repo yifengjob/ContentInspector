@@ -70,7 +70,13 @@ export class TaskQueueManager {
    */
   enqueueTask(task: Task): void {
     this.ensureTypeQueue(task.fileType);
-    const queues = this.queueByTypeAndSize.get(task.fileType)!;
+    const queues = this.queueByTypeAndSize.get(task.fileType);
+
+    // 【修复】添加空值检查，虽然理论上不会为 null
+    if (!queues) {
+      console.error('[TaskQueueManager] 队列初始化失败:', task.fileType);
+      return;
+    }
 
     if (task.isLargeFile) {
       queues.large.push(task);
