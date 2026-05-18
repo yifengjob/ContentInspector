@@ -140,13 +140,3 @@ export interface IpcResponse<T = any> {
   data?: T;
   error?: string;
 }
-
-/**
- * 文件读取结果
- */
-export interface FileReadResult extends IpcResponse<ArrayBuffer> {}
-
-/**
- * 文件统计结果
- */
-export interface FileStatsResult extends IpcResponse<FileStats> {}

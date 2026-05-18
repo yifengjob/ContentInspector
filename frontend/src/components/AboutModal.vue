@@ -31,7 +31,7 @@
               采用 Worker Threads 多线程技术和真正的流式处理架构，将 CPU
               密集型的文件解析任务放到后台线程执行。 文本文件使用滑动窗口重叠策略（5MB 分块 + 200
               字符重叠），确保跨边界敏感词不漏检；
-              文档文件（PDF/Word/Excel）先提取文本再流式发送，大文件预览首屏加载 < 500ms。
+              文档文件（PDF/Word/Excel）先提取文本再流式发送，大文件预览首屏加载 &lt; 500ms。
             </p>
             <p>
               智能并发控制根据 CPU 核心数和可用内存动态调整，在性能和稳定性之间取得最佳平衡。 PDF
@@ -189,12 +189,6 @@
     font-weight: 700;
     color: var(--primary-color);
     margin: 0 0 8px 0;
-  }
-
-  .app-version {
-    font-size: 14px;
-    color: var(--text-secondary);
-    margin: 0 0 24px 0;
   }
 
   .app-subtitle {

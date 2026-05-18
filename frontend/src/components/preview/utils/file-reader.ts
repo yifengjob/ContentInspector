@@ -2,7 +2,17 @@
  * 文件读取工具函数
  */
 
-import { FileReadResult, FileStatsResult } from '@/types/preview';
+import type { IpcResponse } from '@/types/preview';
+
+/**
+ * 文件读取结果类型
+ */
+type FileReadResult = IpcResponse<ArrayBuffer>;
+
+/**
+ * 文件统计结果类型
+ */
+type FileStatsResult = IpcResponse<{ size: number; mtime: number }>;
 
 /**
  * 读取文件为 ArrayBuffer

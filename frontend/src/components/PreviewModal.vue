@@ -586,6 +586,7 @@
             <!-- 【方案 D3】虚拟滚动容器 -->
             <div ref="scrollContainer" class="virtual-scroll-container">
               <div class="virtual-spacer" :style="{ height: scroller.getTotalHeight() + 'px' }">
+                <!-- eslint-disable-next-line vue/no-v-html -->
                 <div
                   class="virtual-content"
                   :style="{ transform: `translateY(${scroller.getOffsetTop()}px)` }"

@@ -217,13 +217,16 @@ export class PreviewVirtualScroller {
         if (!lineHighlightsMap.has(startLine)) {
           lineHighlightsMap.set(startLine, []);
         }
-        lineHighlightsMap.get(startLine)!.push({
-          lineIndex: startLine,
-          localStart,
-          localEnd,
-          typeId: highlight.typeId,
-          typeName: highlight.typeName,
-        });
+        const startLineHighlights = lineHighlightsMap.get(startLine);
+        if (startLineHighlights) {
+          startLineHighlights.push({
+            lineIndex: startLine,
+            localStart,
+            localEnd,
+            typeId: highlight.typeId,
+            typeName: highlight.typeName,
+          });
+        }
       } else {
         // 情况 2：高亮跨越多行，需要拆分
 
@@ -235,27 +238,33 @@ export class PreviewVirtualScroller {
         if (!lineHighlightsMap.has(startLine)) {
           lineHighlightsMap.set(startLine, []);
         }
-        lineHighlightsMap.get(startLine)!.push({
-          lineIndex: startLine,
-          localStart: highlight.start - this.state.lineStartPositions[startLine],
-          localEnd: firstLocalEnd,
-          typeId: highlight.typeId,
-          typeName: highlight.typeName,
-        });
+        const firstLineHighlights = lineHighlightsMap.get(startLine);
+        if (firstLineHighlights) {
+          firstLineHighlights.push({
+            lineIndex: startLine,
+            localStart: highlight.start - this.state.lineStartPositions[startLine],
+            localEnd: firstLocalEnd,
+            typeId: highlight.typeId,
+            typeName: highlight.typeName,
+          });
+        }
 
         // 中间行：整行高亮
         for (let line = startLine + 1; line < endLine; line++) {
           if (!lineHighlightsMap.has(line)) {
             lineHighlightsMap.set(line, []);
           }
-          lineHighlightsMap.get(line)!.push({
-            lineIndex: line,
-            localStart: 0,
-            localEnd:
-              this.state.lineStartPositions[line + 1] - this.state.lineStartPositions[line] - 1,
-            typeId: highlight.typeId,
-            typeName: highlight.typeName,
-          });
+          const midLineHighlights = lineHighlightsMap.get(line);
+          if (midLineHighlights) {
+            midLineHighlights.push({
+              lineIndex: line,
+              localStart: 0,
+              localEnd:
+                this.state.lineStartPositions[line + 1] - this.state.lineStartPositions[line] - 1,
+              typeId: highlight.typeId,
+              typeName: highlight.typeName,
+            });
+          }
         }
 
         // 最后一行：从行首到结束位置
@@ -263,13 +272,16 @@ export class PreviewVirtualScroller {
         if (!lineHighlightsMap.has(endLine)) {
           lineHighlightsMap.set(endLine, []);
         }
-        lineHighlightsMap.get(endLine)!.push({
-          lineIndex: endLine,
-          localStart: 0,
-          localEnd: lastLocalEnd,
-          typeId: highlight.typeId,
-          typeName: highlight.typeName,
-        });
+        const endLineHighlights = lineHighlightsMap.get(endLine);
+        if (endLineHighlights) {
+          endLineHighlights.push({
+            lineIndex: endLine,
+            localStart: 0,
+            localEnd: lastLocalEnd,
+            typeId: highlight.typeId,
+            typeName: highlight.typeName,
+          });
+        }
       }
     }
 

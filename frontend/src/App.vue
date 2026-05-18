@@ -63,7 +63,7 @@
   const currentTheme = ref<ThemeMode>('system');
   const isCancelling = ref(false); // 【新增】取消扫描状态
   // 【优化】判断是否为开发环境
-  const isDevMode = computed(() => process.env.NODE_ENV === 'development');
+  const isDevMode = computed(() => import.meta.env.DEV);
 
   // 【新增】更多菜单显示状态
   const showMoreMenu = ref(false);

@@ -205,7 +205,8 @@ function wrapWithRateLimit(
 ): EventListener | RateLimitedFunction {
   if (!config) return handler;
 
-  let { type, delay, driver } = config;
+  const { type } = config;
+  let { delay, driver } = config;
 
   if (type === 'debounce') {
     if (delay === undefined) delay = globalDefaults.defaultDebounceDelay ?? 0;

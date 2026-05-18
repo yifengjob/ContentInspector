@@ -9,12 +9,20 @@ declare global {
       scanCancel: () => Promise<any>;
       previewFileStream: (filePath: string) => Promise<any>; // 流式预览
       cancelPreview: (taskId: number) => Promise<any>;
-      
+
       // 【新增】文件预览相关（vue-office）
-      readFileAsBlob: (filePath: string) => Promise<{ success: boolean; data?: ArrayBuffer; error?: string }>;
-      getFileStats: (filePath: string) => Promise<{ success: boolean; stats?: { size: number; mtime: number }; error?: string }>;
-      readFileChunk: (filePath: string, offset: number, length: number) => Promise<{ success: boolean; chunk?: ArrayBuffer; error?: string }>;
-      
+      readFileAsBlob: (
+        filePath: string
+      ) => Promise<{ success: boolean; data?: ArrayBuffer; error?: string }>;
+      getFileStats: (
+        filePath: string
+      ) => Promise<{ success: boolean; stats?: { size: number; mtime: number }; error?: string }>;
+      readFileChunk: (
+        filePath: string,
+        offset: number,
+        length: number
+      ) => Promise<{ success: boolean; chunk?: ArrayBuffer; error?: string }>;
+
       onPreviewChunk: (callback: (chunk: any) => void) => () => void; // 【方案 D3】
       openFile: (filePath: string) => Promise<any>;
       openFileLocation: (filePath: string) => Promise<any>;
