@@ -78,6 +78,7 @@ class ExcelStreamingExtractor extends BaseExtractor {
       if (workbook) {
         try {
           workbook = null;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e) {
           // 忽略清理错误
         }

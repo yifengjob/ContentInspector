@@ -247,8 +247,13 @@ function detectBuiltinRules(text: string, enabledTypes: string[]): Record<string
 
     let validCount = 0;
     for (const match of matches) {
+      // 【修复】添加 index 空值检查
+      if (match.index === undefined || match.index === null) {
+        continue;
+      }
+
       if (rule.validate) {
-        if (rule.validate(match[0], text, match.index!)) {
+        if (rule.validate(match[0], text, match.index)) {
           validCount++;
         }
       } else {
@@ -276,13 +281,18 @@ export function getHighlights(text: string, enabledTypes: string[]): HighlightRa
     const matches = Array.from(text.matchAll(pattern));
 
     for (const match of matches) {
-      if (rule.validate && !rule.validate(match[0], text, match.index!)) {
+      // 【修复】添加 index 空值检查
+      if (match.index === undefined || match.index === null) {
+        continue;
+      }
+
+      if (rule.validate && !rule.validate(match[0], text, match.index)) {
         continue;
       }
 
       highlights.push({
-        start: match.index!,
-        end: match.index! + match[0].length,
+        start: match.index,
+        end: match.index + match[0].length,
         typeId: rule.id,
         typeName: rule.name,
       });
