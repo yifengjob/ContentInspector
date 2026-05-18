@@ -136,16 +136,12 @@ defineExpose({
   transition: transform 0.2s ease;
 }
 
-/* 【修复】消除工作表标签区域的多余垂直滚动条 */
-.excel-preview-container :deep(.x-spreadsheet) {
-  overflow-x: auto !important;
-  overflow-y: auto !important;
-}
-
-/* 【修复】工作表标签区域不应该有垂直滚动 */
-.excel-preview-container :deep(.x-spreadsheet .bottombar) {
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
+/* 【修复】工作表标签区域不应该有垂直滚动
+ * .x-spreadsheet-menu 是工作表标签菜单的容器
+ * 当只有少数工作表时，不应出现垂直滚动条
+ */
+.excel-preview-container :deep(.x-spreadsheet-menu) {
+  overflow-y: hidden;
 }
 
 .loading-state,
