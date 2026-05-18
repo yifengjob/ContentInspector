@@ -1,16 +1,16 @@
 /**
  * PDF.js 浏览器环境 Polyfill
- * 
+ *
  * pdf.js 3.x legacy build 在 Node.js 环境中需要浏览器全局对象
  * 此模块提供完整的 polyfill，确保 pdf.js 能正常工作
  */
 
-import {logger} from "../../../logger/logger";
+import { logger } from '../../../logger/logger';
 
 /**
  * 为 pdf.js 设置浏览器环境 polyfill
  * 必须在加载 pdf.js 之前调用
- * 
+ *
  * @param context - 全局对象上下文（默认为 global）
  */
 export function setupPdfJsPolyfills(context: any = global): void {
@@ -85,7 +85,7 @@ export function setupPdfJsPolyfills(context: any = global): void {
 
 /**
  * 初始化 DOMMatrix（用于 PDF 渲染）
- * 
+ *
  * @param context - 全局对象上下文（默认为 global）
  */
 export function setupDomMatrix(context: any = global): void {
@@ -96,7 +96,7 @@ export function setupDomMatrix(context: any = global): void {
   // 【修复】移除 @napi-rs/canvas 依赖，避免 Windows 平台缺少 ffmpeg.dll 的问题
   // pdf.js 有自己的矩阵处理逻辑，不需要额外的 DOMMatrix polyfill
   // 如果确实需要，可以使用轻量级的替代方案
-  
+
   // 简单的 DOMMatrix polyfill（仅支持基础功能）
   context.DOMMatrix = class DOMMatrix {
     a: number;
@@ -162,7 +162,7 @@ export function setupDomMatrix(context: any = global): void {
 /**
  * 初始化 Promise.withResolvers polyfill
  * （某些旧版本 Node.js 或库可能需要）
- * 
+ *
  * @param context - 全局对象上下文（默认为 global）
  */
 export function setupPromiseWithResolvers(context: any = global): void {
@@ -170,7 +170,7 @@ export function setupPromiseWithResolvers(context: any = global): void {
     return; // 已存在，跳过
   }
 
-  (context.Promise as any).withResolvers = function() {
+  (context.Promise as any).withResolvers = function () {
     let resolve: any, reject: any;
     const promise = new Promise((res, rej) => {
       resolve = res;
@@ -183,7 +183,7 @@ export function setupPromiseWithResolvers(context: any = global): void {
 /**
  * 一次性设置所有 PDF 相关的 polyfill
  * 推荐在应用启动时调用
- * 
+ *
  * @param context - 全局对象上下文（默认为 global）
  */
 export function setupAllPdfPolyfills(context: any = global): void {

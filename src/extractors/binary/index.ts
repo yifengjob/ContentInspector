@@ -8,12 +8,12 @@ import { extractWithBinary, extractTextFromBinary } from './binary-extractor';
 
 // 定义配置并自动注册
 const BINARY_CONFIG = {
-    extensions: ['bin', 'exe', 'dll', 'so', 'dylib'],
-    fileType: 'other' as const,
-    processor: FileProcessorType.BINARY_SCAN,
-    supportsStreaming: false,
-    extractor: extractWithBinary,
-    description: '二进制文件（仅二进制扫描）'
+  extensions: ['bin', 'exe', 'dll', 'so', 'dylib'],
+  fileType: 'other' as const,
+  processor: FileProcessorType.BINARY_SCAN,
+  supportsStreaming: false,
+  extractor: extractWithBinary,
+  description: '二进制文件（仅二进制扫描）',
 };
 
 registerExtractor(BINARY_CONFIG);

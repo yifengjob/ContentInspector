@@ -85,7 +85,7 @@
       const plainConfig = JSON.parse(JSON.stringify(config.value));
       await saveConfig(plainConfig);
       // 应用主题设置
-      applyTheme(config.value.theme as any);
+      applyTheme(config.value.theme as 'light' | 'dark' | 'system');
       // 【C2 优化】静默成功，不显示提示
       emit('close');
     } catch (error) {

@@ -32,18 +32,26 @@
       environmentInfo.value = {
         os: result.osVersion || 'unknown',
         os_version: result.osVersion || '未知',
-        issues: (result.issues || []).map((issue: any) => ({
-          severity:
-            issue.severity === 'critical'
-              ? 'Critical'
-              : issue.severity === 'warning'
-                ? 'Warning'
-                : 'Info',
-          title: issue.title,
-          description: issue.description,
-          solution: issue.solution,
-          download_url: issue.downloadUrl,
-        })),
+        issues: (result.issues || []).map(
+          (issue: {
+            severity?: string;
+            title?: string;
+            description?: string;
+            solution?: string;
+            downloadUrl?: string;
+          }) => ({
+            severity:
+              issue.severity === 'critical'
+                ? 'Critical'
+                : issue.severity === 'warning'
+                  ? 'Warning'
+                  : 'Info',
+            title: issue.title || '',
+            description: issue.description || '',
+            solution: issue.solution || '',
+            download_url: issue.downloadUrl,
+          })
+        ),
         is_ready: result.isReady,
       };
     } catch (error) {

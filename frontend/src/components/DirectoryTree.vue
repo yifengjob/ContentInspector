@@ -73,6 +73,7 @@
                 children: nodes,
               } as DirectoryNode;
             }
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
           } catch (error) {
             // 驱动器不存在或无权限，跳过
           }
@@ -118,13 +119,13 @@
     });
   }
 
-  // 【辅助方法】计算总路径数
-  const countTotalPaths = (nodes: DirectoryNode[]): number => {
+  // 【辅助方法】计算总路径数（保留供未来使用）
+  const _countTotalPaths = (nodes: DirectoryNode[]): number => {
     let count = 0;
     nodes.forEach((node) => {
       count++;
       if (node.children && node.children.length > 0) {
-        count += countTotalPaths(node.children);
+        count += _countTotalPaths(node.children);
       }
     });
     return count;
@@ -291,6 +292,7 @@
                 children: nodes,
               } as DirectoryNode;
             }
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
           } catch (error) {
             // 驱动器不存在或无权限，跳过
           }

@@ -14,7 +14,7 @@
  * 9. UI 配置（窗口、显示）
  */
 
-import {LogLevel} from "../../types";
+import { LogLevel } from '../../types';
 
 // ==================== 1. 单位转换常量 ====================
 
@@ -125,19 +125,19 @@ export const PREVIEW_MAX_TIMEOUT = 20000; // 20 秒
 // 解析超时请使用 PARSER_* 系列常量，Worker 监控超时请使用 WORKER_* 系列常量
 
 /** 标准文件读取超时时间（毫秒）- 用于 PDF/Excel/Binary/RTF/ZIP 等复杂解析 */
-export const FILE_READ_TIMEOUT_STANDARD_MS = 15000;  // 15秒（适应 Windows 锁屏场景）
+export const FILE_READ_TIMEOUT_STANDARD_MS = 15000; // 15秒（适应 Windows 锁屏场景）
 
 /** 快速失败文件读取超时时间（毫秒）- 用于降级逻辑或简单操作 */
-export const FILE_READ_TIMEOUT_FAST_MS = 5000;  // 5秒
+export const FILE_READ_TIMEOUT_FAST_MS = 5000; // 5秒
 
 /** 文件打开超时时间（毫秒） */
-export const FILE_OPEN_TIMEOUT_MS = 3000;  // 3秒
+export const FILE_OPEN_TIMEOUT_MS = 3000; // 3秒
 
 /** 文件统计超时时间（毫秒） */
-export const FILE_STAT_TIMEOUT_MS = 3000;  // 3秒
+export const FILE_STAT_TIMEOUT_MS = 3000; // 3秒
 
 /** 文件关闭超时时间（毫秒） */
-export const FILE_CLOSE_TIMEOUT_MS = 1000;  // 1秒
+export const FILE_CLOSE_TIMEOUT_MS = 1000; // 1秒
 
 // --- 3.5 PDF 解析超时配置 ---
 
@@ -155,18 +155,18 @@ export const PDF_TOTAL_TIMEOUT_MS = 60000; // 60秒
  * @returns 超时时间（毫秒）
  */
 export function calculateParserTimeout(fileSizeBytes: number): number {
-    const sizeMB = fileSizeBytes / BYTES_TO_MB;
+  const sizeMB = fileSizeBytes / BYTES_TO_MB;
 
-    // 基础超时 + 按大小增长的超时
-    let timeoutMs = PARSER_BASE_TIMEOUT + (sizeMB * PARSER_TIMEOUT_PER_MB);
+  // 基础超时 + 按大小增长的超时
+  let timeoutMs = PARSER_BASE_TIMEOUT + sizeMB * PARSER_TIMEOUT_PER_MB;
 
-    // 限制在最大超时范围内
-    timeoutMs = Math.min(timeoutMs, PARSER_MAX_TIMEOUT);
+  // 限制在最大超时范围内
+  timeoutMs = Math.min(timeoutMs, PARSER_MAX_TIMEOUT);
 
-    // 确保至少为基础超时
-    timeoutMs = Math.max(timeoutMs, PARSER_BASE_TIMEOUT);
+  // 确保至少为基础超时
+  timeoutMs = Math.max(timeoutMs, PARSER_BASE_TIMEOUT);
 
-    return Math.floor(timeoutMs);
+  return Math.floor(timeoutMs);
 }
 
 /**
@@ -175,18 +175,18 @@ export function calculateParserTimeout(fileSizeBytes: number): number {
  * @returns 超时时间（毫秒）
  */
 export function calculateWorkerTimeout(fileSizeBytes: number): number {
-    const sizeMB = fileSizeBytes / BYTES_TO_MB;
+  const sizeMB = fileSizeBytes / BYTES_TO_MB;
 
-    // 基础超时 + 按大小增长的超时
-    let timeoutMs = WORKER_BASE_TIMEOUT + (sizeMB * WORKER_TIMEOUT_PER_MB);
+  // 基础超时 + 按大小增长的超时
+  let timeoutMs = WORKER_BASE_TIMEOUT + sizeMB * WORKER_TIMEOUT_PER_MB;
 
-    // 限制在最大超时范围内
-    timeoutMs = Math.min(timeoutMs, WORKER_MAX_TIMEOUT);
+  // 限制在最大超时范围内
+  timeoutMs = Math.min(timeoutMs, WORKER_MAX_TIMEOUT);
 
-    // 确保至少为基础超时
-    timeoutMs = Math.max(timeoutMs, WORKER_BASE_TIMEOUT);
+  // 确保至少为基础超时
+  timeoutMs = Math.max(timeoutMs, WORKER_BASE_TIMEOUT);
 
-    return Math.floor(timeoutMs);
+  return Math.floor(timeoutMs);
 }
 
 /**
@@ -195,18 +195,18 @@ export function calculateWorkerTimeout(fileSizeBytes: number): number {
  * @returns 超时时间（毫秒）
  */
 export function calculatePreviewTimeout(fileSizeBytes: number): number {
-    const sizeMB = fileSizeBytes / BYTES_TO_MB;
+  const sizeMB = fileSizeBytes / BYTES_TO_MB;
 
-    // 基础超时 + 按大小增长的超时
-    let timeoutMs = PREVIEW_BASE_TIMEOUT + (sizeMB * PREVIEW_TIMEOUT_PER_MB);
+  // 基础超时 + 按大小增长的超时
+  let timeoutMs = PREVIEW_BASE_TIMEOUT + sizeMB * PREVIEW_TIMEOUT_PER_MB;
 
-    // 限制在最大超时范围内
-    timeoutMs = Math.min(timeoutMs, PREVIEW_MAX_TIMEOUT);
+  // 限制在最大超时范围内
+  timeoutMs = Math.min(timeoutMs, PREVIEW_MAX_TIMEOUT);
 
-    // 确保至少为基础超时
-    timeoutMs = Math.max(timeoutMs, PREVIEW_BASE_TIMEOUT);
+  // 确保至少为基础超时
+  timeoutMs = Math.max(timeoutMs, PREVIEW_BASE_TIMEOUT);
 
-    return Math.floor(timeoutMs);
+  return Math.floor(timeoutMs);
 }
 
 // ==================== 4. 文件大小限制 ====================
@@ -222,9 +222,9 @@ export const MAX_TEXT_CONTENT_SIZE_MB = 25;
 
 /** 文件大小限制配置对象 */
 export const FILE_SIZE_LIMITS = {
-    defaultMaxSizeMB: DEFAULT_MAX_FILE_SIZE_MB,
-    pdfMaxSizeMB: DEFAULT_MAX_PDF_SIZE_MB,
-    maxTextContentSizeMB: MAX_TEXT_CONTENT_SIZE_MB
+  defaultMaxSizeMB: DEFAULT_MAX_FILE_SIZE_MB,
+  pdfMaxSizeMB: DEFAULT_MAX_PDF_SIZE_MB,
+  maxTextContentSizeMB: MAX_TEXT_CONTENT_SIZE_MB,
 };
 
 // ==================== 5. 扫描流程配置 ====================

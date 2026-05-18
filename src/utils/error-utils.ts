@@ -13,8 +13,8 @@ import { FILE_SIZE_DECIMAL_PLACES } from '../core/config/constants';
  */
 export class AppError extends Error {
   constructor(
-    public code: string,      // 错误代码（用于前端识别）
-    message: string,          // 用户友好的错误消息
+    public code: string, // 错误代码（用于前端识别）
+    message: string, // 用户友好的错误消息
     public originalError?: any // 原始错误对象（用于日志和调试）
   ) {
     super(message);
@@ -33,24 +33,24 @@ export const ErrorCodes = {
   READ_FAILED: 'READ_FAILED',
   WRITE_FAILED: 'WRITE_FAILED',
   DELETE_FAILED: 'DELETE_FAILED',
-  
+
   // 解析相关错误
   PARSE_ERROR: 'PARSE_ERROR',
   UNSUPPORTED_FORMAT: 'UNSUPPORTED_FORMAT',
-  
+
   // 扫描相关错误
   SCAN_TIMEOUT: 'SCAN_TIMEOUT',
   SCAN_CANCELLED: 'SCAN_CANCELLED',
-  
+
   // 配置相关错误
   CONFIG_LOAD_FAILED: 'CONFIG_LOAD_FAILED',
   CONFIG_SAVE_FAILED: 'CONFIG_SAVE_FAILED',
-  
+
   // 通用错误
-  UNKNOWN: 'UNKNOWN'
+  UNKNOWN: 'UNKNOWN',
 } as const;
 
-export type ErrorCode = typeof ErrorCodes[keyof typeof ErrorCodes];
+export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
 
 /**
  * 错误工厂函数 - 文件操作相关
@@ -78,7 +78,11 @@ export function createPermissionError(filePath: string, originalError?: any): Ap
  */
 // const FILE_SIZE_DECIMAL_PLACES = 1; // 已删除，使用导入的常量
 
-export function createFileTooLargeError(filePath: string, sizeMB: number, limitMB: number): AppError {
+export function createFileTooLargeError(
+  filePath: string,
+  sizeMB: number,
+  limitMB: number
+): AppError {
   return new AppError(
     ErrorCodes.FILE_TOO_LARGE,
     `文件过大 (${sizeMB.toFixed(FILE_SIZE_DECIMAL_PLACES)}MB)，超过限制 (${limitMB}MB): ${path.basename(filePath)}`
@@ -122,10 +126,7 @@ export function createParseError(filePath: string, format: string, originalError
 }
 
 export function createUnsupportedFormatError(_filePath: string, format: string): AppError {
-  return new AppError(
-    ErrorCodes.UNSUPPORTED_FORMAT,
-    `不支持的文件格式: .${format}`
-  );
+  return new AppError(ErrorCodes.UNSUPPORTED_FORMAT, `不支持的文件格式: .${format}`);
 }
 
 /**
@@ -140,10 +141,7 @@ export function createScanTimeoutError(filePath: string, timeoutSeconds: number)
 }
 
 export function createScanCancelledError(): AppError {
-  return new AppError(
-    ErrorCodes.SCAN_CANCELLED,
-    '扫描已取消'
-  );
+  return new AppError(ErrorCodes.SCAN_CANCELLED, '扫描已取消');
 }
 
 /**
@@ -151,19 +149,11 @@ export function createScanCancelledError(): AppError {
  */
 
 export function createConfigLoadError(originalError?: any): AppError {
-  return new AppError(
-    ErrorCodes.CONFIG_LOAD_FAILED,
-    '加载配置失败，将使用默认配置',
-    originalError
-  );
+  return new AppError(ErrorCodes.CONFIG_LOAD_FAILED, '加载配置失败，将使用默认配置', originalError);
 }
 
 export function createConfigSaveError(originalError?: any): AppError {
-  return new AppError(
-    ErrorCodes.CONFIG_SAVE_FAILED,
-    '保存配置失败',
-    originalError
-  );
+  return new AppError(ErrorCodes.CONFIG_SAVE_FAILED, '保存配置失败', originalError);
 }
 
 /**
@@ -171,11 +161,7 @@ export function createConfigSaveError(originalError?: any): AppError {
  */
 
 export function createUnknownError(message: string, originalError?: any): AppError {
-  return new AppError(
-    ErrorCodes.UNKNOWN,
-    message,
-    originalError
-  );
+  return new AppError(ErrorCodes.UNKNOWN, message, originalError);
 }
 
 /**
@@ -184,33 +170,30 @@ export function createUnknownError(message: string, originalError?: any): AppErr
 export function convertNodeError(error: any, filePath?: string, context?: string): AppError {
   const errorCode = error?.code || '';
   const errorMessage = error?.message || String(error);
-  
+
   // 文件不存在
   if (errorCode === 'ENOENT') {
-    return filePath 
+    return filePath
       ? createFileNotFoundError(filePath, error)
       : createUnknownError('文件或目录不存在', error);
   }
-  
+
   // 权限不足
   if (errorCode === 'EACCES' || errorCode === 'EPERM') {
     return filePath
       ? createPermissionError(filePath, error)
       : createUnknownError('权限不足', error);
   }
-  
+
   // 文件被锁定（Windows）
   if (errorCode === 'EBUSY' || errorCode === 'ETXTBSY') {
     return filePath
       ? createPermissionError(filePath, error)
       : createUnknownError('文件正在使用中', error);
   }
-  
+
   // 其他错误
-  return createUnknownError(
-    context ? `${context}: ${errorMessage}` : errorMessage,
-    error
-  );
+  return createUnknownError(context ? `${context}: ${errorMessage}` : errorMessage, error);
 }
 
 /**
@@ -227,21 +210,21 @@ export function serializeError(error: any): { code: string; message: string } {
   if (error instanceof AppError) {
     return {
       code: error.code,
-      message: error.message
+      message: error.message,
     };
   }
-  
+
   // 普通 Error
   if (error instanceof Error) {
     return {
       code: ErrorCodes.UNKNOWN,
-      message: error.message
+      message: error.message,
     };
   }
-  
+
   // 其他类型
   return {
     code: ErrorCodes.UNKNOWN,
-    message: String(error)
+    message: String(error),
   };
 }

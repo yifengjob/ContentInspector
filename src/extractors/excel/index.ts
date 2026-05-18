@@ -9,24 +9,24 @@ import { extractWithExcelJS } from './excel-streaming-extractor';
 
 // 现代 Excel 格式配置（xlsx, et）
 const EXCEL_MODERN_CONFIG = {
-    extensions: ['xlsx', 'et'],
-    fileType: 'excel' as const,
-    processor: FileProcessorType.PARSER_REQUIRED,
-    supportsStreaming: false,
-    extractor: extractWithExcelJS,
-    description: 'Excel 表格（使用 exceljs 流式解析，内存效率高）'
+  extensions: ['xlsx', 'et'],
+  fileType: 'excel' as const,
+  processor: FileProcessorType.PARSER_REQUIRED,
+  supportsStreaming: false,
+  extractor: extractWithExcelJS,
+  description: 'Excel 表格（使用 exceljs 流式解析，内存效率高）',
 };
 
 registerExtractor(EXCEL_MODERN_CONFIG);
 
 // 旧版 Excel 格式配置（xls）
 const EXCEL_LEGACY_CONFIG = {
-    extensions: ['xls'],
-    fileType: 'excel' as const,
-    processor: FileProcessorType.PARSER_REQUIRED,
-    supportsStreaming: false,
-    extractor: extractWithSheetJS,
-    description: 'Excel 97-2003 表格（使用 SheetJS 解析）'
+  extensions: ['xls'],
+  fileType: 'excel' as const,
+  processor: FileProcessorType.PARSER_REQUIRED,
+  supportsStreaming: false,
+  extractor: extractWithSheetJS,
+  description: 'Excel 97-2003 表格（使用 SheetJS 解析）',
 };
 
 registerExtractor(EXCEL_LEGACY_CONFIG);

@@ -8,24 +8,24 @@ import { extractPptx } from './ppt-extractor';
 
 // 现代 PowerPoint 格式（pptx, dps）
 const PPTX_CONFIG = {
-    extensions: ['pptx', 'dps'],
-    fileType: 'powerpoint' as const,
-    processor: FileProcessorType.PARSER_REQUIRED,
-    supportsStreaming: false,
-    extractor: extractPptx,
-    description: 'PowerPoint 演示文稿（解压 + XML 解析）'
+  extensions: ['pptx', 'dps'],
+  fileType: 'powerpoint' as const,
+  processor: FileProcessorType.PARSER_REQUIRED,
+  supportsStreaming: false,
+  extractor: extractPptx,
+  description: 'PowerPoint 演示文稿（解压 + XML 解析）',
 };
 
 registerExtractor(PPTX_CONFIG);
 
 // 旧版 PowerPoint 格式（ppt）
 const PPT_CONFIG = {
-    extensions: ['ppt'],
-    fileType: 'powerpoint' as const,
-    processor: FileProcessorType.BINARY_SCAN,
-    supportsStreaming: false,
-    extractor: async () => ({ text: '', unsupportedPreview: true }), // 占位，实际使用 binary
-    description: '旧版 PowerPoint（仅二进制扫描）'
+  extensions: ['ppt'],
+  fileType: 'powerpoint' as const,
+  processor: FileProcessorType.BINARY_SCAN,
+  supportsStreaming: false,
+  extractor: async () => ({ text: '', unsupportedPreview: true }), // 占位，实际使用 binary
+  description: '旧版 PowerPoint（仅二进制扫描）',
 };
 
 registerExtractor(PPT_CONFIG);

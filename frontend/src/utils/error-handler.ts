@@ -24,7 +24,7 @@ export interface ErrorInfo {
 /**
  * 分类错误并提供友好提示
  */
-export function classifyError(error: any): ErrorInfo {
+export function classifyError(error: unknown): ErrorInfo {
   const errorMessage = String(error?.message || error || '').toLowerCase();
 
   // 超时错误
@@ -159,7 +159,7 @@ export function classifyError(error: any): ErrorInfo {
 /**
  * 获取错误的友好显示文本
  */
-export function getFriendlyErrorMessage(error: any): string {
+export function getFriendlyErrorMessage(error: unknown): string {
   const info = classifyError(error);
 
   if (info.suggestion) {
@@ -172,6 +172,6 @@ export function getFriendlyErrorMessage(error: any): string {
 /**
  * 根据错误严重程度获取提示类型
  */
-export function getErrorSeverity(error: any): 'info' | 'warning' | 'error' {
+export function getErrorSeverity(error: unknown): 'info' | 'warning' | 'error' {
   return classifyError(error).severity;
 }

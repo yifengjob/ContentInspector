@@ -22,10 +22,11 @@ type FileStatsResult = IpcResponse<{ size: number; mtime: number }>;
 export async function readFileAsBlob(filePath: string): Promise<FileReadResult> {
   try {
     return await window.electronAPI.readFileAsBlob(filePath);
-  } catch (error: any) {
+  } catch (_error) {
+    const errorMessage = _error instanceof Error ? _error.message : '读取文件失败';
     return {
       success: false,
-      error: error.message || '读取文件失败',
+      error: errorMessage,
     };
   }
 }
@@ -38,10 +39,11 @@ export async function readFileAsBlob(filePath: string): Promise<FileReadResult> 
 export async function getFileStats(filePath: string): Promise<FileStatsResult> {
   try {
     return await window.electronAPI.getFileStats(filePath);
-  } catch (error: any) {
+  } catch (_error) {
+    const errorMessage = _error instanceof Error ? _error.message : '获取文件信息失败';
     return {
       success: false,
-      error: error.message || '获取文件信息失败',
+      error: errorMessage,
     };
   }
 }

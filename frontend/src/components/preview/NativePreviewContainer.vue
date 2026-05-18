@@ -20,6 +20,7 @@
   });
 
   // 预览组件引用
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const previewComponent = ref<any>(null);
 
   // 加载状态

@@ -265,8 +265,8 @@
   // 【新增】打开开发者工具
   const handleOpenDevTools = () => {
     // 通过 window.electronAPI 调用主进程的 openDevTools
-    if ((window as any).electronAPI?.openDevTools) {
-      (window as any).electronAPI.openDevTools();
+    if (window.electronAPI?.openDevTools) {
+      window.electronAPI.openDevTools();
     } else {
       console.warn('electronAPI.openDevTools 不可用');
     }
@@ -285,8 +285,8 @@
       // 清空时也保存
       try {
         await setSearchExpression('');
-      } catch (error: any) {
-        console.error('清空表达式失败:', error);
+      } catch (_error) {
+        console.error('清空表达式失败:', _error);
       }
       return;
     }
@@ -303,12 +303,13 @@
         // 验证通过，自动保存
         try {
           await setSearchExpression(expr);
-        } catch (error: any) {
-          console.error('保存表达式失败:', error);
+        } catch (_error) {
+          console.error('保存表达式失败:', _error);
         }
       }
-    } catch (error: any) {
-      expressionValidationError.value = error.message || '验证失败';
+    } catch (_error) {
+      const errorMessage = _error instanceof Error ? _error.message : '验证失败';
+      expressionValidationError.value = errorMessage;
       // 验证失败，不保存
     }
   };

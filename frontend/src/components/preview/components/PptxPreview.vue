@@ -36,8 +36,9 @@
 
       // PPTX 组件可以直接使用 ArrayBuffer
       pptxSrc.value = result.data;
-    } catch (err: any) {
-      error.value = `加载失败: ${err.message}`;
+    } catch (_err) {
+      const errorMessage = _err instanceof Error ? _err.message : '加载失败';
+      error.value = `加载失败: ${errorMessage}`;
       emit('error', error.value);
     } finally {
       loading.value = false;
@@ -56,7 +57,7 @@
   /**
    * 错误处理
    */
-  function handleError(_e: any) {
+  function handleError(_e: unknown) {
     loading.value = false;
     error.value = '演示文稿渲染失败，请尝试切换到文本预览模式';
     emit('error', error.value);

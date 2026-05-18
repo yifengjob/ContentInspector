@@ -5,10 +5,10 @@
 
 import * as fs from 'fs';
 import {
-  FILE_READ_TIMEOUT_STANDARD_MS, 
-  FILE_OPEN_TIMEOUT_MS, 
-  FILE_STAT_TIMEOUT_MS, 
-  FILE_CLOSE_TIMEOUT_MS 
+  FILE_READ_TIMEOUT_STANDARD_MS,
+  FILE_OPEN_TIMEOUT_MS,
+  FILE_STAT_TIMEOUT_MS,
+  FILE_CLOSE_TIMEOUT_MS,
 } from '../core/config/constants';
 
 /**

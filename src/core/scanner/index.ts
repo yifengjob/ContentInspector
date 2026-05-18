@@ -1,6 +1,6 @@
 /**
  * Scanner 模块 - 扫描核心功能
- * 
+ *
  * 职责：
  * - 协调各个子模块完成扫描任务
  * - 管理扫描生命周期
@@ -15,12 +15,12 @@ export { ScanCleanup, type CleanupOptions } from './scan-cleanup';
 
 // 辅助函数
 export {
-    createProgressUpdater,
-    cleanupPendingTask,
-    sendToMainWindow,
-    calculateTimeout,
-    BatchSender,
-    resultBatchSender,
-    configureBatchSender,
-    LogThrottler
+  createProgressUpdater,
+  cleanupPendingTask,
+  sendToMainWindow,
+  calculateTimeout,
+  BatchSender,
+  resultBatchSender,
+  configureBatchSender,
+  LogThrottler,
 } from './helpers/scanner-helpers';

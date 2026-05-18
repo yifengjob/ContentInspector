@@ -11,9 +11,9 @@
  * @param consumer Consumer 对象
  */
 export function markConsumerIdle(consumer: any): void {
-    consumer.busy = false;
-    consumer.taskId = undefined;
-    consumer.counted = false;  // 【P0修复】重置计数标志，允许下次任务重新计数
+  consumer.busy = false;
+  consumer.taskId = undefined;
+  consumer.counted = false; // 【P0修复】重置计数标志，允许下次任务重新计数
 }
 
 /**
@@ -23,14 +23,14 @@ export function markConsumerIdle(consumer: any): void {
  * @param log 日志函数
  */
 export function safelyTerminateWorker(
-    worker: any,
-    consumer: any,
-    log: (msg: string) => void
+  worker: any,
+  consumer: any,
+  log: (msg: string) => void
 ): void {
-    try {
-        consumer.isTerminating = true;
-        worker.terminate();
-    } catch (error: any) {
-        log(`终止 Worker 失败: ${error.message}`);
-    }
+  try {
+    consumer.isTerminating = true;
+    worker.terminate();
+  } catch (error: any) {
+    log(`终止 Worker 失败: ${error.message}`);
+  }
 }

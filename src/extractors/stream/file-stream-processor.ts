@@ -1,6 +1,6 @@
 /**
  * 流式文件处理器 - 使用滑动窗口重叠策略处理大文件
- * 
+ *
  * 核心优势：
  * 1. 内存可控：峰值内存 = CHUNK_SIZE + OVERLAP_SIZE（约 5MB）
  * 2. 无漏检：通过重叠区保证跨边界敏感词不被遗漏
@@ -11,7 +11,7 @@ import { createReadStream } from 'fs';
 import {
   SLIDING_WINDOW_CHUNK_SIZE_MB,
   SLIDING_WINDOW_OVERLAP_SIZE,
-  BYTES_TO_MB
+  BYTES_TO_MB,
 } from '../../core/config/constants';
 import { getHighlights, evaluateSearchExpressionOnly } from '../../detection/sensitive-detector';
 import { mainLogger } from '../../logger/logger';
@@ -21,70 +21,70 @@ import type { HighlightRange } from '../../types';
  * 敏感词检测结果
  */
 export interface SensitiveResult {
-  keyword: string;        // 匹配的敏感词
-  position: number;       // 在当前块中的位置
-  typeId: string;         // 类型 ID
-  typeName: string;       // 类型名称
+  keyword: string; // 匹配的敏感词
+  position: number; // 在当前块中的位置
+  typeId: string; // 类型 ID
+  typeName: string; // 类型名称
 }
 
 /**
  * 数据块信息
  */
 export interface ChunkData {
-  chunkIndex: number;           // 块索引 (从0开始)
-  text: string;                 // 块的文本内容
-  lines: string[];              // 按行分割
+  chunkIndex: number; // 块索引 (从0开始)
+  text: string; // 块的文本内容
+  lines: string[]; // 按行分割
   highlights: HighlightRange[]; // 敏感词高亮
-  startLine?: number;           // 起始行号
-  byteOffset: number;           // 字节偏移量
+  startLine?: number; // 起始行号
+  byteOffset: number; // 字节偏移量
 }
 
 /**
  * 处理统计信息
  */
 export interface ProcessingStats {
-  totalChunks: number;      // 总块数
-  totalBytes: number;       // 总字节数
-  totalLines?: number;      // 总行数 (可选)
+  totalChunks: number; // 总块数
+  totalBytes: number; // 总字节数
+  totalLines?: number; // 总行数 (可选)
 }
 
 /**
  * 流式处理器选项
  */
 export interface StreamProcessorOptions {
-  mode: 'detect' | 'preview';           // 处理模式
-  enabledTypes: string[];               // 启用的敏感词类型
-  searchExpression?: string;            // 自定义逻辑表达式
-  enableBuiltinRules?: boolean;         // 【新增】是否启用内置敏感词规则（默认 true）
-  
+  mode: 'detect' | 'preview'; // 处理模式
+  enabledTypes: string[]; // 启用的敏感词类型
+  searchExpression?: string; // 自定义逻辑表达式
+  enableBuiltinRules?: boolean; // 【新增】是否启用内置敏感词规则（默认 true）
+
   // 回调函数
-  onChunk?: (chunkData: ChunkData) => void;           // 每块就绪回调
-  onComplete?: (stats: ProcessingStats) => void;      // 完成回调
-  onError?: (error: Error) => void;                   // 错误回调
+  onChunk?: (chunkData: ChunkData) => void; // 每块就绪回调
+  onComplete?: (stats: ProcessingStats) => void; // 完成回调
+  onError?: (error: Error) => void; // 错误回调
 }
 
 /**
  * 流式文件处理器
  */
 export class FileStreamProcessor {
-  private readonly chunkSize: number;     // 分块大小（字节）
-  private readonly overlapSize: number;   // 重叠区大小（字符）
-  
+  private readonly chunkSize: number; // 分块大小（字节）
+  private readonly overlapSize: number; // 重叠区大小（字符）
+
   // 状态变量
-  private buffer: string = '';            // 累积缓冲区
-  private previousOverlap: string = '';   // 上一块的重叠尾部
-  private totalProcessed: number = 0;     // 已处理的总字节数
-  private totalChars: number = 0;         // 【新增】已处理的总字符数（用于高亮偏移）
-  private chunkIndex: number = 0;         // 当前块索引
-  private globalLineOffset: number = 0;   // 全局行偏移
-  
+  private buffer: string = ''; // 累积缓冲区
+  private previousOverlap: string = ''; // 上一块的重叠尾部
+  private totalProcessed: number = 0; // 已处理的总字节数
+  private totalChars: number = 0; // 【新增】已处理的总字符数（用于高亮偏移）
+  private chunkIndex: number = 0; // 当前块索引
+  private globalLineOffset: number = 0; // 全局行偏移
+
   // 扫描模式：累加计数
   private accumulatedCounts: Record<string, number> = {};
   private totalCount: number = 0;
-  
+
   // 【新增】自定义表达式匹配结果（独立属性，不在counts中）
   private expressionMatchedValue: number = 0;
-  
+
   // 【新增】自定义表达式：记录关键词出现状态
   private keywordFoundFlags: Record<string, boolean> = {};
   private hasEvaluatedExpression: boolean = false;
@@ -97,7 +97,7 @@ export class FileStreamProcessor {
 
   /**
    * 主入口: 流式处理文件
-   * 
+   *
    * @param filePath - 文件路径 (路径A需要,路径B可为空)
    * @param options - 处理选项
    * @param preExtractedText - 预提取的文本 (路径B使用)
@@ -119,14 +119,11 @@ export class FileStreamProcessor {
   /**
    * 路径A: 直接流式读取原始文件
    */
-  private async processRawFile(
-    filePath: string,
-    options: StreamProcessorOptions
-  ): Promise<void> {
+  private async processRawFile(filePath: string, options: StreamProcessorOptions): Promise<void> {
     return new Promise((resolve, reject) => {
       const stream = createReadStream(filePath, {
         encoding: 'utf-8',
-        highWaterMark: 64 * 1024  // 64KB 缓冲区
+        highWaterMark: 64 * 1024, // 64KB 缓冲区
       });
 
       let isResolved = false;
@@ -152,7 +149,7 @@ export class FileStreamProcessor {
         if (this.buffer.length > 0) {
           this.processBufferChunk(options);
         }
-        
+
         // 【新增】在文件结束时评估自定义表达式
         this.evaluateSearchExpressionAtEnd(options.searchExpression);
 
@@ -160,7 +157,7 @@ export class FileStreamProcessor {
         options.onComplete?.({
           totalChunks: this.chunkIndex,
           totalBytes: this.totalProcessed,
-          totalLines: this.globalLineOffset
+          totalLines: this.globalLineOffset,
         });
 
         resolve();
@@ -179,34 +176,35 @@ export class FileStreamProcessor {
   /**
    * 路径B: 处理已提取的文本
    */
-  private async processExtractedText(
-    text: string,
-    options: StreamProcessorOptions
-  ): Promise<void> {
+  private async processExtractedText(text: string, options: StreamProcessorOptions): Promise<void> {
     // 【关键修复】边界检查，防止无限循环
     if (!text || text.length === 0) {
       options.onComplete?.({
         totalChunks: 0,
         totalBytes: 0,
-        totalLines: 0
+        totalLines: 0,
       });
       return;
     }
-    
+
     // 【安全保护】限制最大迭代次数，防止无限循环
     const MAX_ITERATIONS = text.length + 100; // 最多迭代 text.length + 100 次
     let iterations = 0;
-    
+
     const chunkSize = this.chunkSize;
     let offset = 0;
 
     while (offset < text.length) {
       iterations++;
       if (iterations > MAX_ITERATIONS) {
-        mainLogger.warn('[FileStreamProcessor] processExtractedText 迭代次数过多 ({} / {})，强制退出', iterations, MAX_ITERATIONS);
+        mainLogger.warn(
+          '[FileStreamProcessor] processExtractedText 迭代次数过多 ({} / {})，强制退出',
+          iterations,
+          MAX_ITERATIONS
+        );
         break;
       }
-      
+
       // 找到合适的分割点 (优先行边界)
       let splitPos = Math.min(offset + chunkSize, text.length);
 
@@ -217,7 +215,7 @@ export class FileStreamProcessor {
           splitPos = nextNewline + 1;
         }
       }
-      
+
       // 【安全检查】确保 splitPos > offset，否则强制推进
       if (splitPos <= offset) {
         splitPos = offset + 1;
@@ -228,14 +226,19 @@ export class FileStreamProcessor {
 
       // 检测敏感词 (带重叠区)
       const fullChunk = this.previousOverlap + chunkText;
-      const localHighlights = this.detectWithOverlap(fullChunk, options.enabledTypes, options.searchExpression, options.enableBuiltinRules);
-      
+      const localHighlights = this.detectWithOverlap(
+        fullChunk,
+        options.enabledTypes,
+        options.searchExpression,
+        options.enableBuiltinRules
+      );
+
       // 【修复】将局部偏移转换为全局偏移（基于字符数）
-      const charsBefore = this.totalChars;  // 当前块之前的总字符数
-      const globalHighlights = localHighlights.map(h => ({
+      const charsBefore = this.totalChars; // 当前块之前的总字符数
+      const globalHighlights = localHighlights.map((h) => ({
         ...h,
         start: h.start - this.previousOverlap.length + charsBefore,
-        end: h.end - this.previousOverlap.length + charsBefore
+        end: h.end - this.previousOverlap.length + charsBefore,
       }));
 
       // 发送数据块
@@ -245,27 +248,27 @@ export class FileStreamProcessor {
         lines,
         highlights: globalHighlights,
         startLine: this.globalLineOffset,
-        byteOffset: offset
+        byteOffset: offset,
       });
-      
+
       // 更新状态
       this.previousOverlap = fullChunk.slice(-this.overlapSize);
       this.globalLineOffset += lines.length;
       this.chunkIndex++;
       this.totalProcessed += Buffer.byteLength(chunkText, 'utf-8');
-      this.totalChars += chunkText.length;  // 【新增】累加字符数
+      this.totalChars += chunkText.length; // 【新增】累加字符数
 
       offset = splitPos;
     }
 
     // 【新增】在文件结束时评估自定义表达式
     this.evaluateSearchExpressionAtEnd(options.searchExpression);
-    
+
     // 发送完成消息
     options.onComplete?.({
       totalChunks: this.chunkIndex,
       totalBytes: this.totalProcessed,
-      totalLines: this.globalLineOffset
+      totalLines: this.globalLineOffset,
     });
   }
 
@@ -280,14 +283,19 @@ export class FileStreamProcessor {
     const currentChunk = this.previousOverlap + this.buffer.slice(0, splitPos);
 
     // 检测敏感词
-    const localHighlights = this.detectWithOverlap(currentChunk, options.enabledTypes, options.searchExpression, options.enableBuiltinRules);
-    
+    const localHighlights = this.detectWithOverlap(
+      currentChunk,
+      options.enabledTypes,
+      options.searchExpression,
+      options.enableBuiltinRules
+    );
+
     // 【修复】将局部偏移转换为全局偏移（基于字符数）
-    const charsBefore = this.totalChars;  // 当前块之前的总字符数
-    const globalHighlights = localHighlights.map(h => ({
+    const charsBefore = this.totalChars; // 当前块之前的总字符数
+    const globalHighlights = localHighlights.map((h) => ({
       ...h,
       start: h.start - this.previousOverlap.length + charsBefore,
-      end: h.end - this.previousOverlap.length + charsBefore
+      end: h.end - this.previousOverlap.length + charsBefore,
     }));
 
     // 分割成行
@@ -301,7 +309,7 @@ export class FileStreamProcessor {
       lines,
       highlights: globalHighlights,
       startLine: this.globalLineOffset,
-      byteOffset: this.totalProcessed - this.buffer.length
+      byteOffset: this.totalProcessed - this.buffer.length,
     });
 
     // 更新状态
@@ -309,7 +317,7 @@ export class FileStreamProcessor {
     this.globalLineOffset += lines.length;
     this.chunkIndex++;
     this.totalProcessed += splitPos;
-    this.totalChars += chunkText.length;  // 【新增】累加字符数
+    this.totalChars += chunkText.length; // 【新增】累加字符数
 
     // 移除已处理的部分
     this.buffer = this.buffer.slice(splitPos);
@@ -343,7 +351,7 @@ export class FileStreamProcessor {
 
   /**
    * 带重叠区的敏感词检测
-   * 
+   *
    * 【优化】当 enableBuiltinRules=true 且有 searchExpression 时，在同一轮中处理两者
    */
   private detectWithOverlap(
@@ -353,26 +361,29 @@ export class FileStreamProcessor {
     enableBuiltinRules: boolean = true // 【新增】是否启用内置规则
   ): HighlightRange[] {
     let allHighlights: HighlightRange[] = [];
-    
+
     // 【优化】条件执行检测
     if (enableBuiltinRules && enabledTypes.length > 0) {
       // ✅ 执行内置规则检测
       allHighlights = getHighlights(chunk, enabledTypes);
     }
-    
+
     // 【优化】如果同时有表达式，合并高亮结果
     if (searchExpression && searchExpression.trim()) {
       const expressionHighlights = this.getExpressionKeywordHighlights(chunk, searchExpression);
       allHighlights = allHighlights.concat(expressionHighlights);
     }
-    
+
     // 【修复】过滤掉重叠区的重复结果
     // 【优化】表达式关键词和内置规则使用相同的过滤逻辑
     const overlapLength = this.previousOverlap.length;
-    const newHighlights = allHighlights.filter(h => h.start >= overlapLength);
+    const newHighlights = allHighlights.filter((h) => h.start >= overlapLength);
 
     // 【扫描模式】累加计数（在一次调用中完成）
-    if ((enableBuiltinRules && enabledTypes.length > 0) || (searchExpression && searchExpression.trim())) {
+    if (
+      (enableBuiltinRules && enabledTypes.length > 0) ||
+      (searchExpression && searchExpression.trim())
+    ) {
       this.accumulateCounts(newHighlights, chunk, searchExpression, enableBuiltinRules);
     }
 
@@ -381,7 +392,7 @@ export class FileStreamProcessor {
 
   /**
    * 累加敏感词计数 (扫描模式)
-   * 
+   *
    * 【优化】在一次调用中完成内置规则和自定义表达式的计数，避免多次扫描文本
    */
   private accumulateCounts(
@@ -393,17 +404,17 @@ export class FileStreamProcessor {
     // 1. 累加内置规则的计数（基于已有的高亮结果，无需再次扫描）
     if (enableBuiltinRules) {
       for (const highlight of highlights) {
-        this.accumulatedCounts[highlight.typeId] = 
+        this.accumulatedCounts[highlight.typeId] =
           (this.accumulatedCounts[highlight.typeId] || 0) + 1;
         this.totalCount++;
       }
     }
-    
+
     // 2. 【新方案】记录自定义表达式中关键词的出现状态
     if (searchExpression && searchExpression.trim()) {
       // 提取表达式中的所有关键词
       const keywords = this.extractKeywordsFromExpression(searchExpression);
-      
+
       // 检查每个关键词是否在当前 chunk 中出现
       for (const keyword of keywords) {
         if (chunkText.includes(keyword)) {
@@ -412,32 +423,32 @@ export class FileStreamProcessor {
       }
     }
   }
-  
+
   /**
    * 【新增】从表达式中提取所有关键词
-   * 
+   *
    * 【注意】此函数仅提取关键词文本，不保留逻辑运算符语义
    * 例如：“密码 & !身份证” → ["密码", "身份证"]
    * 用途：仅用于记录关键词是否在chunk中出现，不用于表达式评估
-   * 
+   *
    * @param expression 自定义表达式
    * @returns 关键词数组
    */
   private extractKeywordsFromExpression(expression: string): string[] {
     // 移除逻辑运算符和括号
     const cleaned = expression
-      .replace(/[&|!()]/g, ' ')  // 替换运算符为空格
+      .replace(/[&|!()]/g, ' ') // 替换运算符为空格
       .trim();
-      
+
     // 按空格分割，过滤空字符串
-    return cleaned.split(/\s+/).filter(k => k.length > 0);
+    return cleaned.split(/\s+/).filter((k) => k.length > 0);
   }
-    
+
   /**
    * 【新增】获取表达式关键词的高亮位置
-   * 
+   *
    * 【优化】复用内置规则的 matchAll 逻辑，确保准确性
-   * 
+   *
    * @param text 文本内容
    * @param searchExpression 搜索表达式
    * @returns 高亮范围数组
@@ -445,31 +456,31 @@ export class FileStreamProcessor {
   private getExpressionKeywordHighlights(text: string, searchExpression: string): HighlightRange[] {
     const highlights: HighlightRange[] = [];
     const keywords = this.extractKeywordsFromExpression(searchExpression);
-      
+
     // 【优化】对每个关键词使用 matchAll，与内置规则保持一致
     for (const keyword of keywords) {
       // 转义特殊字符，创建安全的正则表达式
       const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const pattern = new RegExp(escapedKeyword, 'g');
-      
+
       const matches = Array.from(text.matchAll(pattern));
-      
+
       for (const match of matches) {
         highlights.push({
           start: match.index!,
           end: match.index! + keyword.length,
-          typeId: 'expression_keyword',  // 【标记】这是表达式关键词
-          typeName: '表达式关键词'
+          typeId: 'expression_keyword', // 【标记】这是表达式关键词
+          typeName: '表达式关键词',
         });
       }
     }
-      
+
     // 按起始位置排序
     highlights.sort((a, b) => a.start - b.start);
-      
+
     return highlights;
   }
-  
+
   /**
    * 【新增】在文件处理结束时评估自定义表达式
    * 基于累积的关键词出现状态进行评估
@@ -478,23 +489,23 @@ export class FileStreamProcessor {
     if (!searchExpression || !searchExpression.trim() || this.hasEvaluatedExpression) {
       return;
     }
-    
+
     try {
       // 构建上下文文本：包含所有出现过的关键词
       const foundKeywords = Object.keys(this.keywordFoundFlags)
-        .filter(k => this.keywordFoundFlags[k])
+        .filter((k) => this.keywordFoundFlags[k])
         .join(' ');
-      
+
       // 使用 evaluateSearchExpressionOnly 评估
       const isMatched = evaluateSearchExpressionOnly(foundKeywords, searchExpression);
-      
+
       if (isMatched) {
         // 【需求变更】直接设置独立属性，不再存入accumulatedCounts
         this.expressionMatchedValue = 1;
         // 【需求变更】自定义表达式不计入敏感信息总数，只记录有无
         // this.totalCount++;  // ← 已注释，不再累加到总数
       }
-      
+
       this.hasEvaluatedExpression = true;
     } catch (error: any) {
       mainLogger.error('[流式处理] 表达式评估失败: {}', error.message);
@@ -530,13 +541,13 @@ export class FileStreamProcessor {
     this.buffer = '';
     this.previousOverlap = '';
     this.totalProcessed = 0;
-    this.totalChars = 0;  // 【新增】重置字符计数
+    this.totalChars = 0; // 【新增】重置字符计数
     this.chunkIndex = 0;
     this.globalLineOffset = 0;
     this.accumulatedCounts = {};
     this.totalCount = 0;
     // 【新增】重置自定义表达式相关状态
-    this.expressionMatchedValue = 0;  // 【新增】重置表达式匹配结果
+    this.expressionMatchedValue = 0; // 【新增】重置表达式匹配结果
     this.keywordFoundFlags = {};
     this.hasEvaluatedExpression = false;
   }

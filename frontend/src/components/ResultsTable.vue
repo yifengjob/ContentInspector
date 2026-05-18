@@ -4,6 +4,7 @@
   import { useAppStore } from '@/stores/app';
   import { storeToRefs } from 'pinia';
   import { debounce, formatFileSize, formatTime, promisePool } from '@/utils/format';
+  import type { ScanResultItem } from '@/types';
   import {
     askDialog,
     deleteFile,
@@ -34,6 +35,7 @@
   const selectedFiles = ref<Set<string>>(new Set());
   const selectAllCheckbox = ref<HTMLInputElement | null>(null);
   const isResizing = ref(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const scrollerRef = ref<any>(null);
   const headerRef = ref<HTMLDivElement | null>(null);
 
@@ -180,8 +182,8 @@
     // 排序
     if (sortField.value) {
       results = [...results].sort((a, b) => {
-        let aVal: any;
-        let bVal: any;
+        let aVal: number | string;
+        let bVal: number | string;
 
         // 处理 counts.xxx 字段（敏感类型计数）
         if (sortField.value.startsWith('counts.')) {
@@ -508,11 +510,11 @@
     return parts[parts.length - 1] || filePath;
   };
 
-  const handlePreview = (item: any) => {
+  const handlePreview = (item: ScanResultItem) => {
     emit('preview', item.filePath);
   };
 
-  const handleOpen = async (item: any) => {
+  const handleOpen = async (item: ScanResultItem) => {
     try {
       await openFile(item.filePath);
     } catch (error) {
@@ -525,7 +527,7 @@
     }
   };
 
-  const handleOpenLocation = async (item: any) => {
+  const handleOpenLocation = async (item: ScanResultItem) => {
     try {
       await openFileLocation(item.filePath);
     } catch (error) {
@@ -538,7 +540,7 @@
     }
   };
 
-  const handleDelete = async (item: any) => {
+  const handleDelete = async (item: ScanResultItem) => {
     const deleteMode = config.value.deleteToTrash ? '移入回收站' : '永久删除';
     // 【P1】使用 Electron 对话框替代 confirm
     const confirmed = await askDialog(`确定要${deleteMode}此文件吗？\n${item.filePath}`, {

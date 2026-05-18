@@ -1,6 +1,6 @@
 /**
  * Core 模块 - 核心功能统一导出
- * 
+ *
  * 提供简化的导入路径，例如：
  * import { startScan, ScanState } from '@/core';
  */

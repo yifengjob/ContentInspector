@@ -47,6 +47,7 @@
   // 【新增】原生预览相关
   const useNativePreview = ref(false); // 是否使用原生预览
   const nativePreviewError = ref<string | null>(null); // 原生预览错误
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nativePreviewRef = ref<any>(null); // 原生预览组件引用
 
   // 【新增】窗口调整大小
@@ -586,12 +587,13 @@
             <!-- 【方案 D3】虚拟滚动容器 -->
             <div ref="scrollContainer" class="virtual-scroll-container">
               <div class="virtual-spacer" :style="{ height: scroller.getTotalHeight() + 'px' }">
-                <!-- eslint-disable-next-line vue/no-v-html -->
+                <!-- eslint-disable vue/no-v-html -->
                 <div
                   class="virtual-content"
                   :style="{ transform: `translateY(${scroller.getOffsetTop()}px)` }"
                   v-html="visibleContent"
                 ></div>
+                <!-- eslint-enable vue/no-v-html -->
               </div>
             </div>
           </div>

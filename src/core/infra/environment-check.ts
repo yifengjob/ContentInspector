@@ -4,7 +4,7 @@ import * as os from 'os';
 export function checkEnvironment(): EnvironmentCheck {
   const platform = process.platform;
   const release = os.release();
-  
+
   let osVersion: string;
   if (platform === 'win32') {
     osVersion = `Windows ${release}`;
@@ -13,9 +13,9 @@ export function checkEnvironment(): EnvironmentCheck {
   } else {
     osVersion = `Linux ${release}`;
   }
-  
+
   const issues: EnvironmentCheck['issues'] = [];
-  
+
   // Windows特定检查
   if (platform === 'win32') {
     // 检查Windows版本（需要Windows 7+）
@@ -27,28 +27,29 @@ export function checkEnvironment(): EnvironmentCheck {
         description: '需要Windows 7或更高版本',
         severity: 'critical',
         solution: '请升级Windows系统到Windows 7或更高版本',
-        downloadUrl: 'https://www.microsoft.com/windows'
+        downloadUrl: 'https://www.microsoft.com/windows',
       });
     }
   }
-  
+
   // macOS特定检查
   if (platform === 'darwin') {
     const macVersion = parseFloat(release);
-    if (macVersion < 19.0) { // macOS 10.15 Catalina
+    if (macVersion < 19.0) {
+      // macOS 10.15 Catalina
       issues.push({
         title: 'macOS版本过低',
         description: '需要macOS 10.15 (Catalina)或更高版本',
         severity: 'critical',
         solution: '请升级macOS系统到最新版本',
-        downloadUrl: 'https://support.apple.com/macos'
+        downloadUrl: 'https://support.apple.com/macos',
       });
     }
   }
-  
+
   return {
     osVersion,
-    isReady: issues.filter(i => i.severity === 'critical').length === 0,
-    issues
+    isReady: issues.filter((i) => i.severity === 'critical').length === 0,
+    issues,
   };
 }

@@ -8,12 +8,12 @@ import { extractXmlFile } from './xml-extractor';
 
 // 定义配置并自动注册
 const XML_CONFIG = {
-    extensions: ['xml'],
-    fileType: 'markup' as const,
-    processor: FileProcessorType.STREAMING_TEXT,
-    supportsStreaming: true,
-    extractor: extractXmlFile,
-    description: 'XML 文件（使用 sax 流式解析）'
+  extensions: ['xml'],
+  fileType: 'markup' as const,
+  processor: FileProcessorType.STREAMING_TEXT,
+  supportsStreaming: true,
+  extractor: extractXmlFile,
+  description: 'XML 文件（使用 sax 流式解析）',
 };
 
 registerExtractor(XML_CONFIG);

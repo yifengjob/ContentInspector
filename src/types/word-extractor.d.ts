@@ -8,6 +8,6 @@ declare module 'word-extractor' {
       getFooters(): string;
     }>;
   }
-  
+
   export = WordExtractor;
 }
