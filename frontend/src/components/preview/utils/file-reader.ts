@@ -11,8 +11,7 @@ import { FileReadResult, FileStatsResult } from '@/types/preview';
  */
 export async function readFileAsBlob(filePath: string): Promise<FileReadResult> {
   try {
-    const result = await window.electronAPI.readFileAsBlob(filePath);
-    return result;
+    return await window.electronAPI.readFileAsBlob(filePath);
   } catch (error: any) {
     return {
       success: false,
@@ -28,8 +27,7 @@ export async function readFileAsBlob(filePath: string): Promise<FileReadResult> 
  */
 export async function getFileStats(filePath: string): Promise<FileStatsResult> {
   try {
-    const result = await window.electronAPI.getFileStats(filePath);
-    return result;
+    return await window.electronAPI.getFileStats(filePath);
   } catch (error: any) {
     return {
       success: false,
@@ -69,6 +67,10 @@ export async function readFileWithProgress(
 
     if (!result || !result.success) {
       throw new Error(result?.error || '读取文件块失败');
+    }
+
+    if (!result.chunk) {
+      throw new Error('读取到的数据块为空');
     }
 
     chunks.push(result.chunk);
