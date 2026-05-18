@@ -14,16 +14,16 @@
 import {
   BYTES_TO_MB,
   DEFAULT_MAX_PDF_SIZE_MB,
+  FILE_READ_TIMEOUT_STANDARD_MS,
   MAX_TEXT_CONTENT_SIZE_MB,
   PDF_OCR_ENABLED,
   PDF_PAGE_TIMEOUT_MS,
   PDF_TOTAL_TIMEOUT_MS,
-  FILE_READ_TIMEOUT_STANDARD_MS,
 } from '../../core/config/constants';
 import type { ExtractorResult } from '../types';
 import { BaseExtractor } from '../base-extractor';
 import { readFileWithTimeout } from '../../utils/file-utils';
-import { withTimeout, withLogging, composeDecorators } from '../extractor-decorators';
+import { composeDecorators, withLogging, withTimeout } from '../extractor-decorators';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
 import * as path from 'path';
 
@@ -57,8 +57,9 @@ function getWorkerPdfJsLib() {
     }
 
     // 设置 worker
-    const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
-    (pdfjsLib as any).GlobalWorkerOptions.workerSrc = workerPath;
+
+    (pdfjsLib as any).GlobalWorkerOptions.workerSrc =
+      require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
 
     // 配置 CMap 和字体路径
     const pdfjsDistPath = path.dirname(require.resolve('pdfjs-dist'));
@@ -67,6 +68,12 @@ function getWorkerPdfJsLib() {
     (pdfjsLib as any).GlobalWorkerOptions.cMapPacked = true;
     (pdfjsLib as any).GlobalWorkerOptions.standardFontDataUrl =
       path.join(pdfjsDistPath, 'standard_fonts/') + '/';
+
+    // 【性能优化】完全禁用字体渲染和 canvas，减少内存占用
+    (pdfjsLib as any).GlobalWorkerOptions.disableFontFace = true;
+    (pdfjsLib as any).GlobalWorkerOptions.useSystemFonts = true;
+    (pdfjsLib as any).GlobalWorkerOptions.disableRange = true;
+    (pdfjsLib as any).GlobalWorkerOptions.disableStream = true;
 
     workerPdfJsLib = pdfjsLib;
     return pdfjsLib;
