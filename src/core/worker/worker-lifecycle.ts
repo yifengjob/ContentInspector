@@ -93,7 +93,13 @@ export class WorkerLifecycleManager {
         break;
       }
 
-      const task = this.workerCreateQueue.shift()!;
+      // 【修复】添加空值检查，虽然理论上不会为 null（因为前面检查了 length > 0）
+      const task = this.workerCreateQueue.shift();
+      if (!task) {
+        this.log.error('[Worker创建] 队列意外为空，退出循环');
+        break;
+      }
+
       const currentRetry = retryCounts.get(task.consumerId) || 0;
 
       if (currentRetry >= MAX_RETRY_PER_WORKER) {
@@ -246,6 +252,7 @@ export class WorkerLifecycleManager {
         // 【修复】正确处理 terminate 返回的 Promise
         void consumer.worker.terminate();
         consumer.worker.removeAllListeners();
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (e) {
         // 忽略终止错误
       }

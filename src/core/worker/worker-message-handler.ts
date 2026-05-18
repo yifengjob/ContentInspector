@@ -209,7 +209,13 @@ export class WorkerMessageHandler {
   ): void {
     this.log.warn('[TaskQueue] 任务 {} 超时: {}', consumer.taskId, task.filePath);
 
-    const pending = this.pendingTasks.get(consumer.taskId!);
+    // 【修复】添加 taskId 空值检查
+    if (consumer.taskId === undefined || consumer.taskId === null) {
+      this.log.error('[TaskQueue] Worker {} 没有关联的任务 ID，无法处理超时', consumer.id);
+      return;
+    }
+
+    const pending = this.pendingTasks.get(consumer.taskId);
     if (pending) {
       this.pendingTasks.delete(consumer.taskId!);
 
