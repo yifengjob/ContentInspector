@@ -44,7 +44,9 @@ export async function unzipFile(filePath: string): Promise<ZipEntry[]> {
   } catch (error: any) {
     // 【关键修复】捕获解压错误，防止卡死
     if (error.message.includes('invalid') || error.message.includes('corrupt')) {
-      throw new Error(`ZIP 文件损坏或格式错误: ${error.message}`);
+      const newError = new Error(`ZIP 文件损坏或格式错误: ${error.message}`);
+      (newError as any).cause = error;
+      throw newError;
     }
     throw error;
   }

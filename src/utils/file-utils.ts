@@ -58,8 +58,10 @@ export async function openFileWithTimeout(
       clearTimeout(timeoutId);
       if (err) {
         reject(err);
+      } else if (fd === undefined || fd === null) {
+        reject(new Error(`文件打开成功但未返回文件描述符: ${filePath}`));
       } else {
-        resolve(fd!);
+        resolve(fd);
       }
     });
   });
@@ -84,8 +86,10 @@ export async function statWithTimeout(
       clearTimeout(timeoutId);
       if (err) {
         reject(err);
+      } else if (stats === undefined || stats === null) {
+        reject(new Error(`文件统计成功但未返回统计信息: ${filePath}`));
       } else {
-        resolve(stats!);
+        resolve(stats);
       }
     });
   });
