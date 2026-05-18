@@ -136,7 +136,7 @@ const nativePreviewRef = ref<any>(null)  // 原生预览组件引用
 
 // 【新增】窗口调整大小
 const modalContainerRef = ref<HTMLElement | null>(null)
-const { handleMouseDown: handleResizeMouseDown, resetSize, isResizing } = useResizable(modalContainerRef, {
+const { handleMouseDown: handleResizeMouseDown, resetSize, getIsResizing } = useResizable(modalContainerRef, {
   minWidth: 900,
   minHeight: 600,
   maxWidth: window.innerWidth * 0.95,
@@ -145,10 +145,10 @@ const { handleMouseDown: handleResizeMouseDown, resetSize, isResizing } = useRes
 
 /**
  * 【新增】处理遮罩层点击
- * 如果正在调整大小，不关闭窗口
+ * 如果正在调整大小或刚刚结束调整，不关闭窗口
  */
 function handleOverlayClick() {
-  if (isResizing.value) {
+  if (getIsResizing()) {
     // 正在调整大小时，忽略遮罩层点击
     return
   }

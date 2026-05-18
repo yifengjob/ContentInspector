@@ -33,6 +33,9 @@ export function useResizable(
   // 调整状态
   const isResizing = ref(false)
   const currentDirection = ref('')
+  
+  // 【修复】标记是否刚刚结束调整，用于防止遮罩层点击关闭
+  let justFinishedResizing = false
 
   // 拖拽起始状态
   let startX = 0
@@ -53,6 +56,7 @@ export function useResizable(
 
     isResizing.value = true
     currentDirection.value = direction
+    justFinishedResizing = false
 
     // 记录起始状态
     startX = event.clientX
@@ -127,6 +131,7 @@ export function useResizable(
    */
   function handleMouseUp() {
     isResizing.value = false
+    justFinishedResizing = true
     currentDirection.value = ''
 
     // 移除全局事件监听
@@ -136,6 +141,18 @@ export function useResizable(
     // 恢复默认样式
     document.body.style.userSelect = ''
     document.body.style.cursor = ''
+    
+    // 【修复】延迟重置标志，给遮罩层点击检查留出时间窗口
+    setTimeout(() => {
+      justFinishedResizing = false
+    }, 100)
+  }
+
+  /**
+   * 检查是否正在调整或刚刚结束调整
+   */
+  function getIsResizing(): boolean {
+    return isResizing.value || justFinishedResizing
   }
 
   /**
@@ -178,6 +195,7 @@ export function useResizable(
     isResizing,
     currentDirection,
     handleMouseDown,
-    resetSize
+    resetSize,
+    getIsResizing
   }
 }
