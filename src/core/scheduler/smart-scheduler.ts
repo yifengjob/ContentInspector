@@ -160,11 +160,13 @@ export class SmartScheduler {
 
     // 【新增】注册状态同步监听器（如果提供了 scanState）
     if (this.scanState) {
+      const scanStateRef = this.scanState; // 创建局部引用，避免在闭包中使用可选链
+
       this.onQueueLengthChanged = (length: number) => {
-        this.scanState!.setTaskQueueLength(length);
+        scanStateRef.setTaskQueueLength(length);
       };
       this.onPendingTasksSizeChanged = (size: number) => {
-        this.scanState!.setPendingTasksSize(size);
+        scanStateRef.setPendingTasksSize(size);
       };
 
       this.eventBus.on('task-queue-length-changed', this.onQueueLengthChanged);
