@@ -1,5 +1,5 @@
 <template>
-  <div class="modal-overlay" @click.self="$emit('close')" :class="{ visible: visible }">
+  <div class="modal-overlay" @click.self="handleOverlayClick" :class="{ visible: visible }">
     <div class="modal-container" ref="modalContainerRef">
       <!-- 【新增】8个拖拽手柄 -->
       <div class="resize-handle resize-n" @mousedown="handleResizeMouseDown('n', $event)"></div>
@@ -136,12 +136,24 @@ const nativePreviewRef = ref<any>(null)  // 原生预览组件引用
 
 // 【新增】窗口调整大小
 const modalContainerRef = ref<HTMLElement | null>(null)
-const { handleMouseDown: handleResizeMouseDown, resetSize } = useResizable(modalContainerRef, {
+const { handleMouseDown: handleResizeMouseDown, resetSize, isResizing } = useResizable(modalContainerRef, {
   minWidth: 900,
   minHeight: 600,
   maxWidth: window.innerWidth * 0.95,
   maxHeight: window.innerHeight * 0.95
 })
+
+/**
+ * 【新增】处理遮罩层点击
+ * 如果正在调整大小，不关闭窗口
+ */
+function handleOverlayClick() {
+  if (isResizing.value) {
+    // 正在调整大小时，忽略遮罩层点击
+    return
+  }
+  emit('close')
+}
 
 // 【方案 D3】流式接收状态
 interface PreviewChunk {
@@ -637,7 +649,8 @@ useEventListener(scrollContainer, 'scroll', {
 .resize-handle {
   position: absolute;
   z-index: 100;
-  transition: background-color 0.2s ease;
+  /* 完全透明，不显示任何视觉反馈 */
+  background-color: transparent;
 }
 
 /* 四个边 */
@@ -704,11 +717,6 @@ useEventListener(scrollContainer, 'scroll', {
   width: 20px;
   height: 20px;
   cursor: sw-resize;
-}
-
-/* 悬停时显示视觉反馈 */
-.resize-handle:hover {
-  background-color: rgba(24, 144, 255, 0.2);
 }
 
 .modal-overlay.visible .modal-container {
