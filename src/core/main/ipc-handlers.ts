@@ -401,4 +401,131 @@ export function setupIpcHandlers(
     ipcMain.handle('validate-expression', (_, expression: string) => {
         return validateExpression(expression);
     });
+
+    // ========== 文件预览相关（vue-office） ==========
+
+    /**
+     * 读取文件为 ArrayBuffer
+     */
+    ipcMain.handle('read-file-as-blob', async (_, filePath: string) => {
+        try {
+            // 路径安全检查：防止目录遍历攻击
+            const normalizedPath = path.normalize(filePath);
+            const allowedDirs = [
+                app.getPath('userData'),
+                app.getPath('home'),
+                app.getPath('desktop'),
+                app.getPath('documents')
+            ];
+
+            const isAllowed = allowedDirs.some(dir => {
+                const normalizedDir = path.normalize(dir);
+                return normalizedPath === normalizedDir ||
+                       normalizedPath.startsWith(normalizedDir + path.sep);
+            });
+
+            if (!isAllowed) {
+                throw new Error('无权访问该文件');
+            }
+
+            // 检查文件是否存在
+            if (!fs.existsSync(normalizedPath)) {
+                throw new Error('文件不存在');
+            }
+
+            // 读取文件
+            const buffer = await fs.promises.readFile(normalizedPath);
+
+            // 转换为 ArrayBuffer
+            const arrayBuffer = buffer.buffer.slice(
+                buffer.byteOffset,
+                buffer.byteOffset + buffer.byteLength
+            );
+
+            mainLogger.info('[Preview] 读取文件成功: {}, 大小: {} MB', normalizedPath, buffer.length / (1024 * 1024));
+
+            return {
+                success: true,
+                data: arrayBuffer
+            };
+        } catch (error: any) {
+            mainLogger.error('[Preview] 读取文件失败: {}', error.message);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    });
+
+    /**
+     * 获取文件统计信息
+     */
+    ipcMain.handle('get-file-stats', async (_, filePath: string) => {
+        try {
+            // 路径安全检查
+            const normalizedPath = path.normalize(filePath);
+
+            // 检查文件是否存在
+            if (!fs.existsSync(normalizedPath)) {
+                throw new Error('文件不存在');
+            }
+
+            const stats = await fs.promises.stat(normalizedPath);
+
+            return {
+                success: true,
+                stats: {
+                    size: stats.size,
+                    mtime: stats.mtimeMs
+                }
+            };
+        } catch (error: any) {
+            mainLogger.error('[Preview] 获取文件信息失败: {}', error.message);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    });
+
+    /**
+     * 分块读取文件（可选，用于大文件流式加载）
+     */
+    ipcMain.handle('read-file-chunk', async (_, filePath: string, offset: number, length: number) => {
+        try {
+            // 路径安全检查
+            const normalizedPath = path.normalize(filePath);
+
+            // 检查文件是否存在
+            if (!fs.existsSync(normalizedPath)) {
+                throw new Error('文件不存在');
+            }
+
+            // 打开文件
+            const fd = await fs.promises.open(normalizedPath, 'r');
+
+            // 创建缓冲区
+            const buffer = Buffer.alloc(length);
+
+            // 读取指定范围的数据
+            const { bytesRead } = await fd.read(buffer, 0, length, offset);
+
+            // 关闭文件
+            await fd.close();
+
+            // 转换为 ArrayBuffer
+            const arrayBuffer = buffer.buffer.slice(0, bytesRead);
+
+            return {
+                success: true,
+                chunk: arrayBuffer
+            };
+        } catch (error: any) {
+            mainLogger.error('[Preview] 读取文件块失败: {}', error.message);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    });
 }

@@ -25,6 +25,11 @@ interface ElectronAPI {
   openFileLocation: (filePath: string) => Promise<any>
   deleteFile: (filePath: string, toTrash: boolean) => Promise<any>
   
+  // 【新增】文件预览相关（vue-office）
+  readFileAsBlob: (filePath: string) => Promise<{ success: boolean; data?: ArrayBuffer; error?: string }>
+  getFileStats: (filePath: string) => Promise<{ success: boolean; stats?: { size: number; mtime: number }; error?: string }>
+  readFileChunk?: (filePath: string, offset: number, length: number) => Promise<{ success: boolean; chunk?: ArrayBuffer; error?: string }>
+  
   // 报告导出
   exportReport: (results: any[], format: string, filePath?: string) => Promise<any>
   
