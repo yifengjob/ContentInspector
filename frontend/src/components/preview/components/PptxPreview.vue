@@ -79,7 +79,7 @@ function handleRendered() {
 /**
  * 错误处理
  */
-function handleError(e: any) {
+function handleError(_e: any) {
   loading.value = false
   error.value = '演示文稿渲染失败，请尝试切换到文本预览模式'
   emit('error', error.value)
