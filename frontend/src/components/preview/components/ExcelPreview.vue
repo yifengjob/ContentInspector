@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { ref, onUnmounted } from 'vue';
+  import { onMounted, onUnmounted, ref } from 'vue';
   import VueOfficeExcel from '@vue-office/excel';
   import '@vue-office/excel/lib/index.css';
   import { readFileAsBlob } from '../utils/file-reader';
@@ -89,8 +89,10 @@
     destroy();
   });
 
-  // 初始加载
-  loadDocument(props.filePath);
+  // 组件挂载后加载文档（确保容器有正确的尺寸）
+  onMounted(() => {
+    loadDocument(props.filePath);
+  });
 
   // 暴露接口给父组件
   defineExpose({

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { ref, onUnmounted } from 'vue';
+  import { onMounted, onUnmounted, ref } from 'vue';
   import VueOfficeDocx from '@vue-office/docx';
   import '@vue-office/docx/lib/index.css';
   import { readFileAsBlob } from '../utils/file-reader';
@@ -47,10 +47,10 @@
       }
 
       // 将 ArrayBuffer 转换为 Blob
-      const blob = new Blob([result.data], {
+
+      docxBlob.value = new Blob([result.data], {
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       });
-      docxBlob.value = blob;
     } catch (err: any) {
       error.value = `加载失败: ${err.message}`;
       emit('error', error.value);
@@ -94,8 +94,10 @@
     destroy();
   });
 
-  // 初始加载
-  loadDocument(props.filePath);
+  // 组件挂载后加载文档（确保容器有正确的尺寸）
+  onMounted(() => {
+    loadDocument(props.filePath);
+  });
 
   // 暴露接口给父组件
   defineExpose({
