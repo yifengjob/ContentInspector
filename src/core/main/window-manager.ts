@@ -198,7 +198,7 @@ export function createWindowManager(): WindowManager {
       const isDev =
         process.env.NODE_ENV === 'development' ||
         process.env.ELECTRON_IS_DEV === '1' ||
-        !require('fs').existsSync(path.join(__dirname, '..', '..', 'renderer', 'index.html'));
+        !fs.existsSync(path.join(__dirname, '..', '..', 'renderer', 'index.html'));
 
       mainLogger.info('运行模式:', isDev ? '开发模式 (Vite)' : '生产模式 (文件)');
 
@@ -224,7 +224,6 @@ export function createWindowManager(): WindowManager {
         mainLogger.info('加载本地文件:', indexPath);
 
         // 检查文件是否存在
-        const fs = require('fs');
         if (!fs.existsSync(indexPath)) {
           mainLogger.error('前端文件不存在:', indexPath);
           // 尝试打印 __dirname 看看实际指向哪里
