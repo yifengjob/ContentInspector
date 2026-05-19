@@ -20,16 +20,6 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
     },
   },
-  // 【新增】优化依赖，解决 @vue-office 包的入口解析问题
-  optimizeDeps: {
-    include: [
-      '@vue-office/docx',
-      '@vue-office/excel',
-      '@vue-office/pdf',
-      '@vue-office/pptx',
-      'vue-demi',
-    ],
-  },
   base: './', // 使用相对路径，适配 Electron
   clearScreen: false,
   server: {
