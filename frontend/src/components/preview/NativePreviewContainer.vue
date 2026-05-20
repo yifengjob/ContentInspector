@@ -8,6 +8,8 @@
 
   // 【新增】导入统一的 JitViewerWrapper
   import JitViewerWrapper from './components/JitViewerWrapper.vue';
+  // 【优化】导入预览工具函数
+  import { isNativePreviewSupported } from '@/utils/preview-utils';
 
   const props = defineProps<{
     filePath: string;
@@ -23,30 +25,9 @@
     return props.filePath.split('.').pop()?.toLowerCase() || '';
   });
 
-  // 【修改】判断是否支持原生预览（扩展支持范围）
+  // 【优化】使用统一的工具函数判断是否支持原生预览
   const isSupportedFormat = computed(() => {
-    const supportedFormats = [
-      // Office 格式
-      'docx',
-      'xlsx',
-      'pptx',
-      // PDF
-      'pdf',
-      // 国产格式
-      'ofd',
-      // 文本格式
-      'md',
-      'markdown',
-      'txt',
-      // 代码文件（可选，根据需求决定是否在此处预览）
-      'js',
-      'ts',
-      'py',
-      'java',
-      'html',
-      'css',
-    ];
-    return supportedFormats.includes(fileType.value);
+    return isNativePreviewSupported(props.filePath);
   });
 
   // 预览组件引用

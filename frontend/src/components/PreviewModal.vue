@@ -18,6 +18,8 @@
   import { useResizable } from '@/composables/useResizable';
   // 【新增】导入原生预览容器
   import NativePreviewContainer from './preview/NativePreviewContainer.vue';
+  // 【优化】导入预览工具函数
+  import { isNativePreviewSupported } from '@/utils/preview-utils';
 
   const props = defineProps<{
     filePath: string;
@@ -139,12 +141,9 @@
     return error.value.includes('文件过大') || error.value.includes('无法预览');
   });
 
-  // 【新增】判断是否支持原生预览
-  const supportedNativeFormats = ['docx', 'xlsx', 'xls', 'pdf', 'pptx'];
-
+  // 【优化】使用统一的工具函数判断是否支持原生预览
   const shouldUseNativePreview = computed(() => {
-    const ext = props.filePath.split('.').pop()?.toLowerCase() || '';
-    return supportedNativeFormats.includes(ext);
+    return isNativePreviewSupported(props.filePath);
   });
 
   // 【新增】处理原生预览错误，自动降级到文本预览

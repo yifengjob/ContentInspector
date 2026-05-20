@@ -36,12 +36,12 @@
       // 读取文件为 Blob
       console.log('[JitViewer] 正在读取文件:', filePath);
       const result = await readFileAsBlob(filePath);
-      
+
       if (!result.success || !result.data) {
         console.error('[JitViewer] 文件读取失败:', result.error);
         throw new Error(result.error || '读取文件失败');
       }
-      
+
       console.log('[JitViewer] 文件读取成功，大小:', result.data.byteLength, 'bytes');
 
       // 获取文件名（从路径中提取）
@@ -62,7 +62,7 @@
       };
       const mimeType = mimeTypes[fileExt || ''] || 'application/octet-stream';
       const fileBlob = new Blob([result.data], { type: mimeType });
-      
+
       console.log('[JitViewer] Blob 创建成功，MIME 类型:', mimeType);
 
       // 获取容器元素
