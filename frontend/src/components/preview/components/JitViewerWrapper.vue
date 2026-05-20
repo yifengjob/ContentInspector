@@ -42,20 +42,24 @@
       // 将 ArrayBuffer 转换为 Blob
       const fileBlob = new Blob([result.data]);
 
+      // 获取文件名（从路径中提取）
+      const filename = filePath.split('/').pop() || filePath.split('\\').pop() || 'unknown';
+
       // 获取容器元素
       if (!viewerContainer.value) {
         throw new Error('Viewer 容器未就绪');
       }
 
+      console.log('[JitViewer] 开始加载文件:', filename);
+
       // 创建 Viewer 实例
       viewerInstance = createViewer({
         target: viewerContainer.value,
         file: fileBlob,
+        filename: filename, // 传递文件名，帮助 jit-viewer 识别文件类型
         theme: 'light', // 可根据应用主题动态切换
         locale: 'zh-CN', // 中文界面
         toolbar: true, // 启用内置工具栏
-        width: '100%',
-        height: '100%',
       });
 
       // 挂载 Viewer
