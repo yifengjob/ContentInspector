@@ -39,7 +39,12 @@
       'markdown',
       'txt',
       // 代码文件（可选，根据需求决定是否在此处预览）
-      // 'js', 'ts', 'py', 'java', 'html', 'css',
+      'js',
+      'ts',
+      'py',
+      'java',
+      'html',
+      'css',
     ];
     return supportedFormats.includes(fileType.value);
   });

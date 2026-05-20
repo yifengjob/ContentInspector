@@ -56,24 +56,18 @@
         toolbar: true, // 启用内置工具栏
         width: '100%',
         height: '100%',
-        onReady: () => {
-          console.log('[JitViewer] Viewer ready');
-        },
-        onLoad: () => {
-          console.log('[JitViewer] File loaded');
-          loading.value = false;
-          emit('rendered');
-        },
-        onError: (err: Error) => {
-          console.error('[JitViewer] Load error:', err);
-          loading.value = false;
-          error.value = `加载失败: ${err.message}`;
-          emit('error', error.value);
-        },
       });
 
       // 挂载 Viewer
       viewerInstance.mount();
+
+      // jit-viewer 不提供 onLoad 回调，需要手动检测加载状态
+      // 策略：等待一段时间后隐藏 loading（因为 mount() 是同步的）
+      // 对于大文件，jit-viewer 内部会显示自己的 loading 指示器
+      setTimeout(() => {
+        loading.value = false;
+        emit('rendered');
+      }, 500); // 500ms 延迟，确保渲染开始
     } catch (_err) {
       const errorMessage = _err instanceof Error ? _err.message : '未知错误';
       loading.value = false;
