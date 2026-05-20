@@ -45,20 +45,26 @@ async function testOfdExtractor() {
     let extractOfd;
     
     try {
-      // 尝试从 dist 目录加载（如果已编译）
+      // 从 dist 目录加载编译后的模块
       const module = require('./dist/extractors/ofd/ofd-extractor.js');
       extractOfd = module.extractOfd;
+      console.log('✅ 使用编译后的模块\n');
     } catch (e) {
       console.log('⚠️  未找到编译后的模块，尝试使用 ts-node...');
       
-      // 使用 ts-node 直接运行 TypeScript
-      require('ts-node').register({
-        project: './tsconfig.json',
-        transpileOnly: true,
-      });
-      
-      const module = require('./src/extractors/ofd/ofd-extractor.ts');
-      extractOfd = module.extractOfd;
+      try {
+        // 使用 ts-node 直接运行 TypeScript
+        require('ts-node').register({
+          project: './tsconfig.json',
+          transpileOnly: true,
+        });
+        
+        const module = require('./src/extractors/ofd/ofd-extractor.ts');
+        extractOfd = module.extractOfd;
+        console.log('✅ 使用 ts-node 加载模块\n');
+      } catch (tsError) {
+        throw new Error(`无法加载 OFD 提取器模块:\n1. 编译版本: ${e.message}\n2. ts-node: ${tsError.message}`);
+      }
     }
     
     if (!extractOfd) {

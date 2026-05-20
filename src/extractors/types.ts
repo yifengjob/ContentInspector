@@ -28,6 +28,7 @@ export interface FileTypeConfig {
     | 'text'
     | 'markup'
     | 'pdf'
+    | 'ofd'
     | 'word'
     | 'excel'
     | 'powerpoint'
