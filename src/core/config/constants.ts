@@ -287,7 +287,7 @@ export const SLIDING_WINDOW_OVERLAP_SIZE = MAX_SENSITIVE_KEYWORD_LENGTH * 2; // 
 // --- 6.3 预览流式传输配置 ---
 
 /** 预览流式传输每块行数 */
-export const PREVIEW_CHUNK_SIZE = 100;
+export const PREVIEW_CHUNK_SIZE = 500;
 
 // ==================== 7. IPC 通信配置 ====================
 
