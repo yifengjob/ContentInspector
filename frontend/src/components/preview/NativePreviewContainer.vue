@@ -1,15 +1,9 @@
 <script setup lang="ts">
   import { ref, computed, watch, onUnmounted } from 'vue';
-  // 【移除】不再需要单独导入各个预览组件
-  // import DocxPreview from './components/DocxPreview.vue';
-  // import ExcelPreview from './components/ExcelPreview.vue';
-  // import PdfPreview from './components/PdfPreview.vue';
-  // import PptxPreview from './components/PptxPreview.vue';
-
-  // 【新增】导入统一的 JitViewerWrapper
-  import JitViewerWrapper from './components/JitViewerWrapper.vue';
-  // 【优化】导入预览工具函数
-  import { isNativePreviewSupported } from '@/utils/preview-utils';
+  import DocxPreview from './components/DocxPreview.vue';
+  import ExcelPreview from './components/ExcelPreview.vue';
+  import PdfPreview from './components/PdfPreview.vue';
+  import PptxPreview from './components/PptxPreview.vue';
 
   const props = defineProps<{
     filePath: string;
@@ -23,11 +17,6 @@
   // 获取文件扩展名
   const fileType = computed(() => {
     return props.filePath.split('.').pop()?.toLowerCase() || '';
-  });
-
-  // 【优化】使用统一的工具函数判断是否支持原生预览
-  const isSupportedFormat = computed(() => {
-    return isNativePreviewSupported(props.filePath);
   });
 
   // 预览组件引用
@@ -93,9 +82,36 @@
 
 <template>
   <div class="native-preview-container">
-    <!-- 【修改】统一使用 JitViewerWrapper 处理所有支持的格式 -->
-    <JitViewerWrapper
-      v-if="isSupportedFormat"
+    <!-- Word 文档预览 -->
+    <DocxPreview
+      v-if="fileType === 'docx'"
+      ref="previewComponent"
+      :file-path="filePath"
+      @rendered="handleRendered"
+      @error="handleError"
+    />
+
+    <!-- Excel 表格预览 -->
+    <ExcelPreview
+      v-else-if="fileType === 'xlsx' || fileType === 'xls'"
+      ref="previewComponent"
+      :file-path="filePath"
+      @rendered="handleRendered"
+      @error="handleError"
+    />
+
+    <!-- PDF 文档预览 -->
+    <PdfPreview
+      v-else-if="fileType === 'pdf'"
+      ref="previewComponent"
+      :file-path="filePath"
+      @rendered="handleRendered"
+      @error="handleError"
+    />
+
+    <!-- PowerPoint 演示文稿预览 -->
+    <PptxPreview
+      v-else-if="fileType === 'pptx'"
       ref="previewComponent"
       :file-path="filePath"
       @rendered="handleRendered"

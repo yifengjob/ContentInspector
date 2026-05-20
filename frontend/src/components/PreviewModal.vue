@@ -12,14 +12,14 @@
     PreviewVirtualScroller,
     GlobalHighlight,
     LineHighlight,
-  } from '@/utils/preview-virtual-scroller';
+  } from '@/components/preview/utils/preview-virtual-scroller';
   import { useEventListener } from '@/composables/useEventListener';
   // 【新增】导入可调整大小 composable
   import { useResizable } from '@/composables/useResizable';
   // 【新增】导入原生预览容器
   import NativePreviewContainer from './preview/NativePreviewContainer.vue';
   // 【优化】导入预览工具函数
-  import { isNativePreviewSupported } from '@/utils/preview-utils';
+  import { isNativePreviewSupported } from '@/components/preview/utils/preview-utils';
 
   const props = defineProps<{
     filePath: string;
