@@ -30,7 +30,7 @@
       'bat',
     ],
     数据文件: ['csv', 'json', 'xml', 'yaml', 'yml', 'properties', 'toml'],
-    PDF文档: ['pdf'],
+    版式文档: ['pdf', 'ofd'],
     办公文档: ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt', 'wps', 'et', 'dps'],
     // '压缩文件': ['zip', 'rar', '7z', 'tar', 'gz'],
   };

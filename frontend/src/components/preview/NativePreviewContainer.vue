@@ -1,9 +1,13 @@
 <script setup lang="ts">
   import { ref, computed, watch, onUnmounted } from 'vue';
-  import DocxPreview from './components/DocxPreview.vue';
-  import ExcelPreview from './components/ExcelPreview.vue';
-  import PdfPreview from './components/PdfPreview.vue';
-  import PptxPreview from './components/PptxPreview.vue';
+  // 【移除】不再需要单独导入各个预览组件
+  // import DocxPreview from './components/DocxPreview.vue';
+  // import ExcelPreview from './components/ExcelPreview.vue';
+  // import PdfPreview from './components/PdfPreview.vue';
+  // import PptxPreview from './components/PptxPreview.vue';
+
+  // 【新增】导入统一的 JitViewerWrapper
+  import JitViewerWrapper from './components/JitViewerWrapper.vue';
 
   const props = defineProps<{
     filePath: string;
@@ -17,6 +21,27 @@
   // 获取文件扩展名
   const fileType = computed(() => {
     return props.filePath.split('.').pop()?.toLowerCase() || '';
+  });
+
+  // 【修改】判断是否支持原生预览（扩展支持范围）
+  const isSupportedFormat = computed(() => {
+    const supportedFormats = [
+      // Office 格式
+      'docx',
+      'xlsx',
+      'pptx',
+      // PDF
+      'pdf',
+      // 国产格式
+      'ofd',
+      // 文本格式
+      'md',
+      'markdown',
+      'txt',
+      // 代码文件（可选，根据需求决定是否在此处预览）
+      // 'js', 'ts', 'py', 'java', 'html', 'css',
+    ];
+    return supportedFormats.includes(fileType.value);
   });
 
   // 预览组件引用
@@ -82,36 +107,9 @@
 
 <template>
   <div class="native-preview-container">
-    <!-- Word 文档预览 -->
-    <DocxPreview
-      v-if="fileType === 'docx'"
-      ref="previewComponent"
-      :file-path="filePath"
-      @rendered="handleRendered"
-      @error="handleError"
-    />
-
-    <!-- Excel 表格预览 -->
-    <ExcelPreview
-      v-else-if="fileType === 'xlsx' || fileType === 'xls'"
-      ref="previewComponent"
-      :file-path="filePath"
-      @rendered="handleRendered"
-      @error="handleError"
-    />
-
-    <!-- PDF 文档预览 -->
-    <PdfPreview
-      v-else-if="fileType === 'pdf'"
-      ref="previewComponent"
-      :file-path="filePath"
-      @rendered="handleRendered"
-      @error="handleError"
-    />
-
-    <!-- PowerPoint 演示文稿预览 -->
-    <PptxPreview
-      v-else-if="fileType === 'pptx'"
+    <!-- 【修改】统一使用 JitViewerWrapper 处理所有支持的格式 -->
+    <JitViewerWrapper
+      v-if="isSupportedFormat"
       ref="previewComponent"
       :file-path="filePath"
       @rendered="handleRendered"

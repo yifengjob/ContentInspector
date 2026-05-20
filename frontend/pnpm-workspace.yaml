@@ -6,5 +6,6 @@ allowBuilds:
   '@vue-office/excel': true
   '@vue-office/pdf': true
   '@vue-office/pptx': true
+  canvas: true
   esbuild: true
   vue-demi: true

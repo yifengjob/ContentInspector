@@ -195,7 +195,7 @@ class OfdExtractor extends BaseExtractor {
 
     // 过滤掉 SVG 路径指令（如 "M 0.27 0 L 0.27 47"）
     // SVG 路径通常以 M/L/C/Q/Z 等命令开头，后跟数字坐标
-    if (/^[MLCQZHVSTA]\s+[\d.\-]/i.test(text)) {
+    if (/^[MLCQZHVSTA]\s+[\d.-]/i.test(text)) {
       return false;
     }
 
