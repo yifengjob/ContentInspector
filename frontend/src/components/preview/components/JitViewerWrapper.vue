@@ -34,16 +34,36 @@
       }
 
       // 读取文件为 Blob
+      console.log('[JitViewer] 正在读取文件:', filePath);
       const result = await readFileAsBlob(filePath);
+      
       if (!result.success || !result.data) {
+        console.error('[JitViewer] 文件读取失败:', result.error);
         throw new Error(result.error || '读取文件失败');
       }
-
-      // 将 ArrayBuffer 转换为 Blob
-      const fileBlob = new Blob([result.data]);
+      
+      console.log('[JitViewer] 文件读取成功，大小:', result.data.byteLength, 'bytes');
 
       // 获取文件名（从路径中提取）
       const filename = filePath.split('/').pop() || filePath.split('\\').pop() || 'unknown';
+      console.log('[JitViewer] 文件名:', filename);
+
+      // 将 ArrayBuffer 转换为 Blob（需要指定正确的 MIME 类型）
+      const fileExt = filename.split('.').pop()?.toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        pdf: 'application/pdf',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        xls: 'application/vnd.ms-excel',
+        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ofd: 'application/ofd',
+        txt: 'text/plain',
+        md: 'text/markdown',
+      };
+      const mimeType = mimeTypes[fileExt || ''] || 'application/octet-stream';
+      const fileBlob = new Blob([result.data], { type: mimeType });
+      
+      console.log('[JitViewer] Blob 创建成功，MIME 类型:', mimeType);
 
       // 获取容器元素
       if (!viewerContainer.value) {
