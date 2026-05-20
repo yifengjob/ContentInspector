@@ -51,14 +51,28 @@
       // 将 ArrayBuffer 转换为 Blob（需要指定正确的 MIME 类型）
       const fileExt = filename.split('.').pop()?.toLowerCase();
       const mimeTypes: Record<string, string> = {
+        // Office 格式
         pdf: 'application/pdf',
         docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        doc: 'application/msword',
         xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         xls: 'application/vnd.ms-excel',
         pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ppt: 'application/vnd.ms-powerpoint',
+        // OFD
         ofd: 'application/ofd',
+        // 文本格式
         txt: 'text/plain',
         md: 'text/markdown',
+        markdown: 'text/markdown',
+        // 代码文件
+        js: 'application/javascript',
+        ts: 'application/typescript',
+        py: 'text/x-python',
+        java: 'text/x-java-source',
+        htm: 'text/html',
+        html: 'text/html',
+        css: 'text/css',
       };
       const mimeType = mimeTypes[fileExt || ''] || 'application/octet-stream';
       const fileBlob = new Blob([result.data], { type: mimeType });
