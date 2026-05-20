@@ -5,14 +5,15 @@
 /**
  * 支持原生预览的文件格式配置
  * 【优化】单一数据源，同时定义格式和描述，避免重复维护
+ * 
+ * 注意：jit-viewer 仅支持新版 Office 格式（.docx/.xlsx/.pptx）
+ * 不支持旧版格式（.doc/.xls/.ppt），这些格式需要降级到文本预览
  */
 const NATIVE_PREVIEW_CONFIG = {
-  // Office 格式
+  // Office 格式（仅支持 OpenXML 格式）
   docx: 'Word 文档',
   xlsx: 'Excel 表格',
-  xls: 'Excel 表格',
   pptx: 'PowerPoint 演示文稿',
-  ppt: 'PowerPoint 演示文稿',
   // PDF
   pdf: 'PDF 文档',
   // 国产格式
