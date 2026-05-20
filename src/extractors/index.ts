@@ -28,6 +28,7 @@ import './powerpoint';
 import './opendocument';
 import './rtf';
 import './binary';
+import './ofd';  // 【新增】OFD 版式文档提取器
 
 // 文本文件提取器
 export { extractTextFile } from './text/text-extractor';
@@ -53,6 +54,9 @@ export { extractWithBinary, extractTextFromBinary } from './binary/binary-extrac
 
 // OpenDocument 提取器
 export { extractOdt, extractOds, extractOdp } from './opendocument/opendocument-extractor';
+
+// OFD 版式文档提取器
+export { extractOfd } from './ofd/ofd-extractor';
 
 // RTF 富文本提取器
 export { extractRtf } from './rtf/rtf-extractor';
