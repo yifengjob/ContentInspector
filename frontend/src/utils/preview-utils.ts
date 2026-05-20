@@ -3,39 +3,11 @@
  */
 
 /**
- * 支持原生预览的文件格式列表（使用 jit-viewer）
+ * 支持原生预览的文件格式配置
+ * 【优化】单一数据源，同时定义格式和描述，避免重复维护
  */
-export const SUPPORTED_NATIVE_FORMATS = [
+const NATIVE_PREVIEW_CONFIG = {
   // Office 格式
-  'docx',
-  'xlsx',
-  'xls',
-  'pptx',
-  'ppt',
-  // PDF
-  'pdf',
-  // 国产格式
-  'ofd',
-  // 文本格式
-  'md',
-  'markdown',
-  'txt',
-  // 代码文件
-  'js',
-  'ts',
-  'py',
-  'java',
-  'htm',
-  'html',
-  'css',
-] as const;
-
-/**
- * 文件类型描述映射表
- * 【优化】从 SUPPORTED_NATIVE_FORMATS 自动生成键，避免重复维护
- */
-const FILE_TYPE_DESCRIPTIONS: Record<(typeof SUPPORTED_NATIVE_FORMATS)[number], string> = {
-  // Office
   docx: 'Word 文档',
   xlsx: 'Excel 表格',
   xls: 'Excel 表格',
@@ -43,21 +15,34 @@ const FILE_TYPE_DESCRIPTIONS: Record<(typeof SUPPORTED_NATIVE_FORMATS)[number], 
   ppt: 'PowerPoint 演示文稿',
   // PDF
   pdf: 'PDF 文档',
-  // OFD
+  // 国产格式
   ofd: 'OFD 版式文档',
-  // 文本
+  // 文本格式
   md: 'Markdown 文档',
   markdown: 'Markdown 文档',
   txt: '纯文本文件',
-  // 代码
+  // 代码文件
   js: 'JavaScript 文件',
   ts: 'TypeScript 文件',
   py: 'Python 文件',
   java: 'Java 文件',
-  html: 'HTML 文件',
   htm: 'HTML 文件',
+  html: 'HTML 文件',
   css: 'CSS 样式表',
-};
+} as const;
+
+/**
+ * 支持原生预览的文件格式列表（从配置中提取）
+ */
+export const SUPPORTED_NATIVE_FORMATS = Object.keys(
+  NATIVE_PREVIEW_CONFIG
+) as (keyof typeof NATIVE_PREVIEW_CONFIG)[];
+
+/**
+ * 文件类型描述映射表（从配置中提取）
+ */
+const FILE_TYPE_DESCRIPTIONS: Record<keyof typeof NATIVE_PREVIEW_CONFIG, string> =
+  NATIVE_PREVIEW_CONFIG;
 
 /**
  * 获取文件扩展名
